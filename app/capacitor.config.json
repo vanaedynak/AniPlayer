@@ -1,0 +1,12 @@
+{
+  "appId": "app.aniplayer.ios",
+  "appName": "AniPlayer",
+  "webDir": "dist",
+  "backgroundColor": "#09090d",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#09090d",
+    "allowsLinkPreview": false,
+    "preferredContentMode": "desktop"
+  }
+}

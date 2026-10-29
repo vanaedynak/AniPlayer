@@ -1,0 +1,114 @@
+name: Build apps
+
+on:
+  push:
+    branches: [main]
+    paths: ['app/**', '.github/workflows/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    name: iPad (unsigned IPA)
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+      - name: Create iOS project
+        run: |
+          npx cap add ios
+          npx cap sync ios
+
+      - name: App icon
+        run: npx --yes @capacitor/assets@3 generate --ios --assetPath resources --iconBackgroundColor '#09090d'
+
+      - name: Patch Info.plist
+        run: |
+          P=ios/App/App/Info.plist
+          pb() { /usr/libexec/PlistBuddy -c "$1" "$P" || true; }
+          pb "Set :CFBundleDisplayName AniPlayer"
+          pb "Add :UIBackgroundModes array"
+          pb "Add :UIBackgroundModes:0 string audio"
+          pb "Add :UIStatusBarStyle string UIStatusBarStyleLightContent"
+          pb "Delete :UIViewControllerBasedStatusBarAppearance"
+          pb "Add :UIViewControllerBasedStatusBarAppearance bool false"
+          pb "Add :UIRequiresFullScreen bool false"
+          pb "Delete :UISupportedInterfaceOrientations~ipad"
+          pb "Add :UISupportedInterfaceOrientations~ipad array"
+          pb "Add :UISupportedInterfaceOrientations~ipad:0 string UIInterfaceOrientationPortrait"
+          pb "Add :UISupportedInterfaceOrientations~ipad:1 string UIInterfaceOrientationPortraitUpsideDown"
+          pb "Add :UISupportedInterfaceOrientations~ipad:2 string UIInterfaceOrientationLandscapeLeft"
+          pb "Add :UISupportedInterfaceOrientations~ipad:3 string UIInterfaceOrientationLandscapeRight"
+          pb "Set :CFBundleShortVersionString $(node -p "require('./package.json').version")"
+          pb "Set :CFBundleVersion ${{ github.run_number }}"
+
+      - name: Build unsigned app
+        run: |
+          cd ios/App
+          if [ -d App.xcworkspace ]; then TARGET="-workspace App.xcworkspace"; else TARGET="-project App.xcodeproj"; fi
+          xcodebuild $TARGET -scheme App -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build | tail -30
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/App.app Payload/
+          zip -qry ../../AniPlayer.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AniPlayer-ipa
+          path: app/AniPlayer.ipa
+
+  windows:
+    name: Windows installer
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npx electron-builder --win --x64 --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AniPlayer-windows
+          path: app/release/*.exe
+
+  release:
+    name: Publish "latest" release
+    needs: [ios, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Replace rolling release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest out/* --title "AniPlayer build ${{ github.run_number }}" \
+            --notes "IPA для iPad (ставится через Sideloadly/AltStore) и установщик для Windows. Сборка из ${GITHUB_SHA::7}." --latest
