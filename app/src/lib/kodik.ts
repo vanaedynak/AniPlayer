@@ -3,7 +3,8 @@
 import { CapacitorHttp } from '@capacitor/core'
 import { isElectron, isNative } from './platform'
 
-const HOSTS = ['https://kodikapi.com', 'https://kodik-api.com']
+// kodikapi.com no longer resolves; kodik-api.com is the live API host
+const HOSTS = ['https://kodik-api.com']
 
 export interface KodikResult {
   id: string
@@ -53,7 +54,7 @@ export async function kodikDubs(token: string, shikimoriId: number): Promise<Dub
     }
   }
   if (!data) throw lastErr
-  if (data.error) throw new Error(data.error)
+  if (data.error) throw new Error(`Kodik отклонил токен: «${data.error}». Нужен действующий API‑токен Kodik.`)
 
   const map = new Map<number, Dub>()
   for (const r of data.results ?? []) {
