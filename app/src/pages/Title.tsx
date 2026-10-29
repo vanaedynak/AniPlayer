@@ -83,9 +83,12 @@ export default function Title() {
 
   return (
     <div className="flex flex-col gap-10">
-      <div className="animate-fade-up relative overflow-hidden rounded-[32px] ring-1 ring-white/5">
-        <img src={banner} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl" />
-        <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/70 to-bg/30" />
+      <div className="animate-fade-up relative z-10 rounded-[32px] ring-1 ring-white/5">
+        {/* background is clipped on its own so dropdowns can overflow the banner */}
+        <div className="absolute inset-0 overflow-hidden rounded-[32px]">
+          <img src={banner} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl" />
+          <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/70 to-bg/30" />
+        </div>
         <div className="relative flex flex-col gap-6 p-6 sm:flex-row sm:p-10">
           <img src={posterUrl(r)} alt="" className="w-44 shrink-0 self-center rounded-3xl shadow-2xl shadow-black/60 ring-1 ring-white/10 sm:w-60 sm:self-start" />
           <div className="flex min-w-0 flex-col gap-4">

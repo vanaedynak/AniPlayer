@@ -1,7 +1,10 @@
-const { contextBridge, ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer, webFrame } = require('electron')
 
 contextBridge.exposeInMainWorld('aniplayer', {
   isElectron: true,
+  setZoom(factor) {
+    webFrame.setZoomFactor(factor)
+  },
   onBeforeClose(cb) {
     ipcRenderer.on('before-close', async () => {
       try {

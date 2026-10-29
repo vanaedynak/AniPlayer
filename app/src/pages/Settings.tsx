@@ -1,10 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Cloud, LogOut, Link2, PlayCircle, Database, Check, ExternalLink, Loader2 } from 'lucide-react'
+import { Cloud, LogOut, Link2, PlayCircle, Database, Check, ExternalLink, Loader2, ZoomIn } from 'lucide-react'
 import { useSync, getFirebaseConfig, saveFirebaseConfig, signIn, logOut } from '../lib/sync'
 import { anilistViewer, anilistAuthUrl } from '../lib/anilist'
 import { useStore } from '../lib/store'
 import { Panel, PanelTitle } from '../components/ui'
 import { cn } from '../lib/format'
+import { SCALES } from '../lib/platform'
 
 const input = 'h-12 w-full rounded-2xl bg-white/[0.06] px-4 font-semibold ring-1 ring-white/10 outline-none focus:ring-accent/60 placeholder:text-dim'
 const btn = 'h-12 rounded-2xl px-5 font-bold transition disabled:opacity-50'
@@ -241,6 +242,31 @@ function PlayerSettings() {
   )
 }
 
+function InterfaceSettings() {
+  const scale = useStore((s) => s.local.scale)
+  const setLocal = useStore((s) => s.setLocal)
+  return (
+    <Panel>
+      <PanelTitle icon={<ZoomIn className="text-pink" />} title="Интерфейс" sub="Масштаб для этого устройства" />
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+        <span className="font-bold">Масштаб</span>
+        <div className="flex flex-wrap gap-1 rounded-full bg-white/[0.06] p-1">
+          {SCALES.map((sc) => (
+            <button
+              key={sc}
+              onClick={() => setLocal({ scale: sc })}
+              className={cn('rounded-full px-3.5 py-1.5 text-sm font-bold', scale === sc ? 'bg-white text-black' : 'text-white/70 hover:text-white')}
+            >
+              {Math.round(sc * 100)}%
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mt-3 px-1 text-sm text-muted">На компьютере также работают Ctrl + плюс / минус / 0.</div>
+    </Panel>
+  )
+}
+
 function DataSettings() {
   const [done, setDone] = useState(false)
   const exportData = () => {
@@ -267,6 +293,7 @@ export default function Settings() {
     <div className="flex max-w-4xl flex-col gap-6">
       <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Настройки</h1>
       <SyncSettings />
+      <InterfaceSettings />
       <AniListSettings />
       <PlayerSettings />
       <DataSettings />

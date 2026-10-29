@@ -1,16 +1,42 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#b9a2ff"/>
-      <stop offset="0.55" stop-color="#8b5cf6"/>
-      <stop offset="1" stop-color="#5b21b6"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b1037"/>
+      <stop offset="0.55" stop-color="#3b1680"/>
+      <stop offset="1" stop-color="#c0267d"/>
     </linearGradient>
-    <radialGradient id="h" cx="0.3" cy="0.2" r="0.8">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    <radialGradient id="glow" cx="0.5" cy="0.47" r="0.5">
+      <stop offset="0" stop-color="#c4b5fd" stop-opacity="0.55"/>
+      <stop offset="0.6" stop-color="#8b5cf6" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/>
     </radialGradient>
+    <linearGradient id="moon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fde68a"/>
+      <stop offset="1" stop-color="#f9a8d4"/>
+    </linearGradient>
+    <linearGradient id="play" x1="0" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e9d5ff"/>
+    </linearGradient>
+    <mask id="crescent">
+      <rect width="512" height="512" fill="#000"/>
+      <circle cx="256" cy="244" r="168" fill="#fff"/>
+      <circle cx="300" cy="206" r="150" fill="#000"/>
+    </mask>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10"/>
+    </filter>
   </defs>
-  <rect width="512" height="512" rx="112" fill="url(#g)"/>
-  <rect width="512" height="512" rx="112" fill="url(#h)"/>
-  <path d="M196 148c0-14 15-23 27-16l160 108c11 7 11 25 0 32L223 380c-12 8-27-1-27-16z" fill="#fff"/>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="256" cy="244" r="230" fill="url(#glow)"/>
+  <!-- crescent moon wrapping the play button -->
+  <rect width="512" height="512" fill="url(#moon)" mask="url(#crescent)" opacity="0.95"/>
+  <rect width="512" height="512" fill="url(#moon)" mask="url(#crescent)" filter="url(#soft)" opacity="0.6"/>
+  <!-- play -->
+  <path d="M222 178c0-13 14-21 25-14l118 76c10 6.5 10 21.5 0 28l-118 76c-11 7-25-1-25-14z" fill="url(#play)"/>
+  <!-- sparkles -->
+  <path d="M392 120l7 19 19 7-19 7-7 19-7-19-19-7 19-7z" fill="#fff"/>
+  <path d="M120 360l5 13 13 5-13 5-5 13-5-13-13-5 13-5z" fill="#fff" opacity="0.85"/>
+  <circle cx="404" cy="372" r="5" fill="#fff" opacity="0.7"/>
+  <circle cx="132" cy="140" r="4" fill="#fff" opacity="0.6"/>
 </svg>

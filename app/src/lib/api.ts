@@ -165,3 +165,29 @@ export function episodePreview(e: Episode | undefined | null) {
 export function sortedEpisodes(r: Release) {
   return [...(r.episodes ?? [])].sort((a, b) => a.sort_order - b.sort_order || a.ordinal - b.ordinal)
 }
+
+// AniSkip: crowd-sourced opening/ending times keyed by MAL id + episode number
+type Segment = { start: number; stop: number }
+const skipCache = new Map<string, Promise<{ op?: Segment; ed?: Segment }>>()
+export function aniskip(malId: number, episode: number, length = 0) {
+  const key = `${malId}:${episode}`
+  if (!skipCache.has(key)) {
+    const url = `https://api.aniskip.com/v2/skip-times/${malId}/${episode}?types[]=op&types[]=ed&episodeLength=${Math.round(length)}`
+    skipCache.set(
+      key,
+      fetch(url)
+        .then((r) => r.json())
+        .then((d: { found: boolean; results?: { skipType: string; interval: { startTime: number; endTime: number } }[] }) => {
+          const out: { op?: Segment; ed?: Segment } = {}
+          for (const r of d.results ?? []) {
+            const seg = { start: r.interval.startTime, stop: r.interval.endTime }
+            if (r.skipType === 'op') out.op = seg
+            if (r.skipType === 'ed') out.ed = seg
+          }
+          return out
+        })
+        .catch(() => ({})),
+    )
+  }
+  return skipCache.get(key)!
+}

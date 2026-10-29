@@ -4,6 +4,7 @@ import { flushAll } from './sync'
 interface ElectronBridge {
   isElectron: true
   onBeforeClose: (cb: () => Promise<void>) => void
+  setZoom: (factor: number) => void
 }
 
 declare global {
@@ -54,5 +55,27 @@ export function initLifecycle() {
   window.aniplayer?.onBeforeClose(async () => {
     saveAll()
     await flushAll(3000)
+  })
+}
+
+export const SCALES = [0.75, 0.85, 0.9, 1, 1.1, 1.25]
+
+/** interface scale: Electron zooms natively, iPad/browser use CSS zoom */
+export function applyScale(scale: number) {
+  if (window.aniplayer?.setZoom) window.aniplayer.setZoom(scale)
+  else document.documentElement.style.setProperty('zoom', String(scale))
+}
+
+export function initScale(get: () => number, set: (s: number) => void) {
+  applyScale(get())
+  window.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return
+    const i = SCALES.indexOf(get())
+    const cur = i < 0 ? SCALES.indexOf(1) : i
+    if (e.key === '=' || e.key === '+') set(SCALES[Math.min(SCALES.length - 1, cur + 1)])
+    else if (e.key === '-') set(SCALES[Math.max(0, cur - 1)])
+    else if (e.key === '0') set(1)
+    else return
+    e.preventDefault()
   })
 }

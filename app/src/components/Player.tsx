@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
 import Hls from 'hls.js'
 import {
   Play,
@@ -20,7 +20,7 @@ import {
   FastForward,
   Loader2,
 } from 'lucide-react'
-import { episodePreview, type Episode, type Release } from '../lib/api'
+import { episodePreview, aniskip, type Episode, type Release } from '../lib/api'
 import { useStore, getProgress, progressKey, WATCHED_RATIO } from '../lib/store'
 import { waitForFirstSync } from '../lib/sync'
 import { anilistReportEpisode } from '../lib/anilist'
@@ -84,8 +84,23 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
   const resumeAt = useRef<number | null>(null)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-  const op = episode.opening?.start != null && episode.opening?.stop ? episode.opening : null
-  const ed = episode.ending?.start != null && episode.ending?.stop ? episode.ending : null
+  // AniLibria's own markup first, AniSkip (crowd-sourced, by MAL id) when it's missing
+  const ownOp = episode.opening?.start != null && episode.opening?.stop ? episode.opening : null
+  const ownEd = episode.ending?.start != null && episode.ending?.stop ? episode.ending : null
+  const [extSkip, setExtSkip] = useState<{ op?: { start: number; stop: number }; ed?: { start: number; stop: number } }>({})
+  useEffect(() => {
+    setExtSkip({})
+    const mal = release.mal?.id
+    if (!mal || (ownOp && ownEd)) return
+    let alive = true
+    aniskip(mal, Math.floor(episode.ordinal), episode.duration ?? 0).then((r) => alive && setExtSkip(r))
+    return () => {
+      alive = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [episode.id])
+  const op = useMemo(() => ownOp ?? extSkip.op ?? null, [ownOp, extSkip.op])
+  const ed = useMemo(() => ownEd ?? extSkip.ed ?? null, [ownEd, extSkip.ed])
 
   // ---------- saving ----------
   const save = useCallback(

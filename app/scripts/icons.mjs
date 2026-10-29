@@ -11,5 +11,5 @@ mkdirSync('resources', { recursive: true })
 render(512, 'build/icon.png')
 render(256, 'public/icon-256.png')
 // iOS icons must be opaque and square: drop the rounded corners
-render(1024, 'resources/icon.png', svg.replace('rx="112"', 'rx="0"'))
+render(1024, 'resources/icon.png', svg.replace('rx="112" fill="url(#bg)"', 'fill="url(#bg)"'))
 console.log('icons written')

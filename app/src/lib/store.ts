@@ -61,6 +61,7 @@ export interface LocalPrefs {
   volume: number
   muted: boolean
   rate: number
+  scale: number
 }
 
 export const progressKey = (releaseId: number, ordinal: number) => `${releaseId}_${String(ordinal).replace('.', '-')}`
@@ -135,7 +136,7 @@ export const useStore = create<State>()(
         anilistSync: true,
         updatedAt: 0,
       },
-      local: { volume: 1, muted: false, rate: 1 },
+      local: { volume: 1, muted: false, rate: 1, scale: 1 },
 
       saveProgress: (p, force) => {
         const key = progressKey(p.releaseId, p.ordinal)
@@ -245,11 +246,12 @@ export const useStore = create<State>()(
     }),
     {
       name: 'aniplayer-store',
-      version: 2,
+      version: 3,
       // v2: auto-skip with a 5 second "watch it" window became the default
       migrate: (old, version) => {
         const st = old as State
         if (version < 2 && st?.prefs) st.prefs = { ...st.prefs, autoSkipOpening: true, autoSkipEnding: true }
+        if (version < 3 && st?.local) st.local = { ...st.local, scale: st.local.scale ?? 1 }
         return st
       },
     },

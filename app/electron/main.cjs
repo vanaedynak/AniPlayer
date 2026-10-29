@@ -1,6 +1,6 @@
 // Electron shell for Windows. Serves the built app from app://aniplayer so the
 // page has a proper secure origin (IndexedDB, Firebase Auth and CORS all behave).
-const { app, BrowserWindow, protocol, net, ipcMain, shell, nativeTheme } = require('electron')
+const { app, BrowserWindow, protocol, net, ipcMain, shell, nativeTheme, Menu } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 const { pathToFileURL } = require('node:url')
@@ -16,6 +16,8 @@ protocol.registerSchemesAsPrivileged([
 if (!app.requestSingleInstanceLock()) app.quit()
 
 nativeTheme.themeSource = 'dark'
+// no default menu: its zoom shortcuts would fight the in-app scale setting
+Menu.setApplicationMenu(null)
 let win = null
 
 function loadState() {

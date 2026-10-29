@@ -43,11 +43,7 @@ const TABS = [
 export function Logo() {
   return (
     <Link to="/" className="no-drag flex items-center gap-2.5">
-      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent-2 to-accent-3 shadow-lg shadow-accent/30">
-        <svg viewBox="0 0 24 24" className="ml-0.5 h-4 w-4 fill-white">
-          <path d="M7 4.5v15l12-7.5z" />
-        </svg>
-      </span>
+      <img src="favicon.svg" alt="" className="h-10 w-10 drop-shadow-[0_6px_18px_rgba(139,92,246,0.45)]" />
       <span className="text-[22px] font-extrabold tracking-tight">
         ani<span className="text-gradient">player</span>
       </span>
