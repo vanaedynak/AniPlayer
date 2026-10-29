@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Play, Info, Star, Shuffle, ChevronRight } from 'lucide-react'
 import { api, episodePreview, posterUrl, type Release } from '../lib/api'
 import { useAsync } from '../lib/useAsync'
-import { useStore, progressKey } from '../lib/store'
+import { useStore, progressKey, watchHref } from '../lib/store'
 import { Section, Row, ReleaseCard, WideCard, CardSkeletons, Skeleton } from '../components/ui'
 import { fmtTime, fmtOrdinal, cn } from '../lib/format'
 
@@ -94,7 +94,7 @@ export function ContinueRow() {
           return (
             <WideCard
               key={t.releaseId}
-              to={`/watch/${t.alias}/${t.lastOrdinal}`}
+              to={watchHref(t.alias, t.lastOrdinal!)}
               image={p?.preview || t.lastPreview || t.poster}
               title={t.name}
               subtitle={`${fmtOrdinal(t.lastOrdinal!)} серия`}

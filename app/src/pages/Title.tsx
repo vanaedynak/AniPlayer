@@ -150,6 +150,14 @@ export default function Title() {
                 </Link>
               )}
               <StatusPicker r={r} />
+              {r.mal?.id ? (
+                <Link
+                  to={`/anime/${r.mal.id}?kodik=1`}
+                  className="flex h-12 items-center rounded-full bg-white/10 px-5 font-bold ring-1 ring-white/10 transition hover:bg-white/15"
+                >
+                  Другие озвучки
+                </Link>
+              ) : null}
             </div>
           </div>
         </div>

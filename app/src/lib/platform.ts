@@ -5,6 +5,7 @@ interface ElectronBridge {
   isElectron: true
   onBeforeClose: (cb: () => Promise<void>) => void
   setZoom: (factor: number) => void
+  fetchText?: (url: string) => Promise<string>
 }
 
 declare global {

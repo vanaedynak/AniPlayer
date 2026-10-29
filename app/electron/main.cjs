@@ -85,6 +85,14 @@ function createWindow() {
   else win.loadURL('app://aniplayer/index.html')
 }
 
+// Kodik's API has no CORS headers; only its API host may be fetched this way
+ipcMain.handle('fetch-text', async (_e, url) => {
+  const { hostname } = new URL(url)
+  if (!/(^|\.)kodik-?api\.com$/.test(hostname)) throw new Error('host not allowed')
+  const res = await net.fetch(url)
+  return res.text()
+})
+
 ipcMain.on('close-ok', () => win && !win.isDestroyed() && win.destroy())
 
 app.on('second-instance', () => {

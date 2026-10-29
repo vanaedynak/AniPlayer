@@ -6,6 +6,7 @@ import Search from './pages/Search'
 import Schedule from './pages/Schedule'
 import Title from './pages/Title'
 import Watch from './pages/Watch'
+import Anime from './pages/Anime'
 import History from './pages/History'
 import Collection from './pages/Collection'
 import Stats from './pages/Stats'
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/title/:alias" element={<Title />} />
           <Route path="/watch/:alias/:ordinal" element={<Watch />} />
+          <Route path="/anime/:id" element={<Anime />} />
           <Route path="/history" element={<History />} />
           <Route path="/collection" element={<Collection />} />
           <Route path="/stats" element={<Stats />} />

@@ -4,6 +4,8 @@ import { ChevronLeft, ChevronRight, Star, Check, Play } from 'lucide-react'
 import { posterUrl, episodePreview, type Release, type Episode } from '../lib/api'
 import { useStore, progressKey, releaseProgress } from '../lib/store'
 import { fmtTime, fmtOrdinal, cn } from '../lib/format'
+import { shImg, shikiTitle, KINDS, type ShikiAnime } from '../lib/shikimori'
+import { useLibriaIndex } from '../lib/libriaIndex'
 
 export function Section({ title, action, children, className }: { title: ReactNode; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
@@ -248,5 +250,36 @@ export function PanelTitle({ icon, title, sub }: { icon: ReactNode; title: strin
         {sub && <div className="text-sm font-semibold text-muted">{sub}</div>}
       </div>
     </div>
+  )
+}
+
+/** card for a Shikimori entry; marks titles AniLibria has voiced */
+export function ShikiCard({ a }: { a: ShikiAnime }) {
+  const libria = useLibriaIndex((s) => s.byMal[a.id])
+  return (
+    <Link to={libria ? `/title/${libria.alias}` : `/anime/${a.id}`} className="group block">
+      <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-card ring-1 ring-white/5 transition duration-300 group-hover:-translate-y-1 group-hover:shadow-2xl group-hover:shadow-accent/15 group-hover:ring-white/15">
+        <img src={shImg(a.image.original)} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-80" />
+        <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
+          {Number(a.score) > 0 && (
+            <span className="glass flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold">
+              <Star size={12} className="fill-yellow-400 text-yellow-400" /> {a.score}
+            </span>
+          )}
+          {a.status === 'ongoing' && <span className="rounded-lg bg-accent px-2 py-1 text-xs font-bold">Онгоинг</span>}
+        </div>
+        {libria && <span className="absolute right-2 bottom-2 rounded-lg bg-white px-2 py-1 text-[11px] font-extrabold text-black">AniLibria</span>}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 transition group-hover:opacity-100">
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/95 text-black shadow-xl">
+            <Play fill="currentColor" className="ml-1" />
+          </span>
+        </div>
+      </div>
+      <div className="mt-2.5 line-clamp-2 text-[15px] leading-snug font-bold">{shikiTitle(a)}</div>
+      <div className="mt-0.5 text-xs font-medium text-muted">
+        {[a.kind ? KINDS[a.kind] ?? a.kind : null, a.aired_on?.slice(0, 4), a.episodes ? `${a.episodes} эп.` : null].filter(Boolean).join(' · ')}
+      </div>
+    </Link>
   )
 }

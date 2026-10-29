@@ -2,13 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Search as SearchIcon, X, SearchX } from 'lucide-react'
 import { api, type Release } from '../lib/api'
-import { ReleaseCard, CardSkeletons, Empty } from '../components/ui'
+import { shiki, type ShikiAnime } from '../lib/shikimori'
+import { ReleaseCard, ShikiCard, CardSkeletons, Empty } from '../components/ui'
 
 export default function Search() {
   const [sp, setSp] = useSearchParams()
   const [q, setQ] = useState(sp.get('q') ?? '')
   const [items, setItems] = useState<Release[] | null>(null)
   const [loading, setLoading] = useState(false)
+  const [others, setOthers] = useState<ShikiAnime[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -20,6 +22,7 @@ export default function Search() {
     setSp(query ? { q: query } : {}, { replace: true })
     if (query.length < 2) {
       setItems(null)
+      setOthers([])
       return
     }
     setLoading(true)
@@ -32,6 +35,10 @@ export default function Search() {
         })
         .catch(() => setItems([]))
         .finally(() => setLoading(false))
+      shiki
+        .list({ search: query, limit: 30, order: 'popularity', kind: '!music' })
+        .then(setOthers)
+        .catch(() => setOthers([]))
     }, 300)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -54,15 +61,32 @@ export default function Search() {
           </button>
         )}
       </div>
+      {items !== null && items.length > 0 && <h2 className="text-xl font-extrabold">В озвучке AniLibria</h2>}
       {items === null && !loading ? (
         <Empty icon={<SearchIcon />} title="Что посмотрим?" text="Начните вводить название — результаты появятся сразу." />
-      ) : items?.length === 0 && !loading ? (
+      ) : items?.length === 0 && !loading && others.length === 0 ? (
         <Empty icon={<SearchX />} title="Ничего не нашлось" text="Попробуйте другое написание или английское название." />
       ) : (
         <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
           {loading ? <CardSkeletons n={12} /> : items!.map((r) => <ReleaseCard key={r.id} r={r} />)}
         </div>
       )}
+      {(() => {
+        const mine = new Set((items ?? []).map((r) => r.mal?.id))
+        const rest = others.filter((a) => !mine.has(a.id))
+        return rest.length ? (
+          <section className="flex flex-col gap-4">
+            <h2 className="text-xl font-extrabold">
+              Другие аниме <span className="text-sm font-semibold text-muted">· Shikimori, смотреть через Kodik</span>
+            </h2>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+              {rest.map((a) => (
+                <ShikiCard key={a.id} a={a} />
+              ))}
+            </div>
+          </section>
+        ) : null
+      })()}
     </div>
   )
 }

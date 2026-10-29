@@ -2,6 +2,9 @@ const { contextBridge, ipcRenderer, webFrame } = require('electron')
 
 contextBridge.exposeInMainWorld('aniplayer', {
   isElectron: true,
+  fetchText(url) {
+    return ipcRenderer.invoke('fetch-text', url)
+  },
   setZoom(factor) {
     webFrame.setZoomFactor(factor)
   },

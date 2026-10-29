@@ -53,6 +53,7 @@ export interface SyncedPrefs {
   autoNext: boolean
   anilistToken: string
   anilistSync: boolean
+  kodikToken: string
   updatedAt: number
 }
 
@@ -134,6 +135,7 @@ export const useStore = create<State>()(
         autoNext: true,
         anilistToken: '',
         anilistSync: true,
+        kodikToken: '',
         updatedAt: 0,
       },
       local: { volume: 1, muted: false, rate: 1, scale: 1 },
@@ -264,3 +266,8 @@ export const getProgress = (releaseId: number, ordinal: number) =>
 export function releaseProgress(progress: Record<string, Progress>, releaseId: number) {
   return Object.values(progress).filter((p) => p.releaseId === releaseId)
 }
+
+/** routes for an entry: Shikimori/Kodik titles use /anime/:id, AniLibria ones /title and /watch */
+export const titleHref = (alias: string) => (alias.startsWith('shiki-') ? `/anime/${alias.slice(6)}` : `/title/${alias}`)
+export const watchHref = (alias: string, ordinal: number) =>
+  alias.startsWith('shiki-') ? `/anime/${alias.slice(6)}?ep=${ordinal}` : `/watch/${alias}/${ordinal}`

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Library } from 'lucide-react'
-import { useStore, releaseProgress, LIST_LABELS, LIST_COLORS, type ListStatus, type TitleEntry } from '../lib/store'
+import { useStore, releaseProgress, titleHref, LIST_LABELS, LIST_COLORS, type ListStatus, type TitleEntry } from '../lib/store'
 import { Chip, Empty } from '../components/ui'
 
 type Tab = ListStatus | 'favorite'
@@ -10,7 +10,7 @@ function EntryCard({ t }: { t: TitleEntry }) {
   const progress = useStore((s) => s.progress)
   const watched = releaseProgress(progress, t.releaseId).filter((p) => p.watched).length
   return (
-    <Link to={`/title/${t.alias}`} className="group block">
+    <Link to={titleHref(t.alias)} className="group block">
       <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-card ring-1 ring-white/5 transition duration-300 group-hover:-translate-y-1 group-hover:ring-white/15">
         <img src={t.poster} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />

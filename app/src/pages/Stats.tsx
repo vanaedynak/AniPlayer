@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { BarChart3, Flame, Trophy, ArrowRight } from 'lucide-react'
-import { useStore, dayKey, LIST_LABELS, LIST_COLORS, type ListStatus } from '../lib/store'
+import { useStore, dayKey, titleHref, LIST_LABELS, LIST_COLORS, type ListStatus } from '../lib/store'
 import { Panel, PanelTitle } from '../components/ui'
 import { cn, plural } from '../lib/format'
 
@@ -151,7 +151,7 @@ export default function Stats() {
           <PanelTitle icon={<Trophy className="text-yellow-400" />} title="Больше всего серий" />
           <div className="flex flex-col gap-2">
             {s.top.map(({ t, n }, i) => (
-              <Link key={t.releaseId} to={`/title/${t.alias}`} className="flex items-center gap-4 rounded-2xl p-2 hover:bg-white/5">
+              <Link key={t.releaseId} to={titleHref(t.alias)} className="flex items-center gap-4 rounded-2xl p-2 hover:bg-white/5">
                 <span className="w-6 text-center text-lg font-extrabold text-dim">{i + 1}</span>
                 <img src={t.poster} alt="" className="h-16 w-11 rounded-lg object-cover" />
                 <div className="min-w-0 flex-1">

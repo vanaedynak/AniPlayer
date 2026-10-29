@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Cloud, LogOut, Link2, PlayCircle, Database, Check, ExternalLink, Loader2, ZoomIn } from 'lucide-react'
+import { Cloud, LogOut, Link2, PlayCircle, Database, Check, ExternalLink, Loader2, ZoomIn, Film } from 'lucide-react'
 import { useSync, getFirebaseConfig, saveFirebaseConfig, signIn, logOut } from '../lib/sync'
 import { anilistViewer, anilistAuthUrl } from '../lib/anilist'
 import { useStore } from '../lib/store'
@@ -216,6 +216,37 @@ function AniListSettings() {
   )
 }
 
+function KodikSettings() {
+  const token = useStore((s) => s.prefs.kodikToken)
+  const setPrefs = useStore((s) => s.setPrefs)
+  const [val, setVal] = useState('')
+  return (
+    <Panel>
+      <PanelTitle icon={<Film className="text-orange-400" />} title="Kodik" sub="Аниме, которых нет у AniLibria: другие озвучки через плеер Kodik" />
+      {token ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="font-semibold text-emerald-400">Токен сохранён · синхронизируется на iPad</div>
+          <button className={cn(btn, 'bg-white/10 hover:bg-white/15')} onClick={() => setPrefs({ kodikToken: '' })}>
+            Удалить
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-white/75">
+            Kodik выдаёт API‑токен по запросу (инструкция в SETUP.md). Без токена работает всё, кроме тайтлов, которых нет у AniLibria.
+          </p>
+          <div className="flex gap-2">
+            <input className={input} placeholder="API‑токен Kodik" value={val} onChange={(e) => setVal(e.target.value)} />
+            <button className={cn(btn, 'bg-white text-black')} disabled={!val.trim()} onClick={() => setPrefs({ kodikToken: val.trim() })}>
+              Сохранить
+            </button>
+          </div>
+        </div>
+      )}
+    </Panel>
+  )
+}
+
 function PlayerSettings() {
   const prefs = useStore((s) => s.prefs)
   const setPrefs = useStore((s) => s.setPrefs)
@@ -295,6 +326,7 @@ export default function Settings() {
       <SyncSettings />
       <InterfaceSettings />
       <AniListSettings />
+      <KodikSettings />
       <PlayerSettings />
       <DataSettings />
       <div className="px-2 text-xs text-dim">AniPlayer · видео и озвучка AniLibria (anilibria.top) · неофициальный клиент для личного использования</div>

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Clock, History as HistoryIcon, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { useStore, type Progress, type TitleEntry } from '../lib/store'
+import { useStore, watchHref, type Progress, type TitleEntry } from '../lib/store'
 import { WideCard, Empty, Chip } from '../components/ui'
 import { fmtTime, fmtOrdinal, cn } from '../lib/format'
 
@@ -84,7 +84,7 @@ export default function History() {
               {g.items.map(({ p, t }) => (
                 <WideCard
                   key={`${p.releaseId}_${p.ordinal}`}
-                  to={`/watch/${t.alias}/${p.ordinal}`}
+                  to={watchHref(t.alias, p.ordinal)}
                   image={p.preview || t.poster}
                   title={t.name}
                   subtitle={`${fmtOrdinal(p.ordinal)} серия · ${new Date(p.updatedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`}
@@ -100,7 +100,7 @@ export default function History() {
           {byTitle.map((t) => (
             <div key={t.releaseId} className="group relative">
               <WideCard
-                to={`/watch/${t.alias}/${t.lastOrdinal ?? 1}`}
+                to={watchHref(t.alias, t.lastOrdinal ?? 1)}
                 image={t.lastPreview || t.poster}
                 title={t.name}
                 subtitle={`${fmtOrdinal(t.lastOrdinal ?? 1)} серия${t.episodesTotal ? ` из ${t.episodesTotal}` : ''}`}

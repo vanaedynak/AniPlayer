@@ -5,6 +5,7 @@ import { api, SORTINGS, TYPES, SEASONS, type Release, type CatalogParams } from 
 import { useAsync } from '../lib/useAsync'
 import { ReleaseCard, CardSkeletons, Chip, Empty } from '../components/ui'
 import { cn } from '../lib/format'
+import ShikiCatalog from './ShikiCatalog'
 
 function Select({ value, onChange, options, placeholder }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; placeholder: string }) {
   return (
@@ -27,7 +28,44 @@ function Select({ value, onChange, options, placeholder }: { value: string; onCh
   )
 }
 
+function SourceTabs() {
+  const [sp, setSp] = useSearchParams()
+  const all = sp.get('src') === 'all'
+  return (
+    <div className="flex gap-1 self-start rounded-full bg-card-2 p-1 ring-1 ring-white/5">
+      {[
+        { v: '', label: 'AniLibria' },
+        { v: 'all', label: 'Все аниме' },
+      ].map((t) => (
+        <button
+          key={t.v}
+          onClick={() => setSp(t.v ? { src: t.v } : {}, { replace: true })}
+          className={cn('rounded-full px-5 py-2 text-sm font-bold transition', (t.v === 'all') === all ? 'bg-white text-black' : 'text-white/70 hover:text-white')}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function Catalog() {
+  const [sp] = useSearchParams()
+  if (sp.get('src') === 'all')
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Каталог</h1>
+          <div className="mt-1 text-sm font-semibold text-muted">Все аниме с Shikimori. С пометкой AniLibria открываются в нашем плеере, остальные через Kodik</div>
+        </div>
+        <SourceTabs />
+        <ShikiCatalog Select={Select} />
+      </div>
+    )
+  return <LibriaCatalog />
+}
+
+function LibriaCatalog() {
   const [sp, setSp] = useSearchParams()
   const genres = useAsync(() => api.genres(), [])
   const years = useAsync(() => api.years(), [])
@@ -107,6 +145,7 @@ export default function Catalog() {
           <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Каталог</h1>
           <div className="mt-1 text-sm font-semibold text-muted">{total != null ? `${total} тайтлов в озвучке AniLibria` : 'Загрузка…'}</div>
         </div>
+        <SourceTabs />
         {activeCount > 0 && (
           <button onClick={() => setSp(new URLSearchParams(), { replace: true })} className="flex items-center gap-1 text-sm font-bold text-muted hover:text-white">
             <X size={16} /> Сбросить ({activeCount})
