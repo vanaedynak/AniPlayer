@@ -4,6 +4,7 @@ import { useSync, getFirebaseConfig, saveFirebaseConfig, signIn, logOut } from '
 import { anilistViewer, anilistAuthUrl } from '../lib/anilist'
 import { useStore } from '../lib/store'
 import { Panel, PanelTitle } from '../components/ui'
+import { UpdateSettings } from '../components/Updates'
 import { cn } from '../lib/format'
 import { SCALES } from '../lib/platform'
 
@@ -292,6 +293,7 @@ export default function Settings() {
   return (
     <div className="flex max-w-4xl flex-col gap-6">
       <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Настройки</h1>
+      <UpdateSettings />
       <SyncSettings />
       <InterfaceSettings />
       <AniListSettings />

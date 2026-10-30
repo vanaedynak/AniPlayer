@@ -28,6 +28,7 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
       - run: npm ci
+      - run: npm version 1.0.${{ github.run_number }} --no-git-tag-version
       - run: npm run build
 
       - name: Create iOS project
@@ -88,12 +89,17 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
       - run: npm ci
+      # every build gets a higher version so installed apps see it as an update
+      - run: npm version 1.0.${{ github.run_number }} --no-git-tag-version
       - run: npm run build
       - run: npx electron-builder --win --x64 --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: AniPlayer-windows
-          path: app/release/*.exe
+          path: |
+            app/release/*.exe
+            app/release/*.blockmap
+            app/release/latest.yml
 
   release:
     name: Publish "latest" release

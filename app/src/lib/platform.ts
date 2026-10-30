@@ -1,11 +1,23 @@
 // Runtime detection + app lifecycle hooks for Electron (Windows) and Capacitor (iPad)
 import { flushAll } from './sync'
 
+export type UpdateState =
+  | { status: 'idle' | 'checking' | 'latest' }
+  | { status: 'downloading'; version?: string; percent?: number }
+  | { status: 'ready'; version: string }
+  | { status: 'error'; message: string }
+
 interface ElectronBridge {
   isElectron: true
   onBeforeClose: (cb: () => Promise<void>) => void
   setZoom: (factor: number) => void
-  fetchText?: (url: string) => Promise<string>
+  version?: () => Promise<string>
+  updates?: {
+    get: () => Promise<UpdateState>
+    check: () => void
+    install: () => void
+    onChange: (cb: (s: UpdateState) => void) => () => void
+  }
 }
 
 declare global {
@@ -57,6 +69,13 @@ export function initLifecycle() {
     saveAll()
     await flushAll(3000)
   })
+}
+
+/** writes everything in flight, then lets Electron restart into the downloaded update */
+export async function installUpdate() {
+  saveAll()
+  await flushAll(3000)
+  window.aniplayer?.updates?.install()
 }
 
 export const SCALES = [0.75, 0.85, 0.9, 1, 1.1, 1.25]

@@ -20,6 +20,7 @@ import {
 import { api, posterUrl, type Release } from '../lib/api'
 import { useSync } from '../lib/sync'
 import { isElectron } from '../lib/platform'
+import { UpdatePill } from './Updates'
 import { cn } from '../lib/format'
 
 const NAV = [
@@ -225,6 +226,7 @@ function Header() {
           <Link to="/search" className="no-drag flex h-11 w-11 items-center justify-center rounded-full hover:bg-white/10 md:hidden">
             <Search size={20} />
           </Link>
+          <UpdatePill />
           <SyncBadge />
           <Link to="/settings" className="no-drag flex h-11 w-11 items-center justify-center rounded-full hover:bg-white/10">
             <Settings size={20} />

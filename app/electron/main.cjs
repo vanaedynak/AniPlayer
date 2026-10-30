@@ -4,6 +4,7 @@ const { app, BrowserWindow, protocol, net, ipcMain, shell, nativeTheme, Menu } =
 const path = require('node:path')
 const fs = require('node:fs')
 const { pathToFileURL } = require('node:url')
+const { autoUpdater } = require('electron-updater')
 
 const DEV_URL = process.env.VITE_DEV_URL
 const DIST = path.join(__dirname, '..', 'dist')
@@ -19,6 +20,7 @@ nativeTheme.themeSource = 'dark'
 // no default menu: its zoom shortcuts would fight the in-app scale setting
 Menu.setApplicationMenu(null)
 let win = null
+let updating = false
 
 function loadState() {
   try {
@@ -72,7 +74,7 @@ function createWindow() {
   let closing = false
   win.on('close', (e) => {
     saveState()
-    if (closing) return
+    if (closing || updating) return
     e.preventDefault()
     closing = true
     win.webContents.send('before-close')
@@ -85,12 +87,42 @@ function createWindow() {
   else win.loadURL('app://aniplayer/index.html')
 }
 
-// Kodik's API has no CORS headers; only its API host may be fetched this way
-ipcMain.handle('fetch-text', async (_e, url) => {
-  const { hostname } = new URL(url)
-  if (!/(^|\.)kodik-?api\.com$/.test(hostname)) throw new Error('host not allowed')
-  const res = await net.fetch(url)
-  return res.text()
+// updates: CI publishes the installer + latest.yml to the rolling GitHub release (see package.json "publish").
+// Downloads run in the background; the page shows a button once the new version is ready.
+let updateState = { status: 'idle' }
+function setUpdate(s) {
+  updateState = s
+  if (win && !win.isDestroyed()) win.webContents.send('update-state', s)
+}
+
+function checkForUpdates() {
+  if (!app.isPackaged) return setUpdate({ status: 'error', message: 'Обновления работают только в установленной версии' })
+  if (updateState.status === 'downloading' || updateState.status === 'ready') return
+  autoUpdater.checkForUpdates().catch((e) => setUpdate({ status: 'error', message: String(e?.message ?? e) }))
+}
+
+function initUpdater() {
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+  autoUpdater.on('checking-for-update', () => setUpdate({ status: 'checking' }))
+  autoUpdater.on('update-not-available', () => setUpdate({ status: 'latest' }))
+  autoUpdater.on('update-available', (i) => setUpdate({ status: 'downloading', version: i.version, percent: 0 }))
+  autoUpdater.on('download-progress', (p) => setUpdate({ ...updateState, status: 'downloading', percent: p.percent }))
+  autoUpdater.on('update-downloaded', (i) => setUpdate({ status: 'ready', version: i.version }))
+  autoUpdater.on('error', (e) => setUpdate({ status: 'error', message: String(e?.message ?? e) }))
+  if (!app.isPackaged) return
+  setTimeout(checkForUpdates, 5000)
+  setInterval(checkForUpdates, 2 * 60 * 60 * 1000)
+}
+
+ipcMain.handle('app-version', () => app.getVersion())
+ipcMain.handle('update-state', () => updateState)
+ipcMain.on('update-check', checkForUpdates)
+// the page has already flushed progress; skip the close handshake and restart into the installer
+ipcMain.on('update-install', () => {
+  if (updateState.status !== 'ready') return
+  updating = true
+  autoUpdater.quitAndInstall(true, true)
 })
 
 ipcMain.on('close-ok', () => win && !win.isDestroyed() && win.destroy())
@@ -109,6 +141,7 @@ app.whenReady().then(() => {
     return net.fetch(pathToFileURL(file).toString())
   })
   createWindow()
+  initUpdater()
 })
 
 app.on('window-all-closed', () => app.quit())
