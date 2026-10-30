@@ -1,4 +1,5 @@
 // Runtime detection + app lifecycle hooks for Electron (Windows) and Capacitor (iPad)
+import { StatusBar, Style } from '@capacitor/status-bar'
 import { flushAll } from './sync'
 
 export type UpdateState =
@@ -76,6 +77,20 @@ export async function installUpdate() {
   saveAll()
   await flushAll(3000)
   window.aniplayer?.updates?.install()
+}
+
+/** iPad: the status bar (clock, battery) hides while any player is fullscreen, ours or Kodik's */
+export function initStatusBar() {
+  if (!isNative) return
+  void StatusBar.setStyle({ style: Style.Dark }).catch(() => {})
+  const doc = document as Document & { webkitFullscreenElement?: Element }
+  const sync = (full: boolean) => void (full ? StatusBar.hide() : StatusBar.show()).catch(() => {})
+  const onChange = () => sync(!!(doc.fullscreenElement || doc.webkitFullscreenElement))
+  document.addEventListener('fullscreenchange', onChange)
+  document.addEventListener('webkitfullscreenchange', onChange)
+  // native video fullscreen (webkitEnterFullscreen) fires on the video element itself
+  document.addEventListener('webkitbeginfullscreen', () => sync(true), true)
+  document.addEventListener('webkitendfullscreen', () => sync(false), true)
 }
 
 export const SCALES = [0.75, 0.85, 0.9, 1, 1.1, 1.25]

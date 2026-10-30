@@ -48,7 +48,8 @@ jobs:
           pb "Add :UIBackgroundModes:0 string audio"
           pb "Add :UIStatusBarStyle string UIStatusBarStyleLightContent"
           pb "Delete :UIViewControllerBasedStatusBarAppearance"
-          pb "Add :UIViewControllerBasedStatusBarAppearance bool false"
+          # YES: lets fullscreen video hide the status bar (and the StatusBar plugin control it)
+          pb "Add :UIViewControllerBasedStatusBarAppearance bool true"
           pb "Add :UIRequiresFullScreen bool false"
           pb "Delete :UISupportedInterfaceOrientations~ipad"
           pb "Add :UISupportedInterfaceOrientations~ipad array"

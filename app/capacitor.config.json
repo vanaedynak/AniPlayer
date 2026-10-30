@@ -8,5 +8,10 @@
     "backgroundColor": "#09090d",
     "allowsLinkPreview": false,
     "preferredContentMode": "desktop"
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "DARK"
+    }
   }
 }

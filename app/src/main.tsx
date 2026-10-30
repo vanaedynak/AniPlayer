@@ -4,12 +4,13 @@ import './index.css'
 import App from './App.tsx'
 import { initSync } from './lib/sync'
 import { initLibriaIndex } from './lib/libriaIndex'
-import { initLifecycle, initScale, applyScale } from './lib/platform'
+import { initLifecycle, initScale, applyScale, initStatusBar } from './lib/platform'
 import { useStore } from './lib/store'
 
 initSync()
 initLibriaIndex()
 initLifecycle()
+initStatusBar()
 initScale(
   () => useStore.getState().local.scale,
   (scale) => useStore.getState().setLocal({ scale }),
