@@ -74,7 +74,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
   const [hover, setHover] = useState<{ x: number; t: number } | null>(null)
   const [scrub, setScrub] = useState<number | null>(null)
   const [toast, setToast] = useState<{ text: string; action?: { label: string; fn: () => void } } | null>(null)
-  const [ripple, setRipple] = useState<{ side: 'l' | 'r'; id: number } | null>(null)
+  const [ripple, setRipple] = useState<{ side: 'l' | 'r'; id: number; secs: number } | null>(null)
   const [countdown, setCountdown] = useState<number | null>(null)
   const [autoSkip, setAutoSkip] = useState<{ kind: 'op' | 'ed'; left: number } | null>(null)
   const [error, setError] = useState('')
@@ -491,11 +491,11 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
     if (isDouble && x < rect.width * 0.38) {
       clearTimeout(tapTimer.current)
       seekBy(-10)
-      setRipple({ side: 'l', id: now })
+      setRipple((r) => ({ side: 'l', id: now, secs: r?.side === 'l' ? r.secs + 10 : 10 }))
     } else if (isDouble && x > rect.width * 0.62) {
       clearTimeout(tapTimer.current)
       seekBy(10)
-      setRipple({ side: 'r', id: now })
+      setRipple((r) => ({ side: 'r', id: now, secs: r?.side === 'r' ? r.secs + 10 : 10 }))
     } else {
       clearTimeout(tapTimer.current)
       tapTimer.current = setTimeout(() => {
@@ -504,6 +504,13 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
       }, 250)
     }
   }
+
+  // the seek hint fades out shortly after the last double tap; repeated taps add up like on YouTube
+  useEffect(() => {
+    if (!ripple) return
+    const t = setTimeout(() => setRipple(null), 700)
+    return () => clearTimeout(t)
+  }, [ripple])
 
   // ---------- seek bar ----------
   const posFromEvent = (clientX: number) => {
@@ -591,7 +598,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
           <div className="animate-ripple absolute inset-0 bg-white/10" />
           <div className="animate-fade-in flex flex-col items-center gap-1 text-sm font-semibold">
             {ripple.side === 'l' ? <RotateCcw size={30} /> : <RotateCw size={30} />}
-            10 сек
+            {ripple.secs} сек
           </div>
         </div>
       )}
