@@ -18,6 +18,8 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import { api, posterUrl, type Release } from '../lib/api'
+import { shiki, shImg, shikiTitle, KINDS } from '../lib/shikimori'
+import { useLibriaIndex } from '../lib/libriaIndex'
 import { useSync } from '../lib/sync'
 import { isElectron } from '../lib/platform'
 import { UpdatePill } from './Updates'
@@ -70,10 +72,23 @@ function SyncBadge() {
   )
 }
 
+type QuickItem = { key: string; title: string; sub: string; poster: string; meta: string; rating: number | null; href: string; libria: boolean }
+
+const fromRelease = (r: Release): QuickItem => ({
+  key: `l${r.id}`,
+  title: r.name.main,
+  sub: r.name.english ?? '',
+  poster: posterUrl(r, 'thumbnail'),
+  meta: [r.type?.description, r.year].filter(Boolean).join(' · '),
+  rating: r.mal?.rating ?? null,
+  href: `/title/${r.alias}`,
+  libria: true,
+})
+
 function SearchBox() {
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
-  const [items, setItems] = useState<Release[]>([])
+  const [items, setItems] = useState<QuickItem[]>([])
   const [loading, setLoading] = useState(false)
   const [sel, setSel] = useState(0)
   const nav = useNavigate()
@@ -98,23 +113,41 @@ function SearchBox() {
     }
     setLoading(true)
     const t = setTimeout(() => {
-      api
-        .search(query)
-        .then((r) => {
-          setItems(r.slice(0, 8))
+      // Shikimori ranks every anime by popularity; AniLibria adds its own matches the catalog missed
+      Promise.all([
+        shiki.list({ search: query, limit: 8, order: 'popularity', kind: '!music' }).catch(() => []),
+        api.search(query).catch(() => [] as Release[]),
+      ])
+        .then(([sh, lib]) => {
+          const byMal = useLibriaIndex.getState().byMal
+          const out: QuickItem[] = sh.map((a) => {
+            const l = byMal[a.id]
+            return {
+              key: `s${a.id}`,
+              title: shikiTitle(a),
+              sub: a.name,
+              poster: shImg(a.image.preview),
+              meta: [a.kind ? KINDS[a.kind] ?? a.kind : null, a.aired_on?.slice(0, 4)].filter(Boolean).join(' · '),
+              rating: Number(a.score) || null,
+              href: l ? `/title/${l.alias}` : `/anime/${a.id}`,
+              libria: !!l,
+            }
+          })
+          const seen = new Set(sh.map((a) => a.id))
+          for (const r of lib) if (!r.mal?.id || !seen.has(r.mal.id)) out.push(fromRelease(r))
+          setItems(out.slice(0, 8))
           setSel(0)
         })
-        .catch(() => setItems([]))
         .finally(() => setLoading(false))
     }, 250)
     return () => clearTimeout(t)
   }, [q])
 
-  const go = (r: Release) => {
+  const go = (r: QuickItem) => {
     setOpen(false)
     setQ('')
     inputRef.current?.blur()
-    nav(`/title/${r.alias}`)
+    nav(r.href)
   }
 
   return (
@@ -161,25 +194,26 @@ function SearchBox() {
           {items.length === 0 && !loading && <div className="px-4 py-6 text-center text-sm text-muted">Ничего не нашлось</div>}
           {items.map((r, i) => (
             <button
-              key={r.id}
+              key={r.key}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => go(r)}
               onMouseEnter={() => setSel(i)}
               className={cn('flex w-full items-center gap-3 rounded-2xl p-2 text-left', i === sel && 'bg-white/10')}
             >
-              <img src={posterUrl(r, 'thumbnail')} alt="" className="h-16 w-11 shrink-0 rounded-lg object-cover" />
-              <div className="min-w-0">
-                <div className="truncate font-bold">{r.name.main}</div>
-                <div className="truncate text-xs text-muted">{r.name.english}</div>
+              <img src={r.poster} alt="" className="h-16 w-11 shrink-0 rounded-lg bg-card object-cover" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-bold">{r.title}</div>
+                <div className="truncate text-xs text-muted">{r.sub}</div>
                 <div className="mt-0.5 flex items-center gap-2 text-xs font-semibold text-white/60">
-                  {r.type?.description} · {r.year}
-                  {r.mal?.rating ? (
+                  {r.meta}
+                  {r.rating ? (
                     <span className="flex items-center gap-0.5">
-                      <Star size={11} className="fill-yellow-400 text-yellow-400" /> {r.mal.rating.toFixed(1)}
+                      <Star size={11} className="fill-yellow-400 text-yellow-400" /> {r.rating.toFixed(1)}
                     </span>
                   ) : null}
                 </div>
               </div>
+              {r.libria && <span className="shrink-0 rounded-lg bg-white px-2 py-0.5 text-[10px] font-extrabold text-black">AniLibria</span>}
             </button>
           ))}
           {items.length > 0 && (
