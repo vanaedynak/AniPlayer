@@ -9,6 +9,7 @@ import { useStore, progressKey } from '../lib/store'
 import KodikPlayer from '../components/KodikPlayer'
 import { StatusPicker } from '../components/TitleBits'
 import { FranchiseRow } from '../components/FranchiseRow'
+import { ThemesSection } from '../components/Music'
 import { Skeleton, Empty, Chip } from '../components/ui'
 import { cn, fmtOrdinal } from '../lib/format'
 
@@ -53,7 +54,8 @@ export default function Anime() {
         } catch {
           /* ignore */
         }
-        setDubKey(list.find((d) => d.key === saved[a.id])?.key ?? list[0]?.key ?? null)
+        const fromUrl = new URLSearchParams(location.hash.split('?')[1] ?? '').get('dub')
+        setDubKey(list.find((d) => d.key === fromUrl)?.key ?? list.find((d) => d.key === saved[a.id])?.key ?? list[0]?.key ?? null)
       })
       .catch((e) => alive && setDubErr(String(e.message ?? e)))
     return () => {
@@ -80,6 +82,9 @@ export default function Anime() {
   const selectDub = (d: YDub) => {
     setDubKey(d.key)
     setPlayerIdx(0)
+    const next = new URLSearchParams(sp)
+    next.set('dub', d.key)
+    setSp(next, { replace: true })
     try {
       const saved = JSON.parse(localStorage.getItem(DUB_KEY) ?? '{}')
       saved[a!.id] = d.key
@@ -243,6 +248,7 @@ export default function Anime() {
           )}
         </div>
       )}
+      <ThemesSection malId={a.id} />
       <FranchiseRow malId={a.id} />
     </div>
   )

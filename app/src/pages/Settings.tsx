@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Cloud, LogOut, Link2, PlayCircle, Database, Check, ExternalLink, Loader2, ZoomIn } from 'lucide-react'
-import { useSync, getFirebaseConfig, saveFirebaseConfig, signIn, logOut } from '../lib/sync'
+import { useSync, getFirebaseConfig, saveFirebaseConfig, signIn, logOut, accountName } from '../lib/sync'
 import { anilistViewer, anilistAuthUrl } from '../lib/anilist'
 import { useStore } from '../lib/store'
 import { Panel, PanelTitle } from '../components/ui'
@@ -52,9 +52,13 @@ function SyncSettings() {
       const code = (e as { code?: string }).code ?? String(e)
       setMsg(
         code.includes('invalid-credential') || code.includes('wrong-password')
-          ? 'Неверная почта или пароль'
+          ? 'Неверный логин или пароль'
           : code.includes('email-already-in-use')
-            ? 'Аккаунт уже есть — нажмите «Войти»'
+            ? 'Такой аккаунт уже есть — нажмите «Войти» (или выберите другое имя)'
+            : code.includes('bad-username')
+              ? 'Имя: 3–24 символа, латиница, цифры, точка, «-» или «_»'
+              : code.includes('invalid-email')
+                ? 'Проверьте почту'
             : code.includes('weak-password')
               ? 'Пароль минимум 6 символов'
               : code,
@@ -94,7 +98,7 @@ function SyncSettings() {
       ) : user ? (
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <div className="font-bold">{user.email}</div>
+            <div className="font-bold">{accountName(user)}</div>
             <div className={cn('text-sm font-semibold', status === 'synced' ? 'text-emerald-400' : status === 'error' ? 'text-rose-400' : 'text-yellow-400')}>
               {status === 'synced' ? 'Всё синхронизировано' : status === 'offline' ? 'Нет сети — изменения отправятся позже' : status === 'error' ? `Ошибка: ${error}` : 'Синхронизация…'}
             </div>
@@ -111,8 +115,17 @@ function SyncSettings() {
             void go(false)
           }}
         >
-          <p className="text-sm text-muted">Войдите одной и той же почтой на всех устройствах. Первый раз — «Создать аккаунт».</p>
-          <input className={input} type="email" placeholder="Почта" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+          <p className="text-sm text-muted">Имя пользователя или почта — что удобнее. Войдите тем же логином на всех устройствах. Первый раз — «Создать аккаунт».</p>
+          <input
+            className={input}
+            placeholder="Имя пользователя или почта"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+          />
           <input className={input} type="password" placeholder="Пароль" value={pass} onChange={(e) => setPass(e.target.value)} autoComplete="current-password" />
           <div className="flex gap-2">
             <button type="submit" disabled={busy} className={cn(btn, 'flex-1 bg-white text-black')}>

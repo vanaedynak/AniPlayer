@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { UpscaleMode } from './upscale'
 import { persist } from 'zustand/middleware'
 import { posterUrl, type Release } from './api'
 
@@ -63,6 +64,8 @@ export interface LocalPrefs {
   muted: boolean
   rate: number
   scale: number
+  /** Anime4K level; per device because it depends on the GPU */
+  upscale: UpscaleMode
 }
 
 export const progressKey = (releaseId: number, ordinal: number) => `${releaseId}_${String(ordinal).replace('.', '-')}`
@@ -138,7 +141,7 @@ export const useStore = create<State>()(
         kodikToken: '',
         updatedAt: 0,
       },
-      local: { volume: 1, muted: false, rate: 1, scale: 1 },
+      local: { volume: 1, muted: false, rate: 1, scale: 1, upscale: 'off' },
 
       saveProgress: (p, force) => {
         const key = progressKey(p.releaseId, p.ordinal)
@@ -248,12 +251,13 @@ export const useStore = create<State>()(
     }),
     {
       name: 'aniplayer-store',
-      version: 3,
+      version: 4,
       // v2: auto-skip with a 5 second "watch it" window became the default
       migrate: (old, version) => {
         const st = old as State
         if (version < 2 && st?.prefs) st.prefs = { ...st.prefs, autoSkipOpening: true, autoSkipEnding: true }
         if (version < 3 && st?.local) st.local = { ...st.local, scale: st.local.scale ?? 1 }
+        if (version < 4 && st?.local) st.local = { ...st.local, upscale: 'off' }
         return st
       },
     },

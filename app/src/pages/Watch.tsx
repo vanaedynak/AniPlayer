@@ -7,13 +7,15 @@ import { useStore, progressKey } from '../lib/store'
 import Player from '../components/Player'
 import { EpisodeCard, Skeleton, Empty, Panel } from '../components/ui'
 import { StatusPicker, Franchise } from '../components/TitleBits'
+import { DownloadEpisodeButton } from '../components/Downloads'
+import { releaseOrOffline } from '../lib/downloads'
 import { EpisodeRanges, PAGE } from './Title'
 import { fmtOrdinal, cn } from '../lib/format'
 
 export default function Watch() {
   const { alias = '', ordinal = '1' } = useParams()
   const nav = useNavigate()
-  const { data: r, error } = useAsync(() => api.release(alias), [alias])
+  const { data: r, error } = useAsync(() => releaseOrOffline(alias, () => api.release(alias)), [alias])
   const episodes = useMemo(() => (r ? sortedEpisodes(r) : []), [r])
   const idx = Math.max(0, episodes.findIndex((e) => String(e.ordinal) === ordinal))
   const episode = episodes[idx] as Episode | undefined
@@ -103,6 +105,7 @@ export default function Watch() {
                 {p?.watched ? <RotateCcw size={17} /> : <Check size={18} />}
                 {p?.watched ? 'Отметить непросмотренной' : 'Отметить просмотренной'}
               </button>
+              <DownloadEpisodeButton r={r} e={episode} />
               <StatusPicker r={r} />
             </div>
           </div>

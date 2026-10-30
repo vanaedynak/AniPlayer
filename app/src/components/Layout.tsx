@@ -16,6 +16,7 @@ import {
   Star,
   ArrowLeft,
   ArrowRight,
+  HardDriveDownload,
 } from 'lucide-react'
 import { api, posterUrl, type Release } from '../lib/api'
 import { shiki, shImg, shikiTitle, KINDS } from '../lib/shikimori'
@@ -23,6 +24,8 @@ import { useLibriaIndex } from '../lib/libriaIndex'
 import { useSync } from '../lib/sync'
 import { isElectron } from '../lib/platform'
 import { UpdatePill } from './Updates'
+import { MiniPlayer } from './Music'
+import { RoomBridge, RoomButton } from './Room'
 import { cn } from '../lib/format'
 
 const NAV = [
@@ -32,6 +35,7 @@ const NAV = [
   { to: '/history', label: 'История', icon: History },
   { to: '/collection', label: 'Моя коллекция', icon: Library },
   { to: '/stats', label: 'Статистика', icon: BarChart3 },
+  { to: '/downloads', label: 'Загрузки', icon: HardDriveDownload },
 ]
 
 const TABS = [
@@ -261,6 +265,7 @@ function Header() {
             <Search size={20} />
           </Link>
           <UpdatePill />
+          <RoomButton />
           <SyncBadge />
           <Link to="/settings" className="no-drag flex h-11 w-11 items-center justify-center rounded-full hover:bg-white/10">
             <Settings size={20} />
@@ -344,6 +349,8 @@ export default function Layout({ children }: { children: ReactNode }) {
         </main>
       </div>
       <TabBar />
+      <MiniPlayer />
+      <RoomBridge />
     </div>
   )
 }

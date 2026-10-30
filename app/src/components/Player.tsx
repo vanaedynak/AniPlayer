@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   FastForward,
   Loader2,
+  Sparkles,
 } from 'lucide-react'
 import { episodePreview, aniskip, type Episode, type Release } from '../lib/api'
 import { useStore, getProgress, progressKey, WATCHED_RATIO } from '../lib/store'
@@ -26,8 +27,13 @@ import { waitForFirstSync } from '../lib/sync'
 import { anilistReportEpisode } from '../lib/anilist'
 import { onAppHide, isIOS, isElectron } from '../lib/platform'
 import { fmtTime, fmtOrdinal, cn } from '../lib/format'
+import { useRoomPlayback } from './Room'
+import { downloaded, offlineUrl, OfflineLoader, useDownloads, dlKey } from '../lib/downloads'
+import { useRoom } from '../lib/room'
+import { startUpscale, upscaleSupported, UPSCALE_MODES, type UpscaleMode, type Upscaler } from '../lib/upscale'
 
 type Quality = '480' | '720' | '1080'
+type Menu = 'main' | 'quality' | 'speed' | 'upscale'
 const QUALITIES: Quality[] = ['1080', '720', '480']
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 const AUTO_SKIP_MS = 5000
@@ -49,13 +55,14 @@ function sourceFor(ep: Episode, q: Quality): { url: string; q: Quality } | null 
   return null
 }
 
-const useNativeHls = () => isIOS && !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl')
+const nativeHls = () => isIOS && !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl')
 
 export default function Player({ release, episode, next, prev, onSelect }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const hlsRef = useRef<Hls | null>(null)
   const barRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const prefs = useStore((s) => s.prefs)
   const local = useStore((s) => s.local)
@@ -70,7 +77,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
   const [buffered, setBuffered] = useState(0)
   const [controls, setControls] = useState(true)
   const [fullscreen, setFullscreen] = useState(false)
-  const [menu, setMenu] = useState<null | 'main' | 'quality' | 'speed'>(null)
+  const [menu, setMenu] = useState<null | Menu>(null)
   const [hover, setHover] = useState<{ x: number; t: number } | null>(null)
   const [scrub, setScrub] = useState<number | null>(null)
   const [toast, setToast] = useState<{ text: string; action?: { label: string; fn: () => void } } | null>(null)
@@ -101,6 +108,59 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
   }, [episode.id])
   const op = useMemo(() => ownOp ?? extSkip.op ?? null, [ownOp, extSkip.op])
   const ed = useMemo(() => ownEd ?? extSkip.ed ?? null, [ownEd, extSkip.ed])
+
+  const offline = useDownloads((s) => s.items[dlKey(release.id, episode.ordinal)]?.status === 'done')
+
+  // ---------- Anime4K ----------
+  // the canvas sits exactly over the letterboxed picture; the video keeps playing underneath
+  const [upscaled, setUpscaled] = useState<{ from: number; to: number } | null>(null)
+  const [fit, setFit] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  const [videoSize, setVideoSize] = useState<{ w: number; h: number } | null>(null)
+  useEffect(() => {
+    const wrap = wrapRef.current
+    if (!wrap || !videoSize) return
+    const measure = () => {
+      const W = wrap.clientWidth
+      const H = wrap.clientHeight
+      const k = Math.min(W / videoSize.w, H / videoSize.h)
+      const w = videoSize.w * k
+      const h = videoSize.h * k
+      setFit({ x: (W - w) / 2, y: (H - h) / 2, w, h })
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(wrap)
+    return () => ro.disconnect()
+  }, [videoSize])
+
+  const upscaleMode = local.upscale
+  // the canvas only exists once the picture area is measured
+  const hasFit = !!fit
+  useEffect(() => {
+    const v = videoRef.current
+    const c = canvasRef.current
+    setUpscaled(null)
+    if (upscaleMode === 'off' || !v || !c || !videoSize || !upscaleSupported()) return
+    let up: Upscaler | null = null
+    let alive = true
+    const fail = (e: Error) => {
+      if (!alive) return
+      setUpscaled(null)
+      setToast({ text: `Апскейл недоступен: ${e.message}` })
+    }
+    startUpscale(v, c, upscaleMode, fail)
+      .then((u) => {
+        if (!alive) return u.stop()
+        up = u
+        // the first frames decide the output size; show it once known
+        setTimeout(() => alive && setUpscaled(u.info()), 400)
+      })
+      .catch(fail)
+    return () => {
+      alive = false
+      up?.stop()
+    }
+  }, [upscaleMode, videoSize, episode.id, quality, hasFit])
 
   // ---------- saving ----------
   const save = useCallback(
@@ -134,7 +194,9 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
     const v = videoRef.current
     if (!v) return
     let cancelled = false
-    const src = sourceFor(episode, quality)
+    // a downloaded episode always plays from the device: works offline and saves traffic
+    const off = downloaded(release.id, episode.ordinal)
+    const src = off ? { url: offlineUrl(off.key), q: off.quality } : sourceFor(episode, quality)
     setError('')
     if (!src) {
       setError('У этой серии нет видео')
@@ -145,7 +207,8 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
 
     const start = async () => {
       let startAt = keepTime ?? 0
-      if (keepTime == null) {
+      // in a room the position comes from the room, not from this device's history
+      if (keepTime == null && !useRoom.getState().code) {
         await waitForFirstSync()
         if (cancelled) return
         const p = getProgress(release.id, episode.ordinal)
@@ -162,7 +225,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
 
       hlsRef.current?.destroy()
       hlsRef.current = null
-      if (useNativeHls() || !Hls.isSupported()) {
+      if (!off && (nativeHls() || !Hls.isSupported())) {
         v.src = src.url
         const onMeta = () => {
           if (startAt) v.currentTime = startAt
@@ -170,7 +233,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
         }
         v.addEventListener('loadedmetadata', onMeta)
       } else {
-        const hls = new Hls({ startPosition: startAt || -1, maxBufferLength: 45, maxMaxBufferLength: 120, enableWorker: true })
+        const hls = new Hls({ startPosition: startAt || -1, maxBufferLength: 45, maxMaxBufferLength: 120, enableWorker: true, loader: OfflineLoader })
         hlsRef.current = hls
         hls.on(Hls.Events.ERROR, (_e, data) => {
           if (!data.fatal) return
@@ -253,6 +316,20 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
     const t = setTimeout(() => setToast(null), 6000)
     return () => clearTimeout(t)
   }, [toast])
+
+  // ---------- watch together ----------
+  const report = useRoomPlayback(
+    {
+      time: () => videoRef.current?.currentTime ?? 0,
+      playing: () => !!videoRef.current && !videoRef.current.paused,
+      play: () => void videoRef.current?.play().catch(() => {}),
+      pause: () => videoRef.current?.pause(),
+      seek: (t) => {
+        if (videoRef.current) videoRef.current.currentTime = t
+      },
+    },
+    !waiting || time > 0,
+  )
 
   // ---------- actions ----------
   const togglePlay = useCallback(() => {
@@ -545,6 +622,10 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
     }
   }
 
+  const trackSize = (v: HTMLVideoElement) => {
+    if (v.videoWidth) setVideoSize((s) => (s && s.w === v.videoWidth && s.h === v.videoHeight ? s : { w: v.videoWidth, h: v.videoHeight }))
+  }
+
   const pct = (t: number) => (duration ? (t / duration) * 100 : 0)
   const VolumeIcon = local.muted || local.volume === 0 ? VolumeX : local.volume < 0.5 ? Volume1 : Volume2
   const poster = episodePreview(episode)
@@ -567,21 +648,40 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
         playsInline
         preload="auto"
         crossOrigin="anonymous"
-        onPlay={() => setPlaying(true)}
+        onPlay={() => {
+          setPlaying(true)
+          report()
+        }}
         onPause={() => {
           setPlaying(false)
           save(true)
+          report()
         }}
         onWaiting={() => setWaiting(true)}
         onCanPlay={() => setWaiting(false)}
         onPlaying={() => setWaiting(false)}
-        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+        onLoadedMetadata={(e) => {
+          setDuration(e.currentTarget.duration)
+          trackSize(e.currentTarget)
+        }}
+        onResize={(e) => trackSize(e.currentTarget)}
         onDurationChange={(e) => setDuration(e.currentTarget.duration)}
         onTimeUpdate={onTimeUpdate}
-        onSeeked={() => save(true)}
+        onSeeked={() => {
+          save(true)
+          report()
+        }}
         onEnded={onEnded}
         onError={() => !hlsRef.current && setError('Не удалось воспроизвести видео')}
       />
+
+      {upscaleMode !== 'off' && fit && (
+        <canvas
+          ref={canvasRef}
+          className={cn('pointer-events-none absolute transition-opacity duration-300', upscaled ? 'opacity-100' : 'opacity-0')}
+          style={{ left: fit.x, top: fit.y, width: fit.w, height: fit.h }}
+        />
+      )}
 
       {/* tap / click surface */}
       <div className="absolute inset-0" onPointerUp={onSurfacePointerUp} />
@@ -797,13 +897,28 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
                 changeQuality={changeQuality}
                 rate={local.rate}
                 setRate={setRate}
+                upscale={upscaleMode}
+                setUpscale={(m) => {
+                  setLocal({ upscale: m })
+                  setMenu('main')
+                }}
               />
             )}
             <div className="glass flex items-center gap-0.5 rounded-2xl p-1.5 ring-1 ring-white/10">
               <CtrlBtn label="Настройки" onClick={() => setMenu(menu ? null : 'main')} active={!!menu}>
                 <Settings size={19} className={cn('transition-transform duration-300', menu && 'rotate-45')} />
               </CtrlBtn>
-              <span className="hidden px-1.5 text-xs font-bold text-white/70 sm:block">{quality}p</span>
+              <span className="hidden items-center gap-1 px-1.5 text-xs font-bold text-white/70 sm:flex">
+                {offline ? 'Скачано' : `${quality}p`}
+                {upscaled && (
+                  <span
+                    className="flex items-center gap-0.5 rounded-md bg-gradient-to-r from-accent to-pink px-1.5 py-0.5 text-[10px] font-extrabold text-white"
+                    title={upscaled.to > upscaled.from ? `Anime4K: ${upscaled.from}p → ${upscaled.to}p` : 'Anime4K: чистка линий и резкость'}
+                  >
+                    <Sparkles size={10} /> {upscaled.to >= 2000 ? '4K' : upscaled.to >= 1400 ? '2K' : 'A4K'}
+                  </span>
+                )}
+              </span>
               <CtrlBtn label="Картинка в картинке" onClick={togglePip}>
                 <PictureInPicture2 size={19} />
               </CtrlBtn>
@@ -898,14 +1013,18 @@ function SettingsMenu({
   changeQuality,
   rate,
   setRate,
+  upscale,
+  setUpscale,
 }: {
-  menu: 'main' | 'quality' | 'speed'
-  setMenu: (m: null | 'main' | 'quality' | 'speed') => void
+  menu: Menu
+  setMenu: (m: null | Menu) => void
   episode: Episode
   quality: Quality
   changeQuality: (q: Quality) => void
   rate: number
   setRate: (r: number) => void
+  upscale: UpscaleMode
+  setUpscale: (m: UpscaleMode) => void
 }) {
   const prefs = useStore((s) => s.prefs)
   const setPrefs = useStore((s) => s.setPrefs)
@@ -939,6 +1058,9 @@ function SettingsMenu({
         <>
           <Row label="Качество" value={`${quality}p`} onClick={() => setMenu('quality')} />
           <Row label="Скорость" value={rate === 1 ? 'Обычная' : `${rate}×`} onClick={() => setMenu('speed')} />
+          {upscaleSupported() && (
+            <Row label="Апскейл Anime4K" value={UPSCALE_MODES.find((m) => m.id === upscale)!.label} onClick={() => setMenu('upscale')} />
+          )}
           <div className="my-1 h-px bg-white/10" />
           <Toggle label="Пропускать опенинг" on={prefs.autoSkipOpening} set={(v) => setPrefs({ autoSkipOpening: v })} />
           <Toggle label="Пропускать эндинг" on={prefs.autoSkipEnding} set={(v) => setPrefs({ autoSkipEnding: v })} />
@@ -954,6 +1076,24 @@ function SettingsMenu({
                 {q}p {q === '1080' && <span className="ml-1 rounded bg-accent px-1.5 py-0.5 text-[10px] font-extrabold">FHD</span>}
               </span>
               {q === quality && <Check size={18} className="text-accent-2" />}
+            </button>
+          ))}
+        </>
+      )}
+      {menu === 'upscale' && (
+        <>
+          <Back title="Апскейл Anime4K" />
+          {UPSCALE_MODES.map((m) => (
+            <button
+              key={m.id}
+              className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left hover:bg-white/10"
+              onClick={() => setUpscale(m.id)}
+            >
+              <span>
+                <span className="block font-semibold">{m.label}</span>
+                <span className="block text-xs text-white/50">{m.hint}</span>
+              </span>
+              {m.id === upscale && <Check size={18} className="shrink-0 text-accent-2" />}
             </button>
           ))}
         </>

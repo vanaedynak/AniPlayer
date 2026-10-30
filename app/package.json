@@ -14,8 +14,10 @@
   },
   "dependencies": {
     "@capacitor/core": "^8.6.0",
+    "@capacitor/filesystem": "^8.1.5",
     "@capacitor/status-bar": "^8.0.4",
     "@fontsource-variable/manrope": "^5.3.0",
+    "anime4k-webgpu": "^1.0.0",
     "electron-updater": "^6.8.11",
     "firebase": "^13.1.0",
     "hls.js": "^1.7.4",
@@ -26,6 +28,7 @@
     "zustand": "^5.0.16"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.6.0",
     "@capacitor/cli": "^8.6.0",
     "@capacitor/ios": "^8.6.0",
     "@resvg/resvg-js": "^2.6.2",
@@ -34,6 +37,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "@webgpu/types": "^0.1.74",
     "concurrently": "^10.0.6",
     "cross-env": "^10.1.0",
     "electron": "^45.1.0",

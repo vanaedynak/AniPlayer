@@ -109,8 +109,26 @@ export function initSync() {
   window.addEventListener('offline', () => uid && useSync.setState({ status: 'offline' }))
 }
 
-export async function signIn(email: string, password: string, register = false) {
+// a login without "@" is a username: Firebase only knows emails, so it gets a private placeholder address
+const USERNAME_DOMAIN = '@users.aniplayer.app'
+export const USERNAME_RE = /^[a-z0-9._-]{3,24}$/
+
+export function loginToEmail(login: string) {
+  const l = login.trim().toLowerCase()
+  if (l.includes('@')) return l
+  if (!USERNAME_RE.test(l)) throw Object.assign(new Error(), { code: 'bad-username' })
+  return l + USERNAME_DOMAIN
+}
+
+/** what to show for the signed-in account: the username, or the real email */
+export function accountName(user: User | null) {
+  const e = user?.email ?? ''
+  return e.endsWith(USERNAME_DOMAIN) ? e.slice(0, -USERNAME_DOMAIN.length) : e
+}
+
+export async function signIn(login: string, password: string, register = false) {
   if (!auth) throw new Error('Firebase не настроен')
+  const email = loginToEmail(login)
   if (register) await createUserWithEmailAndPassword(auth, email, password)
   else await signInWithEmailAndPassword(auth, email, password)
 }
@@ -294,3 +312,6 @@ syncHooks.progress = pushProgress
 syncHooks.title = pushTitle
 syncHooks.prefs = pushPrefs
 syncHooks.stats = scheduleStats
+
+/** shared handles for features that live outside users/{uid} (watch-together rooms) */
+export const firestore = () => (db && uid ? { db, uid } : null)

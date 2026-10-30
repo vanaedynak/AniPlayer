@@ -7,6 +7,9 @@ import { useStore, progressKey } from '../lib/store'
 import { EpisodeCard, Skeleton, Chip, Empty } from '../components/ui'
 import { StatusPicker } from '../components/TitleBits'
 import { FranchiseRow } from '../components/FranchiseRow'
+import { DownloadSeason } from '../components/Downloads'
+import { releaseOrOffline } from '../lib/downloads'
+import { ThemesSection } from '../components/Music'
 import { fmtOrdinal, fmtTime, cn } from '../lib/format'
 
 export const PAGE = 24
@@ -54,7 +57,7 @@ export function EpisodeRanges({ count, page, setPage, reverse, setReverse }: { c
 
 export default function Title() {
   const { alias = '' } = useParams()
-  const { data: r, error } = useAsync(() => api.release(alias), [alias])
+  const { data: r, error } = useAsync(() => releaseOrOffline(alias, () => api.release(alias)), [alias])
   const episodes = useMemo(() => (r ? sortedEpisodes(r) : []), [r])
   const resume = useResumeTarget(r?.id, episodes)
   const [page, setPage] = useState<number | null>(null)
@@ -151,6 +154,7 @@ export default function Title() {
                 </Link>
               )}
               <StatusPicker r={r} />
+              <DownloadSeason r={r} episodes={episodes} />
               {r.mal?.id ? (
                 <Link
                   to={`/anime/${r.mal.id}?kodik=1`}
@@ -189,6 +193,8 @@ export default function Title() {
           )}
         </section>
       </div>
+
+      {r.mal?.id ? <ThemesSection malId={r.mal.id} /> : null}
     </div>
   )
 }

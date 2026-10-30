@@ -76,6 +76,65 @@ jobs:
           name: AniPlayer-ipa
           path: app/AniPlayer.ipa
 
+  android:
+    name: Android (APK)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm version 1.0.${{ github.run_number }} --no-git-tag-version
+      - run: npm run build
+
+      - name: Create Android project
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: App icon
+        run: npx --yes @capacitor/assets@3 generate --android --assetPath resources --iconBackgroundColor '#09090d' --iconBackgroundColorDark '#09090d'
+
+      - name: Version and orientation
+        run: |
+          G=android/app/build.gradle
+          sed -i -E "s/versionCode [0-9]+/versionCode ${{ github.run_number }}/; s/versionName \"[^\"]*\"/versionName \"$(node -p "require('./package.json').version")\"/" $G
+          # phones and tablets in any orientation; video goes landscape on its own
+          sed -i 's/<activity/<activity android:screenOrientation="fullUser"/' android/app/src/main/AndroidManifest.xml
+
+      # with the keystore secrets every build carries the same signature, so a new APK installs over the old one
+      - name: Build APK
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          cd android
+          if [ -n "$KEYSTORE" ]; then
+            ./gradlew assembleRelease --no-daemon -q
+            echo "$KEYSTORE" | base64 -d > release.jks
+            BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+            $BT/zipalign -f 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+            $BT/apksigner sign --ks release.jks --ks-key-alias aniplayer --ks-pass env:KEYSTORE_PASSWORD --out ../AniPlayer.apk aligned.apk
+          else
+            ./gradlew assembleDebug --no-daemon -q
+            cp app/build/outputs/apk/debug/app-debug.apk ../AniPlayer.apk
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AniPlayer-android
+          path: app/AniPlayer.apk
+
   windows:
     name: Windows installer
     runs-on: windows-latest
@@ -104,7 +163,7 @@ jobs:
 
   release:
     name: Publish "latest" release
-    needs: [ios, windows]
+    needs: [ios, android, windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -118,4 +177,4 @@ jobs:
         run: |
           gh release delete latest --yes --cleanup-tag || true
           gh release create latest out/* --title "AniPlayer build ${{ github.run_number }}" \
-            --notes "IPA для iPad (ставится через Sideloadly/AltStore) и установщик для Windows. Сборка из ${GITHUB_SHA::7}." --latest
+            --notes "IPA для iPad (ставится через Sideloadly/AltStore), APK для Android и установщик для Windows. Сборка из ${GITHUB_SHA::7}." --latest

@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Library } from 'lucide-react'
+import { Library, HardDriveDownload } from 'lucide-react'
 import { useStore, releaseProgress, titleHref, LIST_LABELS, LIST_COLORS, type ListStatus, type TitleEntry } from '../lib/store'
 import { Chip, Empty } from '../components/ui'
+import { PlaylistButton } from '../components/Music'
 
 type Tab = ListStatus | 'favorite'
 
@@ -50,7 +51,15 @@ export default function Collection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Моя коллекция</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Моя коллекция</h1>
+        <div className="flex flex-wrap gap-2">
+        <Link to="/downloads" className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-bold hover:bg-white/15 lg:hidden">
+          <HardDriveDownload size={16} /> Загрузки
+        </Link>
+        <PlaylistButton malIds={[...new Set(Object.values(titles).flatMap((t) => (t.malId && (t.status || t.favorite) ? [t.malId] : [])))]} />
+        </div>
+      </div>
       <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
         {(Object.keys(LIST_LABELS) as ListStatus[]).map((s) => (
           <Chip key={s} active={tab === s} onClick={() => setTab(s)}>

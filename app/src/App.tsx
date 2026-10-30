@@ -11,6 +11,7 @@ import History from './pages/History'
 import Collection from './pages/Collection'
 import Stats from './pages/Stats'
 import Settings from './pages/Settings'
+import Downloads from './pages/Downloads'
 
 // HashRouter: works from file:// in Electron and capacitor:// on iPad
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="/collection" element={<Collection />} />
           <Route path="/stats" element={<Stats />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/downloads" element={<Downloads />} />
           <Route path="*" element={<Home />} />
         </Routes>
       </Layout>
