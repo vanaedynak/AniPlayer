@@ -80,6 +80,80 @@ export const shiki = {
       censored: 'true',
     }),
   anime: (id: number | string) => get<ShikiAnime>(`animes/${id}`),
+  franchise: (id: number | string) => get<ShikiFranchiseGraph>(`animes/${id}/franchise`),
+  /** full entries for up to 50 ids in one call */
+  byIds: (ids: number[]) => get<ShikiAnime[]>('animes', { ids: ids.join(','), limit: 50, censored: 'false' }),
+}
+
+export interface ShikiFranchiseGraph {
+  current_id: number
+  nodes: { id: number; date: number; name: string; kind: string; year: number }[]
+  links: { source_id: number; target_id: number; relation: string }[]
+}
+
+export interface FranchisePart {
+  a: ShikiAnime
+  /** "Сезон 2 · Часть 3" for the main saga, kind + year for the rest */
+  label: string
+  main: boolean
+}
+
+const NOISE = /клип|проморолик|реклама|cm|pv|music/i
+
+/** every TV season, film and OVA of a franchise in airing order, seasons split into parts by title */
+export async function franchiseParts(id: number): Promise<FranchisePart[]> {
+  const g = await shiki.franchise(id)
+  const ids = g.nodes.filter((n) => !NOISE.test(n.kind)).map((n) => n.id)
+  if (ids.length < 2) return []
+  const chunks: number[][] = []
+  for (let i = 0; i < ids.length; i += 50) chunks.push(ids.slice(i, i + 50))
+  const all = (await Promise.all(chunks.map(shiki.byIds))).flat().filter((a) => a.kind !== 'music')
+  const date = (a: ShikiAnime) => a.aired_on ?? '9999'
+  all.sort((x, y) => date(x).localeCompare(date(y)) || x.id - y.id)
+
+  // the main saga: TV series chained by sequel/prequel, starting from this title (or the biggest chain).
+  // Spin-offs and crossovers stay with the extras.
+  const tv = all.filter((a) => a.kind === 'tv')
+  const tvIds = new Set(tv.map((a) => a.id))
+  const next = new Map<number, number[]>()
+  for (const l of g.links)
+    if ((l.relation === 'sequel' || l.relation === 'prequel') && tvIds.has(l.source_id) && tvIds.has(l.target_id)) {
+      next.set(l.source_id, [...(next.get(l.source_id) ?? []), l.target_id])
+      next.set(l.target_id, [...(next.get(l.target_id) ?? []), l.source_id])
+    }
+  const chainOf = (start: number) => {
+    const seen = new Set([start])
+    const queue = [start]
+    while (queue.length) for (const n of next.get(queue.shift()!) ?? []) if (!seen.has(n)) seen.add(n) && queue.push(n)
+    return seen
+  }
+  const episodes = (ids: Set<number>) => tv.reduce((sum, a) => sum + (ids.has(a.id) ? a.episodes || a.episodes_aired || 1 : 0), 0)
+  let saga = tvIds.has(id) ? chainOf(id) : new Set<number>()
+  if (!saga.size) for (const a of tv) {
+    const c = chainOf(a.id)
+    if (episodes(c) > episodes(saga)) saga = c
+  }
+
+  // a season whose title continues the previous one ("X — Прощание", "X. Часть 2") is a part of it
+  const continues = (t: string, base: string) => t.startsWith(base + ' — ') || t.startsWith(base + '. ')
+  let season = 0
+  let base = ''
+  let part = 1
+  const parts: FranchisePart[] = []
+  for (const a of all) {
+    if (saga.has(a.id)) {
+      const t = shikiTitle(a)
+      if (base && continues(t, base)) part++
+      else {
+        season++
+        part = 1
+        base = t
+      }
+      const split = part > 1 || all.some((o) => o !== a && saga.has(o.id) && continues(shikiTitle(o), t))
+      parts.push({ a, label: `Сезон ${season}${split ? ` · Часть ${part}` : ''}`, main: true })
+    } else parts.push({ a, label: [KINDS[a.kind ?? ''] ?? a.kind, a.aired_on?.slice(0, 4)].filter(Boolean).join(' · '), main: false })
+  }
+  return parts
 }
 
 export const shikiTitle = (a: Pick<ShikiAnime, 'russian' | 'name'>) => a.russian || a.name

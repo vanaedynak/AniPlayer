@@ -56,7 +56,7 @@ export default function Catalog() {
       <div className="flex flex-col gap-6">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Каталог</h1>
-          <div className="mt-1 text-sm font-semibold text-muted">Все аниме с Shikimori. С пометкой AniLibria открываются в нашем плеере, остальные через Kodik</div>
+          <div className="mt-1 text-sm font-semibold text-muted">Все аниме с Shikimori. С пометкой AniLibria открываются в нашем плеере, остальные — во всех озвучках через YummyAnime</div>
         </div>
         <SourceTabs />
         <ShikiCatalog Select={Select} />

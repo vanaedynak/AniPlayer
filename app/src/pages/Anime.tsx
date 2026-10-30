@@ -1,19 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
-import { Star, Film, Calendar, Clock, KeyRound, Loader2, Check, Mic, Captions } from 'lucide-react'
+import { Star, Film, Calendar, Clock, Loader2, Check, Mic, Captions, MonitorPlay } from 'lucide-react'
 import { shiki, shikiToRelease, shImg, shikiTitle, stripBB, KINDS, STATUSES } from '../lib/shikimori'
-import { kodikDubs, type Dub } from '../lib/kodik'
+import { findYummy, yummyDubs, dubLabel, type YDub } from '../lib/yummy'
 import { useLibriaIndex } from '../lib/libriaIndex'
 import { useAsync } from '../lib/useAsync'
 import { useStore, progressKey } from '../lib/store'
 import KodikPlayer from '../components/KodikPlayer'
 import { StatusPicker } from '../components/TitleBits'
-import { Skeleton, Empty, Panel, Chip } from '../components/ui'
-import { cn } from '../lib/format'
+import { FranchiseRow } from '../components/FranchiseRow'
+import { Skeleton, Empty, Chip } from '../components/ui'
+import { cn, fmtOrdinal } from '../lib/format'
 
-const DUB_KEY = 'aniplayer-kodik-dub' // remembered dub per title, on this device
+const DUB_KEY = 'aniplayer-yummy-dub' // remembered dub per title, on this device
+const EP_PAGE = 100
 
-/** any anime from Shikimori: AniLibria titles go to our player, the rest play through Kodik */
+/** any anime from Shikimori: AniLibria titles go to our player, the rest play every dub YummyAnime knows */
 export default function Anime() {
   const { id = '' } = useParams()
   const [sp, setSp] = useSearchParams()
@@ -21,79 +23,98 @@ export default function Anime() {
   const libria = useLibriaIndex((s) => s.byMal[Number(id)])
   const { data: a, error } = useAsync(() => shiki.anime(id), [id])
   const r = useMemo(() => (a ? shikiToRelease(a) : null), [a])
-  const token = useStore((s) => s.prefs.kodikToken)
   const entry = useStore((s) => (r ? s.titles[r.id] : undefined))
   const progress = useStore((s) => s.progress)
   const touchTitle = useStore((s) => s.touchTitle)
 
-  const [dubs, setDubs] = useState<Dub[] | null>(null)
+  const [dubs, setDubs] = useState<YDub[] | null>(null)
   const [dubErr, setDubErr] = useState('')
-  const [dubId, setDubId] = useState<number | null>(null)
+  const [dubKey, setDubKey] = useState<string | null>(null)
+  const [playerIdx, setPlayerIdx] = useState(0)
+  const [page, setPage] = useState<number | null>(null)
+  const [altPoster, setAltPoster] = useState('')
 
   useEffect(() => {
-    if (!token || !a) return
+    if (!a || (libria && !forceKodik)) return
+    let alive = true
     setDubs(null)
     setDubErr('')
-    kodikDubs(token, a.id)
+    findYummy(a)
+      .then((y) => {
+        if (alive && y?.poster) setAltPoster(y.poster)
+        return y ? yummyDubs(y.id) : []
+      })
       .then((list) => {
+        if (!alive) return
         setDubs(list)
-        let saved: Record<string, number> = {}
+        let saved: Record<string, string> = {}
         try {
           saved = JSON.parse(localStorage.getItem(DUB_KEY) ?? '{}')
         } catch {
           /* ignore */
         }
-        setDubId(list.find((d) => d.id === saved[a.id])?.id ?? list[0]?.id ?? null)
+        setDubKey(list.find((d) => d.key === saved[a.id])?.key ?? list[0]?.key ?? null)
       })
-      .catch((e) => setDubErr(String(e.message ?? e)))
-  }, [token, a])
+      .catch((e) => alive && setDubErr(String(e.message ?? e)))
+    return () => {
+      alive = false
+    }
+  }, [a, libria, forceKodik])
 
-  const dub = dubs?.find((d) => d.id === dubId) ?? null
+  const dub = dubs?.find((d) => d.key === dubKey) ?? null
+  const numbers = useMemo(() => (dub ? [...dub.episodes.keys()].sort((x, y) => x - y) : []), [dub])
   const epParam = Number(sp.get('ep'))
-  const episode = epParam > 0 ? epParam : entry?.lastOrdinal ?? 1
-  const total = dub?.episodes ?? 0
+  const wanted = epParam > 0 ? epParam : entry?.lastOrdinal ?? numbers[0] ?? 1
+  const episode = dub?.episodes.has(wanted) ? wanted : numbers.find((n) => n >= wanted) ?? numbers[numbers.length - 1] ?? 1
+  const players = dub?.episodes.get(episode) ?? []
+  const video = players[Math.min(playerIdx, players.length - 1)]
+  const nextEp = numbers[numbers.indexOf(episode) + 1]
+  const pages = Math.ceil(numbers.length / EP_PAGE)
+  const curPage = page ?? Math.max(0, Math.floor(numbers.indexOf(episode) / EP_PAGE))
 
   const selectEp = (n: number) => {
     const next = new URLSearchParams(sp)
     next.set('ep', String(n))
     setSp(next, { replace: true })
   }
-  const selectDub = (d: Dub) => {
-    setDubId(d.id)
+  const selectDub = (d: YDub) => {
+    setDubKey(d.key)
+    setPlayerIdx(0)
     try {
       const saved = JSON.parse(localStorage.getItem(DUB_KEY) ?? '{}')
-      saved[a!.id] = d.id
+      saved[a!.id] = d.key
       localStorage.setItem(DUB_KEY, JSON.stringify(saved))
     } catch {
       /* ignore */
     }
   }
 
-  // watching through Kodik also feeds history and "continue watching"
+  // watching here also feeds history and "continue watching"
   useEffect(() => {
     if (!r || !dub) return
     touchTitle(r, { lastOrdinal: episode, lastWatchedAt: Date.now(), status: useStore.getState().titles[r.id]?.status ?? 'watching' })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [r?.id, dub?.id, episode])
+  }, [r?.id, dub?.key, episode])
 
   if (libria && !forceKodik) return <Navigate to={`/title/${libria.alias}`} replace />
   if (error) return <Empty icon={<Film />} title="Не удалось загрузить аниме" text={error} />
   if (!a || !r) return <Skeleton className="h-[420px] w-full rounded-[32px]" />
 
   const desc = stripBB(a.description)
+  // Shikimori has no art for brand-new titles yet
+  const poster = a.image.original.includes('missing') && altPoster ? altPoster : shImg(a.image.original)
   return (
     <div className="flex flex-col gap-8">
       <div className="animate-fade-up relative z-10 rounded-[32px] ring-1 ring-white/5">
         <div className="absolute inset-0 overflow-hidden rounded-[32px]">
-          <img src={shImg(a.image.original)} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl" />
+          <img src={poster} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl" />
           <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/70 to-bg/30" />
         </div>
         <div className="relative flex flex-col gap-6 p-6 sm:flex-row sm:p-10">
-          <img src={shImg(a.image.original)} alt="" className="w-40 shrink-0 self-center rounded-3xl shadow-2xl ring-1 ring-white/10 sm:w-52 sm:self-start" />
+          <img src={poster} alt="" className="w-40 shrink-0 self-center rounded-3xl shadow-2xl ring-1 ring-white/10 sm:w-52 sm:self-start" />
           <div className="flex min-w-0 flex-col gap-4">
             <div className="flex flex-wrap gap-2 text-xs font-bold">
               {a.status === 'ongoing' && <span className="rounded-full bg-accent px-3 py-1">Онгоинг</span>}
-              <span className="glass rounded-full px-3 py-1">Kodik</span>
               {a.genres?.slice(0, 5).map((g) => (
                 <span key={g.id} className="glass rounded-full px-3 py-1">
                   {g.russian}
@@ -137,51 +158,69 @@ export default function Anime() {
         </div>
       </div>
 
-      {!token ? (
-        <Panel>
-          <div className="flex flex-col items-start gap-3">
-            <div className="flex items-center gap-3 text-xl font-extrabold">
-              <KeyRound className="text-accent-2" /> Этого аниме нет у AniLibria
-            </div>
-            <p className="max-w-2xl text-sm text-white/75">
-              Другие озвучки (Studio Band, AniDUB и т.д.) идут через плеер Kodik. Для него нужен API‑токен Kodik — вставьте его в настройках один раз,
-              и он появится на всех устройствах.
-            </p>
-            <Link to="/settings" className="rounded-full bg-white px-5 py-2.5 font-bold text-black">
-              Открыть настройки
-            </Link>
-          </div>
-        </Panel>
-      ) : dubErr ? (
-        <Empty icon={<KeyRound />} title="Kodik не ответил" text={dubErr} />
+      {dubErr ? (
+        <Empty icon={<Film />} title="Источник не ответил" text={dubErr} />
       ) : !dubs ? (
         <div className="flex items-center gap-3 font-semibold text-muted">
           <Loader2 className="animate-spin" /> Ищем озвучки…
         </div>
-      ) : dubs.length === 0 || !dub ? (
-        <Empty icon={<Film />} title="У Kodik нет этого аниме" />
+      ) : dubs.length === 0 || !dub || !video ? (
+        <Empty icon={<Film />} title="Серий пока нет" text="Ни одной озвучки этого аниме не нашлось. Загляните позже." />
       ) : (
         <div className="flex flex-col gap-6">
-          <KodikPlayer release={r} dub={dub} episode={Math.min(episode, total)} hasNext={episode < total} onNext={() => selectEp(episode + 1)} />
+          <KodikPlayer release={r} src={video.url} episode={episode} op={video.op} ed={video.ed} hasNext={nextEp != null} onNext={() => nextEp != null && selectEp(nextEp)} />
+          <div className="-mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-semibold text-muted">
+            <span className="text-white">
+              {fmtOrdinal(episode)} серия · {dubLabel(dub)}
+            </span>
+            {players.length > 1 && (
+              <span className="flex items-center gap-1.5">
+                <MonitorPlay size={15} /> Плеер:
+                {players.map((p, i) => (
+                  <button
+                    key={p.url}
+                    onClick={() => setPlayerIdx(i)}
+                    className={cn('rounded-full px-2.5 py-0.5 ring-1 transition', video === p ? 'bg-white text-black ring-white' : 'ring-white/15 hover:bg-white/10')}
+                  >
+                    {p.player}
+                  </button>
+                ))}
+              </span>
+            )}
+            {!video.kodik && <span className="text-amber-300/80">В этом плеере позиция не запоминается — для синхронизации выберите Kodik</span>}
+          </div>
           <section>
-            <h2 className="mb-3 text-xl font-extrabold">Озвучка</h2>
-            <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+            <h2 className="mb-3 text-xl font-extrabold">
+              Озвучка <span className="text-sm font-semibold text-muted">· {dubs.length}</span>
+            </h2>
+            <div className="flex flex-wrap gap-2">
               {dubs.map((d) => (
-                <Chip key={d.id} active={d.id === dub.id} onClick={() => selectDub(d)}>
+                <Chip key={d.key} active={d.key === dub.key} onClick={() => selectDub(d)}>
                   <span className="flex items-center gap-1.5">
-                    {d.type === 'subtitles' ? <Captions size={14} /> : <Mic size={14} />}
-                    {d.title}
-                    <span className="opacity-50">{d.episodes}</span>
+                    {d.kind === 'subtitles' ? <Captions size={14} /> : <Mic size={14} />}
+                    {dubLabel(d)}
+                    <span className="opacity-50">{d.count}</span>
                   </span>
                 </Chip>
               ))}
             </div>
           </section>
-          {total > 1 && (
+          {numbers.length > 1 && (
             <section>
-              <h2 className="mb-3 text-xl font-extrabold">Серии · {total}</h2>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-xl font-extrabold">Серии · {numbers.length}</h2>
+                {pages > 1 && (
+                  <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
+                    {Array.from({ length: pages }, (_, i) => (
+                      <Chip key={i} active={i === curPage} onClick={() => setPage(i)}>
+                        {numbers[i * EP_PAGE]}–{numbers[Math.min(numbers.length, (i + 1) * EP_PAGE) - 1]}
+                      </Chip>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-2">
-                {Array.from({ length: total }, (_, i) => i + 1).map((n) => {
+                {numbers.slice(curPage * EP_PAGE, (curPage + 1) * EP_PAGE).map((n) => {
                   const p = progress[progressKey(r.id, n)]
                   const ratio = p ? (p.watched ? 1 : p.duration ? p.time / p.duration : 0) : 0
                   return (
@@ -204,6 +243,7 @@ export default function Anime() {
           )}
         </div>
       )}
+      <FranchiseRow malId={a.id} />
     </div>
   )
 }

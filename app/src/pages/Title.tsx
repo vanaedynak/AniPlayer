@@ -5,7 +5,8 @@ import { api, posterUrl, episodePreview, sortedEpisodes } from '../lib/api'
 import { useAsync } from '../lib/useAsync'
 import { useStore, progressKey } from '../lib/store'
 import { EpisodeCard, Skeleton, Chip, Empty } from '../components/ui'
-import { StatusPicker, Franchise } from '../components/TitleBits'
+import { StatusPicker } from '../components/TitleBits'
+import { FranchiseRow } from '../components/FranchiseRow'
 import { fmtOrdinal, fmtTime, cn } from '../lib/format'
 
 export const PAGE = 24
@@ -155,7 +156,7 @@ export default function Title() {
                   to={`/anime/${r.mal.id}?kodik=1`}
                   className="flex h-12 items-center rounded-full bg-white/10 px-5 font-bold ring-1 ring-white/10 transition hover:bg-white/15"
                 >
-                  Другие озвучки
+                  {r.episodes_total && episodes.length < r.episodes_total ? `Все ${r.episodes_total} серий · другие озвучки` : 'Другие озвучки'}
                 </Link>
               ) : null}
             </div>
@@ -169,7 +170,9 @@ export default function Title() {
         </div>
       )}
 
-      <div className="grid gap-10 xl:grid-cols-[1fr_320px]">
+      {r.mal?.id ? <FranchiseRow malId={r.mal.id} /> : null}
+
+      <div>
         <section>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-2xl font-extrabold">Серии</h2>
@@ -185,9 +188,6 @@ export default function Title() {
             <Empty icon={<Clock />} title="Серий пока нет" text={r.notification ?? 'Тайтл ещё в работе у команды AniLibria.'} />
           )}
         </section>
-        <aside>
-          <Franchise r={r} />
-        </aside>
       </div>
     </div>
   )

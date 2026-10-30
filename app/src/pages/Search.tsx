@@ -4,6 +4,8 @@ import { Search as SearchIcon, X, SearchX } from 'lucide-react'
 import { api, type Release } from '../lib/api'
 import { shiki, type ShikiAnime } from '../lib/shikimori'
 import { ReleaseCard, ShikiCard, CardSkeletons, Empty } from '../components/ui'
+import { FranchiseRow } from '../components/FranchiseRow'
+import { shikiTitle } from '../lib/shikimori'
 
 export default function Search() {
   const [sp, setSp] = useSearchParams()
@@ -61,6 +63,7 @@ export default function Search() {
           </button>
         )}
       </div>
+      {others[0] && <FranchiseRow key={others[0].id} malId={others[0].id} title={`${shikiTitle(others[0]).split(/[:—]/)[0].trim()} — все части`} />}
       {items !== null && items.length > 0 && <h2 className="text-xl font-extrabold">В озвучке AniLibria</h2>}
       {items === null && !loading ? (
         <Empty icon={<SearchIcon />} title="Что посмотрим?" text="Начните вводить название — результаты появятся сразу." />
@@ -77,7 +80,7 @@ export default function Search() {
         return rest.length ? (
           <section className="flex flex-col gap-4">
             <h2 className="text-xl font-extrabold">
-              Другие аниме <span className="text-sm font-semibold text-muted">· Shikimori, смотреть через Kodik</span>
+              Другие аниме <span className="text-sm font-semibold text-muted">· все озвучки, Studio Band и другие</span>
             </h2>
             <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
               {rest.map((a) => (

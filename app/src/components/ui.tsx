@@ -254,11 +254,16 @@ export function PanelTitle({ icon, title, sub }: { icon: ReactNode; title: strin
 }
 
 /** card for a Shikimori entry; marks titles AniLibria has voiced */
-export function ShikiCard({ a }: { a: ShikiAnime }) {
+export function ShikiCard({ a, badge, active }: { a: ShikiAnime; badge?: string; active?: boolean }) {
   const libria = useLibriaIndex((s) => s.byMal[a.id])
   return (
     <Link to={libria ? `/title/${libria.alias}` : `/anime/${a.id}`} className="group block">
-      <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-card ring-1 ring-white/5 transition duration-300 group-hover:-translate-y-1 group-hover:shadow-2xl group-hover:shadow-accent/15 group-hover:ring-white/15">
+      <div
+        className={cn(
+          'relative aspect-[2/3] overflow-hidden rounded-2xl bg-card transition duration-300 group-hover:-translate-y-1 group-hover:shadow-2xl group-hover:shadow-accent/15',
+          active ? 'ring-2 ring-accent-2' : 'ring-1 ring-white/5 group-hover:ring-white/15',
+        )}
+      >
         <img src={shImg(a.image.original)} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-80" />
         <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
@@ -269,6 +274,7 @@ export function ShikiCard({ a }: { a: ShikiAnime }) {
           )}
           {a.status === 'ongoing' && <span className="rounded-lg bg-accent px-2 py-1 text-xs font-bold">Онгоинг</span>}
         </div>
+        {badge && <span className="absolute bottom-2 left-2 rounded-lg bg-black/70 px-2 py-1 text-[11px] font-extrabold backdrop-blur">{badge}</span>}
         {libria && <span className="absolute right-2 bottom-2 rounded-lg bg-white px-2 py-1 text-[11px] font-extrabold text-black">AniLibria</span>}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 transition group-hover:opacity-100">
           <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/95 text-black shadow-xl">

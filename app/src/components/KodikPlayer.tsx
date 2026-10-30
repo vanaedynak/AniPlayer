@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { FastForward, Play, SkipForward } from 'lucide-react'
 import { aniskip, type Release } from '../lib/api'
-import { kodikCommand, kodikEpisodeUrl, type Dub } from '../lib/kodik'
+import { kodikCommand } from '../lib/kodik'
+import type { Seg } from '../lib/yummy'
 import { useStore, getProgress, WATCHED_RATIO } from '../lib/store'
 import { waitForFirstSync } from '../lib/sync'
 import { anilistReportEpisode } from '../lib/anilist'
@@ -9,19 +10,23 @@ import { onAppHide } from '../lib/platform'
 import { fmtTime, cn } from '../lib/format'
 
 const AUTO_SKIP_MS = 5000
-type Seg = { start: number; stop: number }
 
-/** Kodik's iframe player wired into our progress, history, stats and auto-skip */
+/** an embedded player (Kodik and friends) wired into our progress, history, stats and auto-skip.
+ *  Only Kodik reports playback over postMessage; other players just play. */
 export default function KodikPlayer({
   release,
-  dub,
+  src,
   episode,
+  op,
+  ed,
   hasNext,
   onNext,
 }: {
   release: Release
-  dub: Dub
+  src: string
   episode: number
+  op?: Seg
+  ed?: Seg
   hasNext: boolean
   onNext: () => void
 }) {
@@ -33,7 +38,6 @@ export default function KodikPlayer({
   const [toast, setToast] = useState('')
   const [playing, setPlaying] = useState(false)
   const [nextIn, setNextIn] = useState<number | null>(null)
-  const src = kodikEpisodeUrl(dub, episode)
   const malId = release.mal?.id
 
   const save = useCallback(
@@ -58,10 +62,14 @@ export default function KodikPlayer({
     st.current = { time: 0, duration: 0, playing: false, played: 0, pendingWatch: 0, lastSave: 0, resumed: false, reported: false, skippedOp: false, skippedEd: false }
     setAutoSkip(null)
     setNextIn(null)
-    setSkip({})
-    if (malId) aniskip(malId, episode).then(setSkip)
+    if (op || ed) setSkip({ op, ed })
+    else {
+      setSkip({})
+      if (malId) aniskip(malId, episode).then(setSkip)
+    }
     return () => save(true)
-  }, [episode, dub.id, malId, save])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src, malId, save])
 
   const seek = (t: number) => kodikCommand(frameRef.current, 'seek', { seconds: Math.max(0, t) })
 
