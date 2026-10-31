@@ -33,7 +33,7 @@ export default function Watch() {
   useEffect(() => {
     if (r) document.title = `${episode ? fmtOrdinal(episode.ordinal) + ' серия · ' : ''}${r.name.main}`
     return () => {
-      document.title = 'AniPlayer'
+      document.title = 'Anyflow'
     }
   }, [r, episode])
 

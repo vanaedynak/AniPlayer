@@ -66,7 +66,15 @@ export interface LocalPrefs {
   scale: number
   /** Anime4K level; per device because it depends on the GPU */
   upscale: UpscaleMode
+  /** color theme of the app */
+  theme?: Theme
 }
+
+export type Theme = 'anyflow' | 'violet'
+export const THEMES: { id: Theme; label: string; colors: [string, string, string] }[] = [
+  { id: 'anyflow', label: 'Anyflow', colors: ['#060a0f', '#14b8a6', '#fb7185'] },
+  { id: 'violet', label: 'Фиолетовая', colors: ['#09090d', '#8b5cf6', '#ec4899'] },
+]
 
 export const progressKey = (releaseId: number, ordinal: number) => `${releaseId}_${String(ordinal).replace('.', '-')}`
 export const dayKey = (d = new Date()) =>

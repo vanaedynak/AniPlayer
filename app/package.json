@@ -53,12 +53,12 @@
     "vite": "^8.3.5",
     "wait-on": "^9.5.1"
   },
-  "description": "AniPlayer — AniLibria client",
+  "description": "Anyflow — anime, manga and ranobe",
   "author": "Ivan",
   "main": "electron/main.cjs",
   "build": {
     "appId": "app.aniplayer.desktop",
-    "productName": "AniPlayer",
+    "productName": "Anyflow Desktop",
     "publish": [
       {
         "provider": "generic",
@@ -89,8 +89,8 @@
       "oneClick": true,
       "perMachine": false,
       "createDesktopShortcut": true,
-      "shortcutName": "AniPlayer",
-      "artifactName": "AniPlayer-Setup-${version}.exe"
+      "shortcutName": "Anyflow Desktop",
+      "artifactName": "Anyflow-Desktop-Setup-${version}.exe"
     }
   }
 }

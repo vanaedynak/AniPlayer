@@ -3,7 +3,7 @@ import { Cloud, LogOut, Link2, PlayCircle, Database, Check, ExternalLink, Loader
 import { Link } from 'react-router-dom'
 import { useSync, getFirebaseConfig, saveFirebaseConfig, signIn, logOut, accountName } from '../lib/sync'
 import { anilistViewer, anilistAuthUrl } from '../lib/anilist'
-import { useStore } from '../lib/store'
+import { useStore, THEMES } from '../lib/store'
 import { Panel, PanelTitle } from '../components/ui'
 import { UpdateSettings } from '../components/Updates'
 import { cn } from '../lib/format'
@@ -188,7 +188,7 @@ function AniListSettings() {
               <a className="font-bold text-accent-2" href="https://anilist.co/settings/developer" target="_blank" rel="noreferrer">
                 anilist.co/settings/developer <ExternalLink size={12} className="inline" />
               </a>{' '}
-              → Create New Client. Name: AniPlayer, Redirect URL (точно так, без пробелов — иначе после входа будет «API route not found»):{' '}
+              → Create New Client. Name: Anyflow, Redirect URL (точно так, без пробелов — иначе после входа будет «API route not found»):{' '}
               <code className="rounded bg-white/10 px-1">{ANILIST_PIN}</code>{' '}
               <button className="font-bold text-accent-2" onClick={() => void navigator.clipboard.writeText(ANILIST_PIN)}>
                 Скопировать
@@ -266,10 +266,28 @@ function PlayerSettings() {
 
 function InterfaceSettings() {
   const scale = useStore((s) => s.local.scale)
+  const theme = useStore((s) => s.local.theme ?? 'anyflow')
   const setLocal = useStore((s) => s.setLocal)
   return (
     <Panel>
-      <PanelTitle icon={<ZoomIn className="text-pink" />} title="Интерфейс" sub="Масштаб для этого устройства" />
+      <PanelTitle icon={<ZoomIn className="text-pink" />} title="Интерфейс" sub="Тема и масштаб для этого устройства" />
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
+        <span className="font-bold">Тема</span>
+        <div className="flex flex-wrap gap-2">
+          {THEMES.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setLocal({ theme: t.id })}
+              className={cn('flex items-center gap-2.5 rounded-full py-1.5 pr-4 pl-1.5 text-sm font-bold ring-1 transition', theme === t.id ? 'bg-white/10 ring-white/40' : 'ring-white/10 hover:bg-white/5')}
+            >
+              <span className="flex h-7 w-7 items-center justify-center rounded-full ring-1 ring-white/10" style={{ background: t.colors[0] }}>
+                <span className="h-3.5 w-3.5 rounded-full" style={{ background: `linear-gradient(135deg, ${t.colors[1]}, ${t.colors[2]})` }} />
+              </span>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-3 px-1">
         <span className="font-bold">Масштаб</span>
         <div className="flex flex-wrap gap-1 rounded-full bg-white/[0.06] p-1">
@@ -339,7 +357,7 @@ export default function Settings() {
       <PlayerSettings />
       <DataSettings />
       <AboutLinks />
-      <div className="px-2 text-xs text-dim">AniPlayer · видео и озвучка AniLibria (anilibria.top) · неофициальный клиент для личного использования</div>
+      <div className="px-2 text-xs text-dim">Anyflow · видео и озвучка AniLibria (anilibria.top) · неофициальный клиент для личного использования</div>
     </div>
   )
 }

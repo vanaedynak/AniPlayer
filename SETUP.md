@@ -1,4 +1,4 @@
-# AniPlayer: настройка
+# Anyflow: настройка
 
 Клиент AniLibria для Windows и iPad, похожий на Animix. Видео и озвучка — AniLibria (публичный API `anilibria.top`).
 
@@ -57,7 +57,7 @@
 Отмечает просмотренные серии в вашем списке AniList (сопоставление по MyAnimeList ID).
 
 1. <https://anilist.co/settings/developer> → **Create New Client**.
-   Name: `AniPlayer`, Redirect URL: `https://anilist.co/api/v2/oauth/pin` → Save.
+   Name: `Anyflow`, Redirect URL: `https://anilist.co/api/v2/oauth/pin` → Save.
 2. В приложении на ПК: **Настройки → AniList** → вставьте Client ID → «Получить токен» →
    Authorize → скопируйте токен → вставьте → «Подключить».
 3. Токен синхронизируется на iPad сам.
@@ -73,16 +73,16 @@ AnimeVost и т.д.) во встроенном плеере Kodik. Ничего 
 ## 4. Установка
 
 ### Windows
-`app/release/AniPlayer-Setup-1.0.0.exe` — установщик (создаёт ярлык на рабочем столе).
+`app/release/Anyflow-Desktop-Setup-1.0.0.exe` — установщик (создаёт ярлык на рабочем столе).
 Свежие сборки также лежат в GitHub Releases (`latest`).
 
 ### iPad
-GitHub Actions собирает неподписанный `AniPlayer.ipa` при каждом пуше
-(вкладка **Releases → latest** или **Actions → артефакт AniPlayer-ipa**).
+GitHub Actions собирает неподписанный `Anyflow.ipa` при каждом пуше
+(вкладка **Releases → latest** или **Actions → артефакт Anyflow-ipa**).
 
 Установить без Mac можно через **Sideloadly** (<https://sideloadly.io>) с ПК:
 1. Поставьте iTunes и iCloud с сайта Apple (не из Microsoft Store), затем Sideloadly.
-2. Подключите iPad кабелем, перетащите `AniPlayer.ipa` в Sideloadly, введите Apple ID → Start.
+2. Подключите iPad кабелем, перетащите `Anyflow.ipa` в Sideloadly, введите Apple ID → Start.
 3. На iPad: **Настройки → Основные → VPN и управление устройством** → доверять своему Apple ID.
 4. На iPadOS 16+ включите **Настройки → Конфиденциальность → Режим разработчика**.
 
@@ -91,7 +91,7 @@ GitHub Actions собирает неподписанный `AniPlayer.ipa` пр�
 не теряются — они в облаке.
 
 ### Android (телефон и планшет)
-В том же релизе лежит `AniPlayer.apk`. Скачайте его на устройство, откройте и разрешите установку
+В том же релизе лежит `Anyflow.apk`. Скачайте его на устройство, откройте и разрешите установку
 из этого источника. Версии из релиза ставятся поверх старой, если в репозитории настроен ключ подписи
 (секреты `ANDROID_KEYSTORE` и `ANDROID_KEYSTORE_PASSWORD`, см. ниже). Без ключа каждую сборку
 приходится ставить после удаления предыдущей; данные в облаке при этом сохраняются.

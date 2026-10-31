@@ -164,7 +164,7 @@ function RoomDialog({ onClose }: { onClose: () => void }) {
             <div className="rounded-2xl bg-white/[0.04] p-4 text-center ring-1 ring-white/5">
               <div className="text-xs font-bold tracking-widest text-muted uppercase">Код комнаты</div>
               <div className="mt-1 font-mono text-4xl font-extrabold tracking-[0.3em]">{code}</div>
-              <div className="mt-1 text-sm text-muted">Друг вводит этот код в AniPlayer: значок 👥 сверху</div>
+              <div className="mt-1 text-sm text-muted">Друг вводит этот код в Anyflow: значок 👥 сверху</div>
             </div>
             <div className="text-sm text-white/80">
               В комнате: {onlineMembers(room).map((m) => m.name).join(', ') || '…'}

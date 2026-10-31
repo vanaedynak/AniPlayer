@@ -105,6 +105,11 @@ export function applyScale(scale: number) {
   else document.documentElement.style.setProperty('zoom', String(scale))
 }
 
+/** the color theme lives on <html>; the CSS swaps the color tokens */
+export function applyTheme(theme: string | undefined) {
+  document.documentElement.dataset.theme = theme ?? 'anyflow'
+}
+
 export function initScale(get: () => number, set: (s: number) => void) {
   applyScale(get())
   window.addEventListener('keydown', (e) => {

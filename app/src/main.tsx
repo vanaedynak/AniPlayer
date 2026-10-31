@@ -4,7 +4,7 @@ import './index.css'
 import App from './App.tsx'
 import { initSync } from './lib/sync'
 import { initLibriaIndex } from './lib/libriaIndex'
-import { initLifecycle, initScale, applyScale, initStatusBar } from './lib/platform'
+import { initLifecycle, initScale, applyScale, applyTheme, initStatusBar } from './lib/platform'
 import { useStore } from './lib/store'
 import { initMangaSync } from './manga/store'
 import { initVault } from './lib/vault'
@@ -20,6 +20,8 @@ initScale(
   (scale) => useStore.getState().setLocal({ scale }),
 )
 useStore.subscribe((s, prev) => s.local.scale !== prev.local.scale && applyScale(s.local.scale))
+applyTheme(useStore.getState().local.theme)
+useStore.subscribe((s, prev) => s.local.theme !== prev.local.theme && applyTheme(s.local.theme))
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

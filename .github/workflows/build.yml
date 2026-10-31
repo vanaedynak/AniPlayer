@@ -43,7 +43,7 @@ jobs:
         run: |
           P=ios/App/App/Info.plist
           pb() { /usr/libexec/PlistBuddy -c "$1" "$P" || true; }
-          pb "Set :CFBundleDisplayName AniPlayer"
+          pb "Set :CFBundleDisplayName Anyflow"
           pb "Add :UIBackgroundModes array"
           pb "Add :UIBackgroundModes:0 string audio"
           pb "Add :UIStatusBarStyle string UIStatusBarStyleLightContent"
@@ -69,12 +69,12 @@ jobs:
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build | tail -30
           mkdir -p Payload
           cp -R build/Build/Products/Release-iphoneos/App.app Payload/
-          zip -qry ../../AniPlayer.ipa Payload
+          zip -qry ../../Anyflow.ipa Payload
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AniPlayer-ipa
-          path: app/AniPlayer.ipa
+          name: Anyflow-ipa
+          path: app/Anyflow.ipa
 
   android:
     name: Android (APK)
@@ -124,16 +124,16 @@ jobs:
             echo "$KEYSTORE" | base64 -d > release.jks
             BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
             $BT/zipalign -f 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
-            $BT/apksigner sign --ks release.jks --ks-key-alias aniplayer --ks-pass env:KEYSTORE_PASSWORD --out ../AniPlayer.apk aligned.apk
+            $BT/apksigner sign --ks release.jks --ks-key-alias aniplayer --ks-pass env:KEYSTORE_PASSWORD --out ../Anyflow.apk aligned.apk
           else
             ./gradlew assembleDebug --no-daemon -q
-            cp app/build/outputs/apk/debug/app-debug.apk ../AniPlayer.apk
+            cp app/build/outputs/apk/debug/app-debug.apk ../Anyflow.apk
           fi
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AniPlayer-android
-          path: app/AniPlayer.apk
+          name: Anyflow-android
+          path: app/Anyflow.apk
 
   windows:
     name: Windows installer
@@ -155,7 +155,7 @@ jobs:
       - run: npx electron-builder --win --x64 --publish never
       - uses: actions/upload-artifact@v4
         with:
-          name: AniPlayer-windows
+          name: Anyflow-windows
           path: |
             app/release/*.exe
             app/release/*.blockmap
@@ -176,5 +176,5 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest out/* --title "AniPlayer build ${{ github.run_number }}" \
+          gh release create latest out/* --title "Anyflow build ${{ github.run_number }}" \
             --notes "IPA для iPad (ставится через Sideloadly/AltStore), APK для Android и установщик для Windows. Сборка из ${GITHUB_SHA::7}." --latest

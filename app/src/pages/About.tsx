@@ -69,7 +69,7 @@ function AboutHome() {
         <div className="flex items-center gap-4">
           <img src="./icon-256.png" alt="" className="h-16 w-16 rounded-2xl" />
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight">AniPlayer</h1>
+            <h1 className="text-3xl font-extrabold tracking-tight">{isElectron ? 'Anyflow Desktop' : 'Anyflow'}</h1>
             <div className="text-sm font-semibold text-muted">
               Версия {version} · {platform}
             </div>
@@ -101,7 +101,7 @@ function AboutHome() {
           ))}
         </div>
       </Panel>
-      <div className="pb-4 text-center text-xs text-dim">© 2026 AniPlayer. Все права защищены.</div>
+      <div className="pb-4 text-center text-xs text-dim">© 2026 Anyflow. Все права защищены.</div>
     </div>
   )
 }
@@ -182,7 +182,7 @@ const PRIVACY: [string, string][] = [
 ]
 
 const TERMS: [string, string][] = [
-  ['Что это', 'AniPlayer — бесплатное неофициальное приложение для просмотра и чтения контента, опубликованного на сторонних сайтах. Приложение не размещает видео, манги или текстов на своих серверах.'],
+  ['Что это', 'Anyflow — бесплатное неофициальное приложение для просмотра и чтения контента, опубликованного на сторонних сайтах. Приложение не размещает видео, манги или текстов на своих серверах.'],
   ['Права на контент', 'Права на аниме, мангу и ранобэ принадлежат их правообладателям, переводы — командам-переводчикам. Если вы правообладатель и хотите, чтобы источник перестал отображаться, напишите в поддержку.'],
   ['Аккаунт', 'Вы отвечаете за сохранность своего пароля. Не создавайте аккаунты от чужого имени и не используйте приложение для рассылки спама.'],
   ['Комментарии и профили', 'Запрещены оскорбления, спам, реклама, спойлеры без пометки, незаконный контент. Нарушения скрываются, аккаунты нарушителей блокируются.'],

@@ -337,7 +337,7 @@ export function TypeSheet({ prefs, set, close, paged }: { prefs: BookPrefs; set:
             <button onClick={() => set({ size: Math.max(13, prefs.size - 1) })} className="h-10 w-10 rounded-full bg-white/10 text-sm font-extrabold">
               A−
             </button>
-            <input type="range" min={13} max={32} value={prefs.size} onChange={(e) => set({ size: Number(e.target.value) })} className="flex-1 accent-[#a78bfa]" />
+            <input type="range" min={13} max={32} value={prefs.size} onChange={(e) => set({ size: Number(e.target.value) })} className="flex-1 accent-accent-2" />
             <button onClick={() => set({ size: Math.min(32, prefs.size + 1) })} className="h-10 w-10 rounded-full bg-white/10 text-lg font-extrabold">
               A+
             </button>
@@ -347,10 +347,10 @@ export function TypeSheet({ prefs, set, close, paged }: { prefs: BookPrefs; set:
           <Seg value={prefs.font} onChange={(font) => set({ font })} options={(Object.keys(FONTS) as BookPrefs['font'][]).map((k) => ({ v: k, l: FONTS[k].label }))} />
         </Field>
         <Field label={`Межстрочный интервал · ${prefs.leading.toFixed(1)}`}>
-          <input type="range" min={1.2} max={2.2} step={0.1} value={prefs.leading} onChange={(e) => set({ leading: Number(e.target.value) })} className="w-full accent-[#a78bfa]" />
+          <input type="range" min={1.2} max={2.2} step={0.1} value={prefs.leading} onChange={(e) => set({ leading: Number(e.target.value) })} className="w-full accent-accent-2" />
         </Field>
         <Field label={`Ширина текста · ${prefs.width}px`}>
-          <input type="range" min={480} max={1200} step={20} value={prefs.width} onChange={(e) => set({ width: Number(e.target.value) })} className="w-full accent-[#a78bfa]" />
+          <input type="range" min={480} max={1200} step={20} value={prefs.width} onChange={(e) => set({ width: Number(e.target.value) })} className="w-full accent-accent-2" />
         </Field>
         <Field label="Тема">
           <div className="grid grid-cols-4 gap-2">

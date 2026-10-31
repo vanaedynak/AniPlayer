@@ -15,6 +15,10 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } },
 ])
 
+// the app was called AniPlayer before: its data folder keeps that name, so a renamed app finds
+// the history, downloads and logins where they always were
+app.setPath('userData', path.join(app.getPath('appData'), 'aniplayer'))
+
 if (!app.requestSingleInstanceLock()) app.quit()
 
 nativeTheme.themeSource = 'dark'
@@ -48,8 +52,8 @@ function createWindow() {
     height: state.height,
     minWidth: 900,
     minHeight: 600,
-    backgroundColor: '#09090d',
-    title: 'AniPlayer',
+    backgroundColor: '#060a0f',
+    title: 'Anyflow Desktop',
     icon: path.join(__dirname, '..', 'build', 'icon.png'),
     titleBarStyle: 'hidden',
     titleBarOverlay: { color: '#00000000', symbolColor: '#ffffff', height: 56 },

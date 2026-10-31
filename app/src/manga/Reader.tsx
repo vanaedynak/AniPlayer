@@ -359,7 +359,7 @@ function ReaderView({
                 setPage(v)
                 if (!paged) document.getElementById(`mp-${v}`)?.scrollIntoView({ block: 'start' })
               }}
-              className="h-1.5 min-w-0 flex-1 cursor-pointer accent-[#a78bfa]"
+              className="h-1.5 min-w-0 flex-1 cursor-pointer accent-accent-2"
               style={{ direction: rtl ? 'rtl' : 'ltr' }}
             />
             <span className="shrink-0 text-sm font-bold tabular-nums">
@@ -1034,7 +1034,7 @@ function SettingsSheet({ prefs, set, close, onSaved }: { prefs: ReaderPrefs; set
         {prefs.mode === 'scroll' ? (
           <>
             <Field label={`Ширина ленты · ${prefs.width}px`}>
-              <input type="range" min={360} max={1600} step={20} value={prefs.width} onChange={(e) => set({ width: Number(e.target.value) })} className="w-full accent-[#a78bfa]" />
+              <input type="range" min={360} max={1600} step={20} value={prefs.width} onChange={(e) => set({ width: Number(e.target.value) })} className="w-full accent-accent-2" />
             </Field>
             <Toggle label="Отступы между страницами" value={prefs.gap} onChange={(gap) => set({ gap })} />
           </>
@@ -1070,7 +1070,7 @@ function SettingsSheet({ prefs, set, close, onSaved }: { prefs: ReaderPrefs; set
           </div>
         </Field>
         <Field label={`Яркость · ${Math.round(prefs.brightness * 100)}%`}>
-          <input type="range" min={0.3} max={1} step={0.05} value={prefs.brightness} onChange={(e) => set({ brightness: Number(e.target.value) })} className="w-full accent-[#a78bfa]" />
+          <input type="range" min={0.3} max={1} step={0.05} value={prefs.brightness} onChange={(e) => set({ brightness: Number(e.target.value) })} className="w-full accent-accent-2" />
         </Field>
         <Toggle label="Экономия трафика (сжатые страницы)" value={prefs.saver} onChange={(saver) => set({ saver })} />
         <div className="mt-2 border-t border-white/10 pt-5">
@@ -1085,7 +1085,7 @@ function SettingsSheet({ prefs, set, close, onSaved }: { prefs: ReaderPrefs; set
 export function Sheet({ title, close, children }: { title: string; close: () => void; children: ReactNode }) {
   return (
     <div
-      className={cn('animate-pop absolute inset-y-0 right-0 z-30 flex w-full max-w-sm flex-col bg-[#15151d]/95 text-white shadow-2xl ring-1 ring-white/10 backdrop-blur-xl', isElectron && 'pt-14')}
+      className={cn('animate-pop absolute inset-y-0 right-0 z-30 flex w-full max-w-sm flex-col bg-card/95 text-white shadow-2xl ring-1 ring-white/10 backdrop-blur-xl', isElectron && 'pt-14')}
       style={{ paddingTop: 'var(--safe-top)', paddingBottom: 'var(--safe-bottom)' }}
     >
       <div className="flex items-center justify-between px-5 py-4">

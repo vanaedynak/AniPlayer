@@ -54,9 +54,9 @@ const TABS = [
 export function Logo() {
   return (
     <Link to="/" className="no-drag flex items-center gap-2.5">
-      <img src="favicon.svg" alt="" className="h-10 w-10 drop-shadow-[0_6px_18px_rgba(139,92,246,0.45)]" />
+      <img src="favicon.svg" alt="" className="h-10 w-10 drop-shadow-[0_6px_18px_var(--color-glow)]" />
       <span className="text-[22px] font-extrabold tracking-tight">
-        ani<span className="text-gradient">player</span>
+        any<span className="text-gradient">flow</span>
       </span>
     </Link>
   )

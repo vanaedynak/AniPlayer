@@ -22,7 +22,7 @@ export class CrashGuard extends Component<{ children: ReactNode }, { error: Erro
 
 function CrashScreen({ error, retry }: { error: Error; retry: () => void }) {
   const [copied, setCopied] = useState(false)
-  const report = `${error.name}: ${error.message}\n${location.hash}\nAniPlayer ${__APP_VERSION__}\n${navigator.userAgent}\n\n${error.stack ?? ''}`
+  const report = `${error.name}: ${error.message}\n${location.hash}\nAnyflow ${__APP_VERSION__}\n${navigator.userAgent}\n\n${error.stack ?? ''}`
   return (
     <div className="mx-auto flex max-w-lg flex-col items-center gap-4 py-16 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-500/15 text-rose-300">
@@ -87,7 +87,7 @@ export function Welcome() {
         <div className="mb-1 flex items-center gap-2 text-2xl font-extrabold">
           <Sparkles className="text-accent-2" /> Добро пожаловать
         </div>
-        <div className="mb-5 text-sm font-semibold text-muted">Коротко о том, что умеет AniPlayer</div>
+        <div className="mb-5 text-sm font-semibold text-muted">Коротко о том, что умеет Anyflow</div>
         <div className="flex flex-col gap-4">
           {points.map((p) => (
             <div key={p.t} className="flex gap-3">

@@ -44,7 +44,7 @@ function MobileUpdatePill() {
   if (!next) return null
   const open = () => {
     if (isIOS) {
-      alert(`Вышла версия ${next.version}. Скачайте на ПК AniPlayer.ipa из релиза на GitHub и поставьте поверх через Sideloadly — данные сохранятся.`)
+      alert(`Вышла версия ${next.version}. Скачайте на ПК Anyflow.ipa из релиза на GitHub и поставьте поверх через Sideloadly — данные сохранятся.`)
       return
     }
     // a link outside the app opens in the system browser, which downloads the APK and offers to install it

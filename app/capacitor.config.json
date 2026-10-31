@@ -1,11 +1,11 @@
 {
   "appId": "app.aniplayer.ios",
-  "appName": "AniPlayer",
+  "appName": "Anyflow",
   "webDir": "dist",
-  "backgroundColor": "#09090d",
+  "backgroundColor": "#060a0f",
   "ios": {
     "contentInset": "never",
-    "backgroundColor": "#09090d",
+    "backgroundColor": "#060a0f",
     "allowsLinkPreview": false,
     "preferredContentMode": "desktop"
   },
