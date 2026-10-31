@@ -1,9 +1,8 @@
 // Reading state: shelf, last position, read chapters and reader settings.
-// Shelf entries follow the account to other devices through Firestore (users/{uid}/manga/{id}).
+// Shelf entries follow the account to other devices (user_docs, kind "manga").
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { collection, doc, onSnapshot, setDoc, writeBatch } from 'firebase/firestore'
-import { firestore, useSync } from '../lib/sync'
+import { pushDoc, registerDocs } from '../lib/sync'
 import { setAdult, type Manga } from './md'
 
 export type ReadStatus = 'reading' | 'planned' | 'completed' | 'postponed' | 'dropped'
@@ -183,15 +182,14 @@ export const useManga = create<MangaState>()(
   ),
 )
 
-// --- Firestore ----------------------------------------------------------------------------------
+// --- sync -----------------------------------------------------------------------------------------
 
 const timers = new Map<string, ReturnType<typeof setTimeout>>()
 const pending = new Map<string, MangaEntry>()
 
 function write(e: MangaEntry) {
-  const f = firestore()
   pending.delete(e.id)
-  if (f) setDoc(doc(f.db, 'users', f.uid, 'manga', e.id), JSON.parse(JSON.stringify(e))).catch((err) => console.error('[manga sync]', err))
+  pushDoc('manga', e.id, e, e.updatedAt)
 }
 
 /** page turns are batched; shelf and read-mark changes go out at once */
@@ -208,45 +206,13 @@ export function flushManga() {
   timers.clear()
 }
 
-let unsub: (() => void) | null = null
-let listeningFor = ''
-
-function listen() {
-  const f = firestore()
-  if (!f) {
-    unsub?.()
-    unsub = null
-    listeningFor = ''
-    return
-  }
-  if (listeningFor === f.uid) return
-  unsub?.()
-  listeningFor = f.uid
-  let first = true
-  unsub = onSnapshot(
-    collection(f.db, 'users', f.uid, 'manga'),
-    (snap) => {
-      const remote = snap.docs.map((d) => d.data() as MangaEntry)
-      useManga.getState().mergeRemote(remote)
-      if (first && !snap.metadata.fromCache) {
-        first = false
-        // entries made on this device before signing in
-        const have = new Map(remote.map((r) => [r.id, r.updatedAt]))
-        const send = Object.values(useManga.getState().entries).filter((e) => (have.get(e.id) ?? 0) < e.updatedAt)
-        if (send.length) {
-          const b = writeBatch(f.db)
-          send.slice(0, 400).forEach((e) => b.set(doc(f.db, 'users', f.uid, 'manga', e.id), JSON.parse(JSON.stringify(e))))
-          void b.commit().catch((err) => console.error('[manga sync]', err))
-        }
-      }
-    },
-    (err) => console.error('[manga sync]', err),
-  )
-}
-
 export function initMangaSync() {
-  listen()
-  useSync.subscribe(listen)
+  registerDocs<MangaEntry>(
+    'manga',
+    (e) => e.id,
+    () => Object.values(useManga.getState().entries),
+    (list) => useManga.getState().mergeRemote(list),
+  )
   document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flushManga())
   window.addEventListener('pagehide', flushManga)
 }

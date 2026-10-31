@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Cloud, LogOut, Link2, PlayCircle, Database, Check, ExternalLink, Loader2, ZoomIn, Info, Activity, LifeBuoy } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { useSync, getFirebaseConfig, saveFirebaseConfig, signIn, logOut, accountName } from '../lib/sync'
+import { useSync, signIn, logOut, accountName, deleteAccount } from '../lib/sync'
 import { anilistViewer, anilistAuthUrl } from '../lib/anilist'
 import { useStore, THEMES } from '../lib/store'
 import { Panel, PanelTitle } from '../components/ui'
@@ -37,9 +37,8 @@ function Step({ n, children }: { n: number; children: ReactNode }) {
 }
 
 function SyncSettings() {
-  const { status, user, error } = useSync()
-  const configured = !!getFirebaseConfig()
-  const [cfg, setCfg] = useState('')
+  const { status, user, error, moving } = useSync()
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [email, setEmail] = useState('')
   const [pass, setPass] = useState('')
   const [busy, setBusy] = useState(false)
@@ -55,7 +54,9 @@ function SyncSettings() {
       setMsg(
         code.includes('invalid-credential') || code.includes('wrong-password')
           ? 'Неверный логин или пароль'
-          : code.includes('email-already-in-use')
+          : code.includes('too-many')
+            ? 'Слишком много регистраций, попробуйте через минуту'
+          : code.includes('email-already-in-use') || code.includes('username-taken')
             ? 'Такой аккаунт уже есть — нажмите «Войти» (или выберите другое имя)'
             : code.includes('bad-username')
               ? 'Имя: 3–24 символа, латиница, цифры, точка, «-» или «_»'
@@ -73,31 +74,7 @@ function SyncSettings() {
   return (
     <Panel>
       <PanelTitle icon={<Cloud className="text-sky-400" />} title="Синхронизация" sub="История, позиция в серии, коллекция и статистика — между ПК и iPad" />
-      {!configured ? (
-        <div className="flex flex-col gap-4">
-          <p className="text-sm text-white/80">
-            Подключите бесплатный проект Firebase (Google). Сделать это нужно один раз — инструкция в файле <b>SETUP.md</b>.
-          </p>
-          <textarea
-            value={cfg}
-            onChange={(e) => setCfg(e.target.value)}
-            placeholder={'const firebaseConfig = {\n  apiKey: "...",\n  projectId: "...",\n  ...\n};'}
-            className={cn(input, 'h-40 resize-none py-3 font-mono text-sm')}
-          />
-          <button
-            className={cn(btn, 'self-start bg-white text-black')}
-            onClick={() => {
-              try {
-                saveFirebaseConfig(cfg)
-              } catch (e) {
-                setMsg(String((e as Error).message))
-              }
-            }}
-          >
-            Сохранить конфиг
-          </button>
-        </div>
-      ) : user ? (
+      {user ? (
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="font-bold">{accountName(user)}</div>
@@ -105,9 +82,21 @@ function SyncSettings() {
               {status === 'synced' ? 'Всё синхронизировано' : status === 'offline' ? 'Нет сети — изменения отправятся позже' : status === 'error' ? `Ошибка: ${error}` : 'Синхронизация…'}
             </div>
           </div>
-          <button className={cn(btn, 'flex items-center gap-2 bg-white/10 hover:bg-white/15')} onClick={() => logOut()}>
-            <LogOut size={18} /> Выйти
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button className={cn(btn, 'flex items-center gap-2 bg-white/10 hover:bg-white/15')} onClick={() => logOut()}>
+              <LogOut size={18} /> Выйти
+            </button>
+            <button
+              className={cn(btn, confirmDelete ? 'bg-rose-500 text-white' : 'bg-white/5 text-rose-300 hover:bg-rose-500/15')}
+              onClick={() => {
+                if (!confirmDelete) return setConfirmDelete(true)
+                deleteAccount().catch((e) => setMsg(String((e as Error).message)))
+              }}
+              onMouseLeave={() => setConfirmDelete(false)}
+            >
+              {confirmDelete ? 'Точно удалить навсегда?' : 'Удалить аккаунт'}
+            </button>
+          </div>
         </div>
       ) : (
         <form
@@ -118,6 +107,9 @@ function SyncSettings() {
           }}
         >
           <p className="text-sm text-muted">Имя пользователя или почта — что удобнее. Войдите тем же логином на всех устройствах. Первый раз — «Создать аккаунт».</p>
+          <p className="rounded-2xl bg-accent/10 px-4 py-3 text-sm font-semibold text-accent-2 ring-1 ring-accent/20">
+            Приложение переехало на новый сервер. Был аккаунт раньше? Просто войдите тем же логином и паролем — история, списки и манга перенесутся сами.
+          </p>
           <input
             className={input}
             placeholder="Имя пользователя или почта"
@@ -131,7 +123,7 @@ function SyncSettings() {
           <input className={input} type="password" placeholder="Пароль" value={pass} onChange={(e) => setPass(e.target.value)} autoComplete="current-password" />
           <div className="flex gap-2">
             <button type="submit" disabled={busy} className={cn(btn, 'flex-1 bg-white text-black')}>
-              {busy ? <Loader2 className="mx-auto animate-spin" /> : 'Войти'}
+              {moving ? 'Переносим данные…' : busy ? <Loader2 className="mx-auto animate-spin" /> : 'Войти'}
             </button>
             <button type="button" disabled={busy} onClick={() => go(true)} className={cn(btn, 'flex-1 bg-white/10 hover:bg-white/15')}>
               Создать аккаунт
