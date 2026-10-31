@@ -108,13 +108,9 @@ const fail = (code: string) => Object.assign(new Error(code), { code })
 
 async function createAccount(login: string, email: string, password: string) {
   if (!sb) throw fail('no-cloud')
-  if (email.endsWith(USERNAME_DOMAIN)) {
-    const { error } = await sb.rpc('register', { login: login.trim().toLowerCase(), password })
-    if (error) throw fail(error.message)
-  } else {
-    const { error } = await sb.auth.signUp({ email, password })
-    if (error) throw fail(/already/i.test(error.message) ? 'username-taken' : error.message)
-  }
+  // nicknames and real addresses alike: the database makes the account confirmed, no letters are sent
+  const { error } = await sb.rpc('register', { login: email.endsWith(USERNAME_DOMAIN) ? login.trim().toLowerCase() : email, password })
+  if (error) throw fail(error.message)
 }
 
 export async function signIn(login: string, password: string, register = false) {

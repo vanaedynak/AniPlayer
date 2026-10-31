@@ -329,11 +329,19 @@ declare
   mail text;
   uid uuid := gen_random_uuid();
 begin
-  if nick !~ '^[a-z0-9._-]{3,24}$' then raise exception 'bad-username' using errcode = 'P0001'; end if;
   if char_length(password) < 6 or char_length(password) > 72 then raise exception 'weak-password' using errcode = 'P0001'; end if;
-  mail := nick || '@users.aniplayer.app';
-  if exists (select 1 from auth.users where email = mail) or exists (select 1 from profiles where username = nick) then
-    raise exception 'username-taken' using errcode = 'P0001';
+  if nick like '%@%' then
+    -- a real address: made confirmed right away, no letters are sent; the nickname comes from its first part
+    if nick !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'invalid-email' using errcode = 'P0001'; end if;
+    mail := nick;
+    nick := split_part(nick, '@', 1);
+    if exists (select 1 from auth.users where email = mail) then raise exception 'username-taken' using errcode = 'P0001'; end if;
+  else
+    if nick !~ '^[a-z0-9._-]{3,24}$' then raise exception 'bad-username' using errcode = 'P0001'; end if;
+    mail := nick || '@users.aniplayer.app';
+    if exists (select 1 from auth.users where email = mail) or exists (select 1 from profiles where username = nick) then
+      raise exception 'username-taken' using errcode = 'P0001';
+    end if;
   end if;
   if (select count(*) from signup_log where at > now() - interval '1 minute') >= 20 then
     raise exception 'too-many' using errcode = 'P0001';
