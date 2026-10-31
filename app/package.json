@@ -13,6 +13,7 @@
     "icons": "node scripts/icons.mjs"
   },
   "dependencies": {
+    "@aparajita/capacitor-secure-storage": "^8.0.1",
     "@capacitor/core": "^8.6.0",
     "@capacitor/filesystem": "^8.1.5",
     "@capacitor/status-bar": "^8.0.4",

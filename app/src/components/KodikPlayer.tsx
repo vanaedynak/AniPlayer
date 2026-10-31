@@ -73,7 +73,9 @@ export default function KodikPlayer({
   const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const malId = release.mal?.id
   const isKodik = /kodik/.test(src)
-  const ours = isKodik && !native
+  // Kodik keeps its own controls: ours on top of its frame fought with its menus, ads and fullscreen.
+  // Progress, skipping the opening, the next episode and quieter ads still work through its messages.
+  const ours = false as boolean
 
   const save = useCallback(
     (force = false) => {

@@ -32,6 +32,7 @@ import {
 import { create } from 'zustand'
 import { firebaseConfig as bakedConfig } from '../firebase-config'
 import { useStore, syncHooks, progressKey, type Progress, type TitleEntry, type SyncedPrefs } from './store'
+import { vaultLogin, vaultRemember, vaultForget } from './vault'
 
 export type SyncStatus = 'disabled' | 'signed-out' | 'connecting' | 'synced' | 'offline' | 'error'
 
@@ -94,11 +95,18 @@ export function initSync() {
   useSync.setState({ status: 'signed-out' })
   firstSync = new Promise((r) => (firstSyncResolve = r))
 
+  let restored = false
   onAuthStateChanged(auth, (user) => {
     stopListeners()
     useSync.setState({ user })
     if (user) startListeners(user.uid)
-    else {
+    else if (!restored && vaultLogin()) {
+      // a fresh install: the account kept in the keychain signs back in
+      restored = true
+      const { login, password } = vaultLogin()!
+      useSync.setState({ status: 'connecting' })
+      void signIn(login, password).catch(() => useSync.setState({ status: 'signed-out' }))
+    } else {
       uid = null
       useSync.setState({ status: 'signed-out' })
       firstSyncResolve?.()
@@ -131,9 +139,11 @@ export async function signIn(login: string, password: string, register = false) 
   const email = loginToEmail(login)
   if (register) await createUserWithEmailAndPassword(auth, email, password)
   else await signInWithEmailAndPassword(auth, email, password)
+  vaultRemember(login, password)
 }
 
 export async function logOut() {
+  vaultForget()
   if (auth) await signOut(auth)
 }
 
