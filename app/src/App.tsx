@@ -17,6 +17,9 @@ import MangaTitle from './manga/MangaTitle'
 import MangaReader from './manga/Reader'
 import Ranobe from './manga/Ranobe'
 import BookReader from './manga/BookReader'
+import RanobeHome from './ranobe/RanobeHome'
+import NovelPage from './ranobe/NovelPage'
+import NovelReader from './ranobe/NovelReader'
 
 // HashRouter: works from file:// in Electron and capacitor:// on iPad
 export default function App() {
@@ -39,7 +42,10 @@ export default function App() {
           <Route path="/manga" element={<MangaHome />} />
           <Route path="/manga/:id" element={<MangaTitle />} />
           <Route path="/manga/read/:id/:chapterId" element={<MangaReader />} />
-          <Route path="/ranobe" element={<Ranobe />} />
+          <Route path="/ranobe" element={<RanobeHome />} />
+          <Route path="/ranobe/files" element={<Ranobe />} />
+          <Route path="/ranobe/n/:src/:id" element={<NovelPage />} />
+          <Route path="/ranobe/n/:src/:id/:ch" element={<NovelReader />} />
           <Route path="/ranobe/:id" element={<BookReader />} />
           <Route path="*" element={<Home />} />
         </Routes>

@@ -49,7 +49,7 @@ export default function Ranobe() {
     >
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Ранобэ</h1>
+          <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Свои книги</h1>
           <div className="mt-1 max-w-2xl text-sm font-semibold text-muted">
             Читалка для книг в EPUB, FB2 и TXT: выберите файл или перетащите его сюда. Книги хранятся на этом устройстве и открываются без интернета.
           </div>

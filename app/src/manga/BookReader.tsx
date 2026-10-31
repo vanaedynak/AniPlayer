@@ -14,7 +14,7 @@ import { isElectron } from '../lib/platform'
 type Doc = Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void }
 type El = HTMLElement & { webkitRequestFullscreen?: () => void }
 
-const FONTS = {
+export const FONTS = {
   serif: { css: 'Georgia, "PT Serif", "Times New Roman", serif', label: 'С засечками' },
   sans: { css: '"Manrope Variable", system-ui, sans-serif', label: 'Без засечек' },
   mono: { css: 'ui-monospace, "Cascadia Mono", Consolas, monospace', label: 'Моно' },
@@ -116,7 +116,7 @@ export default function BookReader() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') return panel ? setPanel(null) : nav('/ranobe')
+      if (e.key === 'Escape') return panel ? setPanel(null) : nav('/ranobe/files')
       if (e.key === 'ArrowRight') goChapter(chapter + 1)
       if (e.key === 'ArrowLeft') goChapter(chapter - 1)
     }
@@ -128,7 +128,7 @@ export default function BookReader() {
     return (
       <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-3 bg-bg">
         <div className="font-bold">Книга не найдена на этом устройстве</div>
-        <button onClick={() => nav('/ranobe')} className="rounded-full bg-white/10 px-6 py-3 font-bold">
+        <button onClick={() => nav('/ranobe/files')} className="rounded-full bg-white/10 px-6 py-3 font-bold">
           К книгам
         </button>
       </div>
@@ -211,7 +211,7 @@ export default function BookReader() {
         className={cn('absolute inset-x-0 top-0 z-10 flex items-center gap-2 bg-gradient-to-b from-black/80 to-black/0 px-3 pb-8 text-white transition duration-300 sm:px-5', isElectron && !full && 'sm:pr-[150px]', !ui && !panel && '-translate-y-full opacity-0')}
         style={{ paddingTop: 'calc(var(--safe-top) + 10px)' }}
       >
-        <IconBtn onClick={() => nav('/ranobe')} title="К книгам">
+        <IconBtn onClick={() => nav('/ranobe/files')} title="К книгам">
           <ArrowLeft size={22} />
         </IconBtn>
         <div className="min-w-0 flex-1">
@@ -328,7 +328,7 @@ export default function BookReader() {
   )
 }
 
-function TypeSheet({ prefs, set, close }: { prefs: BookPrefs; set: (p: Partial<BookPrefs>) => void; close: () => void }) {
+export function TypeSheet({ prefs, set, close, paged }: { prefs: BookPrefs; set: (p: Partial<BookPrefs>) => void; close: () => void; paged?: boolean }) {
   return (
     <Sheet title="Шрифт и тема" close={close}>
       <div className="flex flex-col gap-6">
@@ -370,6 +370,7 @@ function TypeSheet({ prefs, set, close }: { prefs: BookPrefs; set: (p: Partial<B
         </Field>
         <Toggle label="Выравнивание по ширине" value={prefs.justify} onChange={(justify) => set({ justify })} />
         <Toggle label="Красная строка" value={prefs.indent} onChange={(indent) => set({ indent })} />
+        {paged && <Toggle label="Постранично (касание слева / справа листает)" value={!!prefs.paged} onChange={(p) => set({ paged: p })} />}
       </div>
     </Sheet>
   )

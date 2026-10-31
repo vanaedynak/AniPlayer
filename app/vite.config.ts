@@ -14,7 +14,10 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    // Senkuro has no CORS headers; the apps reach it natively or through Electron
-    proxy: { '/senkuro': { target: 'https://api.senkuro.com', changeOrigin: true, rewrite: (p) => p.replace(/^\/senkuro/, '') } },
+    // Senkuro and RanobeHub send no CORS headers; the apps reach them natively or through Electron
+    proxy: {
+      '/senkuro': { target: 'https://api.senkuro.com', changeOrigin: true, rewrite: (p) => p.replace(/^\/senkuro/, '') },
+      '/ranobehub': { target: 'https://ranobehub.org', changeOrigin: true, rewrite: (p) => p.replace(/^\/ranobehub/, '') },
+    },
   },
 })

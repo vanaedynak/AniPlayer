@@ -68,6 +68,8 @@ export interface BookPrefs {
   indent: boolean
   /** show chapters that are not in Russian translated by Gemini */
   translate: boolean
+  /** turn the text a screen at a time instead of scrolling (online ranobe) */
+  paged?: boolean
 }
 
 interface MangaState {

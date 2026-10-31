@@ -6,6 +6,7 @@ import { useManga } from './store'
 import { MangaCard, EntryCard, ReadTabs } from './ui'
 import { CardSkeletons, Chip, Empty, Row, Section } from '../components/ui'
 import { cn } from '../lib/format'
+import { isNovelEntry } from '../ranobe/shelf'
 
 const GRID = 'grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6'
 
@@ -110,8 +111,9 @@ export default function MangaHome() {
     setSp(next, { replace: true })
   }
 
-  const reading = useMemo(() => Object.values(entries).filter((e) => e.lastChapterId).sort((a, b) => (b.lastReadAt ?? 0) - (a.lastReadAt ?? 0)), [entries])
-  const shelf = useMemo(() => Object.values(entries).filter((e) => (e.status && e.status !== 'reading') || e.favorite).sort((a, b) => b.updatedAt - a.updatedAt), [entries])
+  // online ranobe share the shelf; they have their own section
+  const reading = useMemo(() => Object.values(entries).filter((e) => e.lastChapterId && !isNovelEntry(e.id)).sort((a, b) => (b.lastReadAt ?? 0) - (a.lastReadAt ?? 0)), [entries])
+  const shelf = useMemo(() => Object.values(entries).filter((e) => ((e.status && e.status !== 'reading') || e.favorite) && !isNovelEntry(e.id)).sort((a, b) => b.updatedAt - a.updatedAt), [entries])
 
   return (
     <div className="flex flex-col gap-8">

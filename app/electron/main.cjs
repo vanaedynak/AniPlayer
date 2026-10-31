@@ -186,6 +186,7 @@ app.whenReady().then(() => {
     'https://*.mangadex.network/*',
     'https://uploads.mangadex.org/*',
     'https://mirai.senkuro.org/*',
+    'https://ranobehub.org/*',
   ]
   session.defaultSession.webRequest.onHeadersReceived({ urls: corsHosts }, (d, cb) => {
     const headers = Object.fromEntries(Object.entries(d.responseHeaders ?? {}).filter(([k]) => k.toLowerCase() !== 'access-control-allow-origin'))
