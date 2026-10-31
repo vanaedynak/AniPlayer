@@ -1,10 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ChevronLeft, ChevronRight, List, Type, Maximize, Minimize, Loader2, AlertCircle } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, List, Type, Maximize, Minimize, Loader2, AlertCircle, Languages } from 'lucide-react'
 import { openBook, useBooks, type Parsed } from './books'
 import { useManga, type BookPrefs } from './store'
 import { PAPER } from './ui'
-import { Sheet, Field, Seg, Toggle, IconBtn } from './Reader'
+import { Sheet, Field, Seg, Toggle, IconBtn, TranslatorSetup } from './Reader'
+import { isRussian, savedChapter, translateChapter } from './bookTranslate'
+import { DEFAULT_MODEL } from './translate'
 import { cn } from '../lib/format'
 import { isElectron } from '../lib/platform'
 
@@ -24,11 +26,13 @@ export default function BookReader() {
   const position = useBooks((s) => s.position)
   const prefs = useManga((s) => s.book)
   const setBook = useManga((s) => s.setBook)
+  const tr = useManga((s) => s.prefs)
+  const setPrefs = useManga((s) => s.setPrefs)
   const [parsed, setParsed] = useState<Parsed | null>(null)
   const [error, setError] = useState('')
   const [chapter, setChapter] = useState(book?.chapter ?? 0)
   const [ui, setUi] = useState(true)
-  const [panel, setPanel] = useState<null | 'toc' | 'type'>(null)
+  const [panel, setPanel] = useState<null | 'toc' | 'type' | 'translate'>(null)
   const [full, setFull] = useState(false)
   const [frac, setFrac] = useState(0)
   const scroller = useRef<HTMLDivElement>(null)
@@ -65,6 +69,40 @@ export default function BookReader() {
   }, [])
 
   const count = parsed?.chapters.length ?? 0
+
+  // translation: the current chapter (shown batch by batch as it arrives), then the next one in advance
+  const hasKey = tr.geminiKeys.some((k) => k.trim())
+  const source = parsed?.chapters[Math.min(chapter, count - 1)]
+  const foreign = !!source && !isRussian(source.html)
+  const translating = prefs.translate && foreign && hasKey
+  const [ru, setRu] = useState<{ chapter: number; html: string; done: number; total: number } | null>(null)
+  const [trError, setTrError] = useState('')
+  const [trTry, setTrTry] = useState(0)
+  useEffect(() => {
+    if (!translating || !parsed || !source) return
+    let alive = true
+    setTrError('')
+    const ctx = { keys: tr.geminiKeys, model: tr.geminiModel || DEFAULT_MODEL, title: parsed.title || book?.title || '' }
+    void savedChapter(id, chapter).then((hit) => {
+      if (!alive) return
+      if (hit) setRu({ chapter, html: hit, done: 1, total: 1 })
+      else setRu({ chapter, html: '', done: 0, total: 0 })
+      translateChapter(id, chapter, source.html, ctx, (html, done, total) => alive && setRu({ chapter, html, done, total }))
+        .then((html) => {
+          if (!alive) return
+          setRu({ chapter, html, done: 1, total: 1 })
+          const next = parsed.chapters[chapter + 1]
+          if (next && !isRussian(next.html)) void translateChapter(id, chapter + 1, next.html, ctx).catch(() => {})
+        })
+        .catch((e) => alive && setTrError(String(e?.message ?? e)))
+    })
+    return () => {
+      alive = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [translating, parsed, chapter, id, tr.geminiKeys, tr.geminiModel, trTry])
+  const shownRu = translating && ru?.chapter === chapter && ru.html ? ru : null
+  const trBusy = translating && !trError && (!ru || ru.chapter !== chapter || ru.done < ru.total || !ru.html)
   const goChapter = (i: number) => {
     if (i < 0 || i >= count) return
     setChapter(i)
@@ -150,7 +188,7 @@ export default function BookReader() {
             <div className="mb-8 text-center text-sm font-bold tracking-wide uppercase" style={{ color: paper.sub, fontFamily: FONTS.sans.css }}>
               {ch.title}
             </div>
-            <div dangerouslySetInnerHTML={{ __html: ch.html }} />
+            <div dangerouslySetInnerHTML={{ __html: shownRu?.html || ch.html }} />
             <div className="mt-14 flex flex-col items-center gap-3" style={{ fontFamily: FONTS.sans.css }}>
               {chapter < count - 1 ? (
                 <button onClick={() => goChapter(chapter + 1)} className="flex items-center gap-2 rounded-full bg-accent px-7 py-3.5 font-bold text-white shadow-xl">
@@ -179,6 +217,19 @@ export default function BookReader() {
             {ch?.title} · {total}%
           </div>
         </div>
+        {(foreign || prefs.translate) && (
+          <button
+            onClick={() => {
+              if (!hasKey) setPanel('translate')
+              else setBook({ translate: !prefs.translate })
+            }}
+            title={!hasKey ? 'Переводчик' : prefs.translate ? 'Показать оригинал' : 'Перевести на русский'}
+            className={cn('flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-bold transition', translating ? 'bg-accent text-white' : 'bg-white/10 hover:bg-white/20')}
+          >
+            {trBusy ? <Loader2 size={17} className="animate-spin" /> : <Languages size={17} />}
+            <span className="hidden sm:inline">{!hasKey || !prefs.translate ? 'Перевести' : 'Перевод'}</span>
+          </button>
+        )}
         <IconBtn onClick={() => setPanel(panel === 'toc' ? null : 'toc')} title="Оглавление">
           <List size={20} />
         </IconBtn>
@@ -226,6 +277,38 @@ export default function BookReader() {
         </Sheet>
       )}
       {panel === 'type' && <TypeSheet prefs={prefs} set={setBook} close={() => setPanel(null)} />}
+      {panel === 'translate' && (
+        <Sheet title="Переводчик" close={() => setPanel(null)}>
+          <TranslatorSetup
+            book
+            prefs={tr}
+            set={setPrefs}
+            onSaved={() => {
+              setPanel(null)
+              setBook({ translate: true })
+              setTrTry((t) => t + 1)
+            }}
+          />
+        </Sheet>
+      )}
+      {translating && (trError || (trBusy && ru?.chapter === chapter && ru.total > 0)) && (
+        <button
+          onClick={() => trError && setTrTry((t) => t + 1)}
+          className={cn(
+            'absolute bottom-24 left-1/2 z-10 -translate-x-1/2 rounded-2xl px-4 py-2 text-center text-sm font-bold text-white shadow-xl',
+            trError ? 'bg-rose-500/90' : 'bg-black/70 backdrop-blur',
+          )}
+        >
+          {trError ? (
+            <>
+              {trError}
+              <div className="text-xs font-semibold opacity-80">Нажмите, чтобы попробовать ещё раз</div>
+            </>
+          ) : (
+            `Перевожу главу… ${ru!.done} / ${ru!.total}`
+          )}
+        </button>
+      )}
     </div>
   )
 }

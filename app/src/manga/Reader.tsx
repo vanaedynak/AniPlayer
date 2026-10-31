@@ -119,7 +119,8 @@ function ReaderView({
 
   // translator: chapters not in Russian get their bubbles translated, current page first, then AHEAD more
   const canTranslate = !!chapter && chapter.lang !== 'ru'
-  const translating = canTranslate && prefs.translate && !!prefs.geminiKey
+  const hasKey = prefs.geminiKeys.some((k) => k.trim())
+  const translating = canTranslate && prefs.translate && hasKey
   const [bubbles, setBubbles] = useState<Record<string, Bubble[]>>({})
   const [trBusy, setTrBusy] = useState(false)
   const [trError, setTrError] = useState('')
@@ -143,7 +144,7 @@ function ReaderView({
     setTrBusy(missing[0] === urls[page])
     // farthest first: the translator takes the last request first, so the page on screen leads
     missing.slice().reverse().forEach((u) =>
-      translatePage(u, { key: prefs.geminiKey, model: prefs.geminiModel || DEFAULT_MODEL, title: m?.title ?? '', alt: src.data?.fallback[urls.indexOf(u)] })
+      translatePage(u, { keys: prefs.geminiKeys, model: prefs.geminiModel || DEFAULT_MODEL, title: m?.title ?? '', alt: src.data?.fallback[urls.indexOf(u)] })
         .then((b) => {
           if (!alive) return
           setBubbles((cur) => ({ ...cur, [u]: b }))
@@ -155,7 +156,7 @@ function ReaderView({
     return () => {
       alive = false
     }
-  }, [translating, page, n, urls, bubbles, prefs.geminiKey, prefs.geminiModel, m?.title, trTry])
+  }, [translating, page, n, urls, bubbles, prefs.geminiKeys, prefs.geminiModel, m?.title, trTry])
   const bubblesFor = useCallback((i: number) => (translating && !original ? bubbles[urls[i]] : undefined), [translating, original, bubbles, urls])
   const onImgError = (i: number) => setFailed((f) => (f[i] && f[i] > 2 ? f : { ...f, [i]: (f[i] ?? 0) + 1 }))
 
@@ -309,11 +310,11 @@ function ReaderView({
         {canTranslate && (
           <button
             onClick={() => {
-              if (!prefs.geminiKey) setPanel('translate')
+              if (!hasKey) setPanel('translate')
               else if (!prefs.translate) setPrefs({ translate: true })
               else setOriginal((o) => !o)
             }}
-            title={!prefs.geminiKey ? 'Переводчик' : original ? 'Показать перевод' : 'Показать оригинал'}
+            title={!hasKey ? 'Переводчик' : original ? 'Показать перевод' : 'Показать оригинал'}
             className={cn(
               'flex h-11 shrink-0 items-center gap-2 rounded-full px-3 text-sm font-bold transition hover:bg-white/15',
               translating && !original && 'bg-accent/30 text-accent-2',
@@ -588,6 +589,25 @@ function Paged({
         ? cn('h-auto', shown.length > 1 ? 'w-1/2' : 'w-full', 'max-w-[1100px]')
         : 'max-w-none'
 
+  // the wheel scrolls a page taller than the screen; at its top or bottom it turns the page
+  const edge = useRef(0)
+  const onWheel = (e: React.WheelEvent) => {
+    const el = box.current
+    if (!el || zoom || !e.deltaY || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
+    const atEnd = e.deltaY > 0 ? el.scrollTop + el.clientHeight >= el.scrollHeight - 2 : el.scrollTop <= 1
+    if (!atEnd) {
+      edge.current = Date.now() // still scrolling: the page turns only on a fresh flick at the edge
+      return
+    }
+    if (Date.now() - edge.current < 350) {
+      edge.current = Date.now()
+      return
+    }
+    edge.current = Date.now() + 250
+    if (e.deltaY > 0) forward()
+    else back()
+  }
+
   const onUp = (e: React.PointerEvent) => {
     const d = down.current
     down.current = null
@@ -621,7 +641,8 @@ function Paged({
   return (
     <div
       ref={box}
-      className={cn('relative flex-1 overscroll-contain', zoom || fit === 'width' ? 'overflow-auto' : 'overflow-hidden')}
+      className="no-scrollbar relative flex-1 overflow-auto overscroll-contain"
+      onWheel={onWheel}
       onPointerDown={(e) => (down.current = { x: e.clientX, y: e.clientY, t: Date.now() })}
       onPointerUp={onUp}
     >
@@ -633,7 +654,7 @@ function Paged({
           style={{ filter: prefs.brightness < 1 ? `brightness(${prefs.brightness})` : undefined }}
         >
           {shown.map((i) => (
-            <Page key={i} i={i} src={urlFor(i)} onError={onError} eager className={imgCls} />
+            <Page key={i} i={i} src={urlFor(i)} onError={onError} eager className={imgCls} wrap={fit === 'height' ? 'flex h-full items-center' : undefined} />
           ))}
         </div>
       )}
@@ -641,7 +662,22 @@ function Paged({
   )
 }
 
-function Page({ i, src, onError, eager, className }: { i: number; src: string; onError: (i: number) => void; eager?: boolean; className?: string }) {
+function Page({
+  i,
+  src,
+  onError,
+  eager,
+  className,
+  wrap,
+}: {
+  i: number
+  src: string
+  onError: (i: number) => void
+  eager?: boolean
+  className?: string
+  /** classes for the page's own box (fit-to-height needs it as tall as the screen) */
+  wrap?: string
+}) {
   const [loaded, setLoaded] = useState(false)
   const bubbles = useContext(BubblesCtx)(i)
   const img = useRef<HTMLImageElement>(null)
@@ -657,7 +693,7 @@ function Page({ i, src, onError, eager, className }: { i: number; src: string; o
     return () => ro.disconnect()
   }, [bubbles, loaded])
   return (
-    <div id={`mp-${i}`} data-i={i} className={cn('relative', !loaded && 'aspect-[5/7] max-h-[90vh] w-full')}>
+    <div id={`mp-${i}`} data-i={i} className={cn('relative', wrap, !loaded && 'aspect-[5/7] max-h-[90vh] w-full')}>
       {!loaded && (
         <div className="absolute inset-0 flex items-center justify-center opacity-40">
           <Loader2 className="animate-spin" />
@@ -676,79 +712,113 @@ function Page({ i, src, onError, eager, className }: { i: number; src: string; o
       />
       {loaded && bubbles && box && (
         <div className="pointer-events-none absolute" style={box}>
-          {bubbles.map((b, k) => (
-            <FitText key={k} b={b} height={box.height} />
-          ))}
+          <Bubbles list={bubbles} width={box.width} height={box.height} />
         </div>
       )}
     </div>
   )
 }
 
-/** one translated bubble: a white patch over the original. The text shrinks to fit, but never below
- *  a readable size; when it still does not fit, the patch grows around the bubble instead */
-const MIN_TEXT = 14
-function FitText({ b, height }: { b: Bubble; height: number }) {
-  const ref = useRef<HTMLDivElement>(null)
-  // a little extra room: Russian runs longer than English
-  const padX = b.w * 0.1
-  const padY = b.h * 0.08
-  const pageW = height * 0.7 // pages are roughly this shape; only used to keep narrow bubbles wide enough
-  const w = Math.min(1, Math.max(b.w + padX * 2, 120 / pageW))
-  const left = Math.min(1 - w, Math.max(0, b.x + b.w / 2 - w / 2))
-  const top = Math.max(0, b.y - padY)
-  const hgt = Math.min(1 - top, b.h + padY * 2)
+/** the translated bubbles of one page: white patches over the originals. Text shrinks to fit, but stays
+ *  readable; when it still does not fit, a patch grows into the free space around its bubble, never
+ *  over a neighbouring bubble */
+const MIN_TEXT = 13
+const LAST_RESORT = 10
+function Bubbles({ list, width, height }: { list: Bubble[]; width: number; height: number }) {
+  const refs = useRef<(HTMLDivElement | null)[]>([])
   useLayoutEffect(() => {
-    const el = ref.current
-    if (!el) return
-    el.style.height = `${hgt * 100}%`
-    el.style.marginTop = ''
-    let size = Math.max(MIN_TEXT + 2, Math.min(30, height * 0.026))
-    el.style.fontSize = `${size}px`
-    const over = () => el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1
-    while (size > MIN_TEXT && over()) {
-      size -= 0.5
-      el.style.fontSize = `${size}px`
-    }
-    el.style.width = `${w * 100}%`
-    el.style.left = `${left * 100}%`
-    if (over()) {
-      // first wider, still centred on the bubble
-      const wide = Math.min(1, Math.max(w * 1.7, 0.3))
-      el.style.width = `${wide * 100}%`
-      el.style.left = `${Math.min(1 - wide, Math.max(0, b.x + b.w / 2 - wide / 2)) * 100}%`
-    }
-    if (over()) {
-      // then taller: grow downwards and shift up by half, but not past the top of the page
-      const before = el.offsetHeight
-      el.style.height = 'auto'
-      el.style.marginTop = `${-Math.min(top * height, (el.offsetHeight - before) / 2)}px`
-    }
-  }, [b, height, hgt, w, left, top])
+    const raw = list.map((b) => ({ l: b.x * width, t: b.y * height, r: (b.x + b.w) * width, b: (b.y + b.h) * height }))
+    const placed: (typeof raw)[number][] = []
+    raw.forEach((me, k) => {
+      const el = refs.current[k]
+      if (!el) return
+      const cx = (me.l + me.r) / 2
+      const cy = (me.t + me.b) / 2
+      // patches already laid out, and the original bubbles of the ones still to come
+      const others = raw.map((o, j) => (j < k ? placed[j] : o)).filter((o, j) => j !== k && o)
+      // a rect of the given size centred on the bubble, inside the page, cut back where it would cover
+      // another bubble (along the side that bubble is on; ones overlapping in the original are left be)
+      const place = (w: number, h: number) => {
+        let l = Math.max(0, Math.min(width - w, cx - w / 2))
+        let t = Math.max(0, Math.min(height - h, cy - h / 2))
+        let r = Math.min(width, l + w)
+        let bt = Math.min(height, t + h)
+        for (const o of others) {
+          if (!(o.l < r && o.r > l && o.t < bt && o.b > t)) continue
+          if (o.r <= me.l) l = Math.max(l, o.r + 3)
+          else if (o.l >= me.r) r = Math.min(r, o.l - 3)
+          else if (o.b <= me.t) t = Math.max(t, o.b + 3)
+          else if (o.t >= me.b) bt = Math.min(bt, o.t - 3)
+        }
+        placed[k] = { l, t, r, b: bt }
+        Object.assign(el.style, { left: `${l}px`, top: `${t}px`, width: `${r - l}px`, height: `${bt - t}px` })
+      }
+      const over = () => el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1
+      let size = Math.max(MIN_TEXT + 3, Math.min(30, height * 0.026))
+      const shrink = (floor: number) => {
+        el.style.fontSize = `${size}px`
+        while (size > floor && over()) {
+          size -= 0.5
+          el.style.fontSize = `${size}px`
+        }
+      }
+      el.style.overflowWrap = 'normal'
+      // a little extra room: Russian runs longer than English
+      const w0 = Math.max(me.r - me.l, 0) * 1.2
+      const h0 = Math.max(me.b - me.t, 0) * 1.16
+      place(Math.max(w0, 110), h0)
+      shrink(MIN_TEXT)
+      if (over()) {
+        place(Math.max(w0 * 1.8, 170), h0)
+        shrink(MIN_TEXT)
+      }
+      if (over()) {
+        place(Math.max(w0 * 1.8, 170), h0 * 1.8)
+        shrink(MIN_TEXT)
+      }
+      if (over()) shrink(LAST_RESORT)
+      if (over()) el.style.overflowWrap = 'anywhere'
+    })
+  }, [list, width, height])
   return (
-    <div
-      ref={ref}
-      title={b.text}
-      className="absolute flex items-center justify-center rounded-[40%/30%] bg-white px-[3%] py-1 text-center leading-[1.15] font-bold text-black shadow-[0_0_6px_4px_white] [overflow-wrap:anywhere]"
-      style={{
-        top: `${top * 100}%`,
-        fontFamily: '"Comic Neue", "Manrope Variable", system-ui, sans-serif',
-      }}
-    >
-      {b.ru}
-    </div>
+    <>
+      {list.map((b, k) => (
+        <div
+          key={k}
+          ref={(el) => {
+            refs.current[k] = el
+          }}
+          title={b.text}
+          className="absolute flex items-center justify-center overflow-hidden rounded-[40%/30%] bg-white px-[3%] py-1 text-center leading-[1.15] font-bold text-black shadow-[0_0_6px_4px_white]"
+          style={{ fontFamily: '"Comic Neue", "Manrope Variable", system-ui, sans-serif' }}
+        >
+          {b.ru}
+        </div>
+      ))}
+    </>
   )
 }
 
+const KEY_SLOTS = 5
+
 /** key entry and switches for the Gemini translator */
-function TranslatorSetup({ prefs, set, onSaved }: { prefs: ReaderPrefs; set: (p: Partial<ReaderPrefs>) => void; onSaved?: () => void }) {
-  const [key, setKey] = useState(prefs.geminiKey)
+export function TranslatorSetup({ prefs, set, onSaved, book }: { prefs: ReaderPrefs; set: (p: Partial<ReaderPrefs>) => void; onSaved?: () => void; book?: boolean }) {
+  const [keys, setKeys] = useState(() => Array.from({ length: KEY_SLOTS }, (_, i) => prefs.geminiKeys[i] ?? ''))
+  const saved = keys.join('|') === Array.from({ length: KEY_SLOTS }, (_, i) => prefs.geminiKeys[i] ?? '').join('|')
+  const any = keys.some(Boolean)
   return (
     <div className="flex flex-col gap-4 text-sm">
-      <div className="leading-relaxed text-white/75">
-        Перевод делает нейросеть <b className="text-white">Gemini</b>: она видит страницу целиком, находит все реплики и переводит их на русский с учётом сцены,
-        характера героев и игры слов — поверх оригинальных облачков. Работает для глав на английском и японском.
-      </div>
+      {book ? (
+        <div className="leading-relaxed text-white/75">
+          Перевод делает нейросеть <b className="text-white">Gemini</b>: глава уходит к ней по кускам и возвращается на русском, абзац в абзац — с голосами героев,
+          шутками и анимешной подачей. Переведённые главы сохраняются вместе с книгой. Ключи общие с переводчиком манги.
+        </div>
+      ) : (
+        <div className="leading-relaxed text-white/75">
+          Перевод делает нейросеть <b className="text-white">Gemini</b>: она видит страницу целиком, находит все реплики и переводит их на русский с учётом сцены,
+          характера героев и игры слов — поверх оригинальных облачков. Работает для глав на английском и японском.
+        </div>
+      )}
       <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-white/75">
         <li>
           Откройте{' '}
@@ -760,25 +830,31 @@ function TranslatorSetup({ prefs, set, onSaved }: { prefs: ReaderPrefs; set: (p:
         <li>Нажмите «Create API key» и скопируйте ключ.</li>
         <li>Вставьте его сюда. Это бесплатно: хватает на несколько глав в день.</li>
       </ol>
-      <input
-        value={key}
-        onChange={(e) => setKey(e.target.value.trim())}
-        placeholder="Ключ из AI Studio"
-        spellCheck={false}
-        autoComplete="off"
-        className="h-11 rounded-xl bg-white/10 px-4 font-mono text-sm ring-1 ring-white/10 outline-none focus:ring-accent"
-      />
+      <div className="flex flex-col gap-2">
+        {keys.map((k, i) => (
+          <input
+            key={i}
+            value={k}
+            onChange={(e) => setKeys((cur) => cur.map((v, j) => (j === i ? e.target.value.trim() : v)))}
+            placeholder={i ? `Запасной ключ ${i + 1} (другой Google-аккаунт)` : 'Ключ из AI Studio'}
+            spellCheck={false}
+            autoComplete="off"
+            className="h-11 rounded-xl bg-white/10 px-4 font-mono text-sm ring-1 ring-white/10 outline-none focus:ring-accent"
+          />
+        ))}
+        <div className="text-xs text-white/45">Когда у ключа кончаются бесплатные запросы или он перестаёт работать, перевод сам переходит на следующий.</div>
+      </div>
       <button
         onClick={() => {
-          set({ geminiKey: key, translate: true })
+          set({ geminiKeys: keys.filter(Boolean), translate: true })
           onSaved?.()
         }}
-        disabled={!key}
+        disabled={!any}
         className="h-11 rounded-xl bg-white font-bold text-black transition active:scale-[0.98] disabled:opacity-40"
       >
-        {prefs.geminiKey && key === prefs.geminiKey ? 'Сохранить и перевести' : 'Сохранить ключ'}
+        {saved ? 'Сохранить и перевести' : 'Сохранить ключи'}
       </button>
-      <Toggle label="Переводить главы не на русском" value={prefs.translate} onChange={(translate) => set({ translate })} />
+      {!book && <Toggle label="Переводить главы не на русском" value={prefs.translate} onChange={(translate) => set({ translate })} />}
       <Field label="Модель">
         <select
           value={prefs.geminiModel}

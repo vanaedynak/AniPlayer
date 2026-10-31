@@ -74,9 +74,7 @@ async function work() {
   busy = false
 }
 
-export interface PageContext {
-  key: string
-  model: string
+export interface PageContext extends GeminiOpts {
   title: string
   /** another copy of the page (MangaDex's own server) to try when the first one won't load */
   alt?: string
@@ -153,8 +151,72 @@ const SAFETY = ['HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH', 'HARM_C
   threshold: 'BLOCK_NONE',
 }))
 
+// A model that just failed sits out a while so pages don't each wait for its timeout;
+// a key that ran out of free requests (per model) rests until it likely refills
 const resting = new Map<string, number>()
-const REST = 2 * 60_000
+const rest = (id: string, ms: number) => resting.set(id, Date.now() + ms)
+const ready = (id: string) => (resting.get(id) ?? 0) < Date.now()
+
+export interface GeminiOpts {
+  /** the reader's keys: when one runs out of free requests the next one takes over */
+  keys: string[]
+  model: string
+}
+
+/** one generateContent call: the chosen model first with every key, then the other models */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function askGemini(body: object, { keys, model }: GeminiOpts): Promise<any> {
+  const allKeys = [...new Set(keys.map((k) => k.trim()).filter(Boolean))]
+  if (!allKeys.length) throw new Error('Нет ключа Gemini — добавьте его в настройках переводчика')
+  const allModels = [...new Set([model, ...MODELS.map((m) => m.id)])]
+  const models = allModels.filter(ready).length ? allModels.filter(ready) : allModels
+  let res: Response | null = null
+  let json: any = null // eslint-disable-line @typescript-eslint/no-explicit-any
+  let badKey = false
+  for (const m of models) {
+    const fresh = allKeys.filter((k) => ready(`${k}|${m}`) && ready(k))
+    for (const key of fresh.length ? fresh : allKeys) {
+      try {
+        res = await fetch(`${API}/${m}:generateContent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+          body: JSON.stringify(body),
+          // an overloaded model can take minutes; better to ask the next one
+          signal: AbortSignal.timeout(45_000),
+        })
+      } catch {
+        rest(m, 2 * 60_000)
+        res = null
+        break // the model (or the network) is the problem, not the key
+      }
+      json = await res.json().catch(() => null)
+      if (res.ok) return json
+      const msg: string = json?.error?.message ?? ''
+      if (res.status === 400 && /API key/i.test(msg)) {
+        badKey = true
+        rest(key, 60 * 60_000)
+        continue
+      }
+      if (res.status === 429 || res.status === 403) {
+        // this key's quota for this model is spent (or the model is closed to it): try the next key
+        rest(`${key}|${m}`, res.status === 429 ? 30 * 60_000 : 60 * 60_000)
+        continue
+      }
+      if (res.status === 500 || res.status === 503 || res.status === 404) {
+        rest(m, res.status === 404 ? 24 * 3600_000 : 2 * 60_000)
+        break // overloaded or gone for everyone: next model
+      }
+      break
+    }
+    if (res && ![400, 403, 404, 429, 500, 503].includes(res.status)) break
+  }
+  if (!res) throw new Error('Нет связи с Gemini — проверьте интернет (или включите VPN, если Gemini недоступен в вашей стране)')
+  const msg: string = json?.error?.message ?? `HTTP ${res.status}`
+  if (res.status === 429)
+    throw new Error(allKeys.length > 1 ? 'Лимит бесплатных запросов исчерпан на всех ключах — подождите минуту или до завтра' : 'Лимит бесплатных запросов Gemini исчерпан — подождите, или добавьте ещё ключ')
+  if (badKey && res.status === 400) throw new Error('Ключ Gemini не подходит — проверьте его в настройках переводчика')
+  throw new Error(msg)
+}
 
 async function run(url: string, ctx: PageContext): Promise<Bubble[]> {
   const image = await pageImage(url, ctx.alt)
@@ -178,37 +240,7 @@ async function run(url: string, ctx: PageContext): Promise<Bubble[]> {
       },
     },
   }
-  // the chosen model first; when it's overloaded or closed to free keys, the next one.
-  // A model that just failed sits out a couple of minutes so pages don't each wait for its timeout
-  const all = [...new Set([ctx.model, ...MODELS.map((m) => m.id)])]
-  const ready = all.filter((m) => (resting.get(m) ?? 0) < Date.now())
-  const models = ready.length ? ready : all
-  let res: Response | null = null
-  let json: any = null // eslint-disable-line @typescript-eslint/no-explicit-any
-  for (const model of models) {
-    try {
-      res = await fetch(`${API}/${model}:generateContent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': ctx.key },
-        body: JSON.stringify(body),
-        // an overloaded model can take minutes; better to ask the next one
-        signal: AbortSignal.timeout(45_000),
-      })
-    } catch {
-      resting.set(model, Date.now() + REST)
-      continue
-    }
-    json = await res.json().catch(() => null)
-    if (![403, 404, 429, 500, 503].includes(res.status)) break
-    if (res.status !== 403) resting.set(model, Date.now() + REST)
-  }
-  if (!res) throw new Error('Нет связи с Gemini — проверьте интернет (или включите VPN, если Gemini недоступен в вашей стране)')
-  if (!res.ok) {
-    const msg: string = json?.error?.message ?? `HTTP ${res.status}`
-    if (res.status === 429) throw new Error('Лимит бесплатных запросов Gemini исчерпан — подождите минуту или до завтра')
-    if (res.status === 400 && /API key/i.test(msg)) throw new Error('Ключ Gemini не подходит — проверьте его в настройках чтения')
-    throw new Error(msg)
-  }
+  const json = await askGemini(body, ctx)
   const text: string = json?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? ''
   if (!text) throw new Error(json?.promptFeedback?.blockReason ? 'Gemini отказался переводить эту страницу' : 'Пустой ответ Gemini')
   const items = JSON.parse(text) as { box_2d: number[]; text: string; ru: string }[]

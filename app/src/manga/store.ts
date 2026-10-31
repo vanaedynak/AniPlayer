@@ -51,7 +51,8 @@ export interface ReaderPrefs {
   spread: boolean
   /** translate pages of chapters that aren't in Russian */
   translate: boolean
-  geminiKey: string
+  /** up to five Gemini keys (one per Google account): when one runs out, the next takes over */
+  geminiKeys: string[]
   geminiModel: string
 }
 
@@ -63,6 +64,8 @@ export interface BookPrefs {
   width: number
   justify: boolean
   indent: boolean
+  /** show chapters that are not in Russian translated by Gemini */
+  translate: boolean
 }
 
 interface MangaState {
@@ -83,8 +86,8 @@ export const useManga = create<MangaState>()(
   persist(
     (set, get) => ({
       entries: {},
-      prefs: { mode: 'scroll', fit: 'height', gap: false, width: 760, paper: 'dark', saver: false, brightness: 1, lang: 'ru', adult: false, spread: false, translate: true, geminiKey: '', geminiModel: 'gemini-3.8-flash' },
-      book: { size: 19, leading: 1.7, font: 'serif', paper: 'dark', width: 720, justify: true, indent: true },
+      prefs: { mode: 'scroll', fit: 'height', gap: false, width: 760, paper: 'dark', saver: false, brightness: 1, lang: 'ru', adult: false, spread: false, translate: true, geminiKeys: [], geminiModel: 'gemini-3.8-flash' },
+      book: { size: 19, leading: 1.7, font: 'serif', paper: 'dark', width: 720, justify: true, indent: true, translate: false },
 
       touch: (m, patch) => {
         const cur = get().entries[m.id]
@@ -151,11 +154,16 @@ export const useManga = create<MangaState>()(
     }),
     {
       name: 'aniplayer-manga',
-      version: 2,
+      version: 3,
       // v2: Flash 3.8 is tried first now (Flash-Lite stays as its fallback)
       migrate: (p, v) => {
         const s = p as Partial<MangaState>
         if (v < 2 && s.prefs) s.prefs = { ...s.prefs, geminiModel: 'gemini-3.8-flash' }
+        // v3: one key became a list of keys
+        if (v < 3 && s.prefs) {
+          const { geminiKey, ...rest } = s.prefs as ReaderPrefs & { geminiKey?: string }
+          s.prefs = { ...rest, geminiKeys: geminiKey ? [geminiKey] : [] }
+        }
         return s as MangaState
       },
       // settings added later get their defaults
