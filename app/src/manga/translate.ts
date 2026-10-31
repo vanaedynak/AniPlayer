@@ -15,6 +15,13 @@ export interface Bubble {
 const API = 'https://generativelanguage.googleapis.com/v1beta/models'
 export const KEY_URL = 'https://aistudio.google.com/apikey'
 
+// what free keys can use (late 2026); older names are gone for new users
+export const MODELS = [
+  { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite — быстро, пара секунд на страницу' },
+  { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash — чуть точнее, но часто перегружена' },
+]
+export const DEFAULT_MODEL = MODELS[0].id
+
 // results survive restarts, so a re-read chapter costs no quota
 const STORE = 'aniplayer-translations'
 const MAX_SAVED = 600
@@ -106,12 +113,26 @@ async function run(url: string, ctx: PageContext): Promise<Bubble[]> {
       },
     },
   }
-  const res = await fetch(`${API}/${ctx.model}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': ctx.key },
-    body: JSON.stringify(body),
-  })
-  const json = await res.json().catch(() => null)
+  // the chosen model first; when it's overloaded or closed to free keys, the next one
+  const models = [...new Set([ctx.model, ...MODELS.map((m) => m.id)])]
+  let res: Response | null = null
+  let json: any = null // eslint-disable-line @typescript-eslint/no-explicit-any
+  for (const model of models) {
+    try {
+      res = await fetch(`${API}/${model}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': ctx.key },
+        body: JSON.stringify(body),
+        // an overloaded model can take minutes; better to ask the next one
+        signal: AbortSignal.timeout(45_000),
+      })
+    } catch {
+      continue
+    }
+    json = await res.json().catch(() => null)
+    if (![403, 404, 429, 500, 503].includes(res.status)) break
+  }
+  if (!res) throw new Error('Нет ответа Gemini')
   if (!res.ok) {
     const msg: string = json?.error?.message ?? `HTTP ${res.status}`
     if (res.status === 429) throw new Error('Лимит бесплатных запросов Gemini исчерпан — подождите минуту или до завтра')

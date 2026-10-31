@@ -83,7 +83,7 @@ export const useManga = create<MangaState>()(
   persist(
     (set, get) => ({
       entries: {},
-      prefs: { mode: 'scroll', fit: 'height', gap: false, width: 760, paper: 'dark', saver: false, brightness: 1, lang: 'ru', adult: false, spread: false, translate: true, geminiKey: '', geminiModel: 'gemini-flash-latest' },
+      prefs: { mode: 'scroll', fit: 'height', gap: false, width: 760, paper: 'dark', saver: false, brightness: 1, lang: 'ru', adult: false, spread: false, translate: true, geminiKey: '', geminiModel: 'gemini-3.5-flash-lite' },
       book: { size: 19, leading: 1.7, font: 'serif', paper: 'dark', width: 720, justify: true, indent: true },
 
       touch: (m, patch) => {
@@ -155,7 +155,10 @@ export const useManga = create<MangaState>()(
       // settings added later get their defaults
       merge: (p, cur) => {
         const saved = (p ?? {}) as Partial<MangaState>
-        return { ...cur, ...saved, prefs: { ...cur.prefs, ...saved.prefs }, book: { ...cur.book, ...saved.book } }
+        const prefs = { ...cur.prefs, ...saved.prefs }
+        // model names Google has since retired
+        if (/-latest$/.test(prefs.geminiModel)) prefs.geminiModel = cur.prefs.geminiModel
+        return { ...cur, ...saved, prefs, book: { ...cur.book, ...saved.book } }
       },
       onRehydrateStorage: () => (s) => s && setAdult(s.prefs.adult),
     },

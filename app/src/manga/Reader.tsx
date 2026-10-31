@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ChevronLeft, ChevronRight, List, Settings2, Maximize, Minimize, Loader2, X, Check, ExternalLink, AlertCircle, Languages, Eye, EyeOff } from 'lucide-react'
 import { manga, pages, chapterKey, chapterLabel, mangaName, type Chapter, type Manga } from './md'
 import { useManga, type ReaderPrefs } from './store'
-import { translatePage, savedTranslation, KEY_URL, type Bubble } from './translate'
+import { translatePage, savedTranslation, KEY_URL, MODELS, DEFAULT_MODEL, type Bubble } from './translate'
 
 /** translated bubbles for page i, if any */
 const BubblesCtx = createContext<(i: number) => Bubble[] | undefined>(() => undefined)
@@ -133,7 +133,7 @@ function ReaderView({
     if (!missing.length) return
     setTrBusy(missing[0] === urls[page])
     missing.forEach((u) =>
-      translatePage(u, { key: prefs.geminiKey, model: prefs.geminiModel || 'gemini-flash-latest', title: m?.title ?? '' })
+      translatePage(u, { key: prefs.geminiKey, model: prefs.geminiModel || DEFAULT_MODEL, title: m?.title ?? '' })
         .then((b) => {
           if (!alive) return
           setBubbles((cur) => ({ ...cur, [u]: b }))
@@ -683,7 +683,7 @@ function TranslatorSetup({ prefs, set }: { prefs: ReaderPrefs; set: (p: Partial<
       <input
         value={key}
         onChange={(e) => setKey(e.target.value.trim())}
-        placeholder="AIza…"
+        placeholder="Ключ из AI Studio"
         spellCheck={false}
         autoComplete="off"
         className="h-11 rounded-xl bg-white/10 px-4 font-mono text-sm ring-1 ring-white/10 outline-none focus:ring-accent"
@@ -702,9 +702,11 @@ function TranslatorSetup({ prefs, set }: { prefs: ReaderPrefs; set: (p: Partial<
           onChange={(e) => set({ geminiModel: e.target.value })}
           className="h-10 w-full rounded-xl bg-white/10 px-3 text-sm font-bold ring-1 ring-white/10 outline-none"
         >
-          <option value="gemini-flash-latest">Gemini Flash — быстро, лучший выбор</option>
-          <option value="gemini-flash-lite-latest">Gemini Flash-Lite — больше страниц в день</option>
-          <option value="gemini-pro-latest">Gemini Pro — точнее, но медленнее и меньше лимит</option>
+          {MODELS.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
+          ))}
         </select>
       </Field>
       <div className="text-xs text-white/45">Ключ хранится только на этом устройстве. Готовые переводы запоминаются, повторное чтение квоту не тратит.</div>
