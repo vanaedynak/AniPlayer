@@ -77,8 +77,33 @@ export const shiki = {
       status: p.status,
       season: p.season,
       search: p.search,
-      censored: 'true',
+      // R+ titles (ecchi) stay, only hentai is hidden; censored=true hid both
+      censored: 'false',
+      rating: '!rx',
     }),
+  /** search that forgives е/э: Shikimori spells Japanese names «Такаминэ», people type «Такамине» */
+  search: async (query: string, limit = 30, kind = '!music') => {
+    const run = (q: string) => shiki.list({ search: q, limit, order: 'popularity', kind }).catch(() => [] as ShikiAnime[])
+    const q = query.trim().replace(/ё/gi, 'е')
+    if (!/[а-я]/i.test(q)) return run(q)
+    const toE = (w: string) => w.replace(/(?<=[а-я])е/gi, (c) => (c === 'Е' ? 'Э' : 'э'))
+    const words = q.toLowerCase().split(/\s+/).filter((w) => w.length >= 3)
+    // the whole phrase, the phrase with э, and the Japanese-looking words alone («такамине» → «такаминэ»)
+    const named = words.filter((w) => w.length >= 4 && /(?<=[а-я])е/.test(w)).sort((a, b) => b.length - a.length).slice(0, 2)
+    const tries = [...new Set([q, toE(q), ...named.map(toE)])]
+    const lists = await Promise.all(tries.map(run))
+    // titles containing more of the typed words go first; е and э count as one letter
+    const n = (s: string) => s.toLowerCase().replace(/[ёэ]/g, 'е')
+    const stems = words.map((w) => n(w).slice(0, Math.max(3, w.length - 2)))
+    const score = (a: ShikiAnime) => stems.filter((st) => n(`${a.russian} ${a.name}`).includes(st)).length
+    const seen = new Set<number>()
+    const all = lists.flat().filter((a) => !seen.has(a.id) && !!seen.add(a.id))
+    return all
+      .map((a, i) => ({ a, i, s: score(a) }))
+      .sort((x, y) => y.s - x.s || x.i - y.i)
+      .map((x) => x.a)
+      .slice(0, limit)
+  },
   anime: (id: number | string) => get<ShikiAnime>(`animes/${id}`),
   franchise: (id: number | string) => get<ShikiFranchiseGraph>(`animes/${id}/franchise`),
   /** full entries for up to 50 ids in one call */

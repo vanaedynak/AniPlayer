@@ -38,7 +38,7 @@ export default function Search() {
         .catch(() => setItems([]))
         .finally(() => setLoading(false))
       shiki
-        .list({ search: query, limit: 30, order: 'popularity', kind: '!music' })
+        .search(query, 30)
         .then(setOthers)
         .catch(() => setOthers([]))
     }, 300)

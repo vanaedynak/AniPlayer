@@ -121,7 +121,7 @@ function SearchBox() {
     const t = setTimeout(() => {
       // Shikimori ranks every anime by popularity; AniLibria adds its own matches the catalog missed
       Promise.all([
-        shiki.list({ search: query, limit: 8, order: 'popularity', kind: '!music' }).catch(() => []),
+        shiki.search(query, 8).catch(() => []),
         api.search(query).catch(() => [] as Release[]),
       ])
         .then(([sh, lib]) => {
