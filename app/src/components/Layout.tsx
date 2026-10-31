@@ -29,6 +29,8 @@ import { MiniPlayer } from './Music'
 import { RoomBridge, RoomButton } from './Room'
 import { cn } from '../lib/format'
 import { CrashGuard, Welcome } from './Crash'
+import { Avatar } from './Social'
+import { useMyProfile } from '../lib/social'
 import { SUPPORT_URL } from '../lib/links'
 
 const NAV = [
@@ -274,9 +276,21 @@ function Header() {
           <Link to="/settings" className="no-drag flex h-11 w-11 items-center justify-center rounded-full hover:bg-white/10">
             <Settings size={20} />
           </Link>
+          <ProfileButton />
         </div>
       </div>
     </header>
+  )
+}
+
+/** the signed-in user's avatar, leading to their profile */
+function ProfileButton() {
+  const me = useMyProfile()
+  if (!me) return null
+  return (
+    <Link to={`/u/${me.username}`} title="Мой профиль" className="no-drag ml-1 rounded-full ring-2 ring-transparent transition hover:ring-accent-2">
+      <Avatar p={me} size={36} />
+    </Link>
   )
 }
 

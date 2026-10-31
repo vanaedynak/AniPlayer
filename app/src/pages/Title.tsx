@@ -11,6 +11,7 @@ import { FranchiseRow, SeasonTabs } from '../components/FranchiseRow'
 import { DownloadSeason } from '../components/Downloads'
 import { releaseOrOffline } from '../lib/downloads'
 import { ThemesSection } from '../components/Music'
+import { RatingBlock, Comments } from '../components/Social'
 import { fmtOrdinal, fmtTime, cn } from '../lib/format'
 
 export function useResumeTarget(releaseId: number | undefined, episodes: { ordinal: number }[]) {
@@ -156,7 +157,9 @@ export default function Title() {
       </div>
 
       {r.mal?.id ? <FranchiseRow malId={r.mal.id} /> : null}
+      {r.mal?.id ? <RatingBlock animeId={r.mal.id} /> : null}
       {r.mal?.id ? <ThemesSection malId={r.mal.id} /> : null}
+      {r.mal?.id ? <Comments animeId={r.mal.id} /> : null}
     </div>
   )
 }

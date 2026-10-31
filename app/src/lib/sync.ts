@@ -152,6 +152,9 @@ export async function logOut() {
 /** deletes the account and everything stored with it */
 export async function deleteAccount() {
   if (!sb || !uid) return
+  // pictures first: storage files are not removed with the account
+  const { data: files } = await sb.storage.from('avatars').list(uid)
+  if (files?.length) await sb.storage.from('avatars').remove(files.map((f) => `${uid}/${f.name}`))
   const { error } = await sb.rpc('delete_my_account')
   if (error) throw new Error(error.message)
   vaultForget()

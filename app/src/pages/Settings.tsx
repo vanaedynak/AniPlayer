@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Cloud, LogOut, Link2, PlayCircle, Database, Check, ExternalLink, Loader2, ZoomIn, Info, Activity, LifeBuoy } from 'lucide-react'
+import { Cloud, LogOut, Link2, PlayCircle, Database, Check, ExternalLink, Loader2, ZoomIn, Info, Activity, LifeBuoy, UserRound, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useMyProfile, isStaff } from '../lib/social'
 import { useSync, signIn, logOut, accountName, deleteAccount } from '../lib/sync'
 import { anilistViewer, anilistAuthUrl } from '../lib/anilist'
 import { useStore, THEMES } from '../lib/store'
@@ -323,8 +324,19 @@ function DataSettings() {
 /** the way to "О приложении", support and the connection check on phones, where there is no sidebar */
 function AboutLinks() {
   const row = 'flex items-center gap-3 rounded-2xl px-3 py-3 font-bold transition hover:bg-white/5'
+  const me = useMyProfile()
   return (
     <Panel className="!p-3">
+      {me && (
+        <Link to={`/u/${me.username}`} className={row}>
+          <UserRound size={20} className="text-pink" /> Мой профиль
+        </Link>
+      )}
+      {isStaff(me) && (
+        <Link to="/moderation" className={row}>
+          <ShieldCheck size={20} className="text-amber-300" /> Модерация
+        </Link>
+      )}
       <Link to="/about" className={row}>
         <Info size={20} className="text-accent-2" /> О приложении, лицензии, правила
       </Link>

@@ -10,6 +10,7 @@ import KodikPlayer from '../components/KodikPlayer'
 import { StatusPicker } from '../components/TitleBits'
 import { FranchiseRow, SeasonTabs } from '../components/FranchiseRow'
 import { ThemesSection } from '../components/Music'
+import { RatingBlock, Comments } from '../components/Social'
 import { Skeleton, Empty, Chip } from '../components/ui'
 import { SeasonEpisodes } from '../components/SeasonEpisodes'
 import { cn, fmtOrdinal } from '../lib/format'
@@ -231,8 +232,10 @@ export default function Anime() {
         current={showPlayer || entry?.lastOrdinal ? { releaseId: r.id, ordinal: episode } : undefined}
         replace={showPlayer}
       />
+      <RatingBlock animeId={a.id} />
       <ThemesSection malId={a.id} />
       <FranchiseRow malId={a.id} />
+      <Comments animeId={a.id} />
     </div>
   )
 }

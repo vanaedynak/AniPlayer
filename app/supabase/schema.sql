@@ -352,3 +352,32 @@ begin
 end $$;
 revoke all on function public.register(text, text) from public;
 grant execute on function public.register(text, text) to anon, authenticated;
+
+-- ---------------------------------------------------------------------------------------------
+-- avatars and banners: public pictures, each account writes only into its own folder (<uid>/...)
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('avatars', 'avatars', true, 2097152, '{image/png,image/jpeg,image/webp,image/gif}')
+on conflict (id) do update set public = true, file_size_limit = 2097152, allowed_mime_types = '{image/png,image/jpeg,image/webp,image/gif}';
+
+drop policy if exists "avatars read" on storage.objects;
+create policy "avatars read" on storage.objects for select using (bucket_id = 'avatars');
+drop policy if exists "avatars upload own" on storage.objects;
+create policy "avatars upload own" on storage.objects for insert with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "avatars replace own" on storage.objects;
+create policy "avatars replace own" on storage.objects for update using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "avatars delete own" on storage.objects;
+create policy "avatars delete own" on storage.objects for delete using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- what a profile page shows about watching, without opening anyone's private rows
+create or replace function public.profile_stats(target uuid) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select case when not exists (select 1 from profiles where id = target and (public or id = auth.uid())) then null else jsonb_build_object(
+    'seconds', coalesce((select sum(seconds) from watch_stats where user_id = target), 0),
+    'episodes', (select count(*) from user_docs where user_id = target and kind = 'progress' and (data ->> 'watched')::boolean),
+    'completed', (select count(*) from user_docs where user_id = target and kind = 'title' and data ->> 'status' = 'completed'),
+    'watching', (select count(*) from user_docs where user_id = target and kind = 'title' and data ->> 'status' = 'watching'),
+    'comments', (select count(*) from comments where user_id = target and not hidden),
+    'ratings', (select count(*) from ratings where user_id = target)
+  ) end
+$$;
