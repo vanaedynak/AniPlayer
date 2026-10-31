@@ -260,6 +260,14 @@ async function loadParts(id: number): Promise<FranchisePart[]> {
 
   // a season whose title continues the previous one ("X — Прощание", "X. Часть 2") is a part of it
   const continues = (t: string, base: string) => t.startsWith(base + ' — ') || t.startsWith(base + '. ')
+
+  // a special that is the sequel of a season and continues its title is that season's last part
+  // ("Атака титанов: Финал — Заключительная глава")
+  for (const a of all) {
+    if (saga.has(a.id) || !/special|ona/.test(a.kind ?? '')) continue
+    const linked = g.links.some((l) => (l.relation === 'sequel' || l.relation === 'prequel') && l.source_id === a.id && saga.has(l.target_id))
+    if (linked && all.some((o) => saga.has(o.id) && continues(shikiTitle(a), shikiTitle(o)))) saga.add(a.id)
+  }
   let season = 0
   let base = ''
   let part = 1
