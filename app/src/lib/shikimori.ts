@@ -239,9 +239,11 @@ async function loadParts(id: number): Promise<FranchisePart[]> {
   // Spin-offs and crossovers stay with the extras.
   const tv = all.filter((a) => a.kind === 'tv')
   const tvIds = new Set(tv.map((a) => a.id))
+  const allIds = new Set(all.map((a) => a.id))
+  // the chain may pass through an OVA or a special between two seasons (High School DxD: TV → OVA → TV)
   const next = new Map<number, number[]>()
   for (const l of g.links)
-    if ((l.relation === 'sequel' || l.relation === 'prequel') && tvIds.has(l.source_id) && tvIds.has(l.target_id)) {
+    if ((l.relation === 'sequel' || l.relation === 'prequel') && allIds.has(l.source_id) && allIds.has(l.target_id)) {
       next.set(l.source_id, [...(next.get(l.source_id) ?? []), l.target_id])
       next.set(l.target_id, [...(next.get(l.target_id) ?? []), l.source_id])
     }
@@ -249,7 +251,7 @@ async function loadParts(id: number): Promise<FranchisePart[]> {
     const seen = new Set([start])
     const queue = [start]
     while (queue.length) for (const n of next.get(queue.shift()!) ?? []) if (!seen.has(n)) seen.add(n) && queue.push(n)
-    return seen
+    return new Set([...seen].filter((id) => tvIds.has(id)))
   }
   const episodes = (ids: Set<number>) => tv.reduce((sum, a) => sum + (ids.has(a.id) ? a.episodes || a.episodes_aired || 1 : 0), 0)
   let saga = tvIds.has(id) ? chainOf(id) : new Set<number>()
@@ -266,7 +268,8 @@ async function loadParts(id: number): Promise<FranchisePart[]> {
   for (const a of all) {
     if (saga.has(a.id) || !/special|ona/.test(a.kind ?? '')) continue
     const linked = g.links.some((l) => (l.relation === 'sequel' || l.relation === 'prequel') && l.source_id === a.id && saga.has(l.target_id))
-    if (linked && all.some((o) => saga.has(o.id) && continues(shikiTitle(a), shikiTitle(o)))) saga.add(a.id)
+    // a prologue aired before its season (High School DxD Hero, episode 0) stays with the extras
+    if (linked && all.some((o) => saga.has(o.id) && continues(shikiTitle(a), shikiTitle(o)) && date(a) >= date(o))) saga.add(a.id)
   }
   let season = 0
   let base = ''
