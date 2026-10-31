@@ -2,6 +2,7 @@
 // Russian titles and descriptions come from Shikimori, whose manga ids match MangaDex's "mal" link.
 import { CapacitorHttp } from '@capacitor/core'
 import { isIOS, isNative } from '../lib/platform'
+import { skFind, skManga, skNorm, skPages, skSearchManga } from './sk'
 
 const API = 'https://api.mangadex.org'
 const SHIKI = 'https://shikimori.io'
@@ -26,6 +27,10 @@ export interface Manga {
   authors: string[]
   demographic: string | null
   lastChapter: string | null
+  /** every known name, for matching across sources */
+  names: string[]
+  /** the same title on Senkuro, where Russian chapters often continue */
+  sk?: string
 }
 
 export interface Chapter {
@@ -192,11 +197,12 @@ function toManga(r: RawManga): Manga {
     ],
     demographic: a.publicationDemographic,
     lastChapter: a.lastChapter || null,
+    names: [...Object.values(a.title), ...a.altTitles.flatMap((t) => Object.values(t))],
   }
 }
 
 /** 256px thumbnails for cards, 512px for the title page */
-export const coverUrl = (m: { cover: string }, size: 256 | 512 = 256) => (m.cover ? `${m.cover}.${size}.jpg` : '')
+export const coverUrl = (m: { cover: string }, size: 256 | 512 = 256) => (m.cover.startsWith(COVERS) ? `${m.cover}.${size}.jpg` : m.cover)
 export const mangaName = (m: { ruTitle?: string; title: string }) => m.ruTitle || m.title
 
 let adult = false
@@ -272,7 +278,7 @@ export async function list(o: ListOpts): Promise<{ items: Manga[]; total: number
 export async function search(q: string, offset = 0): Promise<{ items: Manga[]; total: number; hidden: number }> {
   // with 18+ off, also count what the filter hides, so the page can offer to show it
   const [found, hidden] = await Promise.all([
-    find(q, offset),
+    find(q, offset).then((r) => (offset ? r : withSenkuro(q, r))),
     adult || offset ? Promise.resolve(0) : find(q, 0, ['erotica'], 1).then((r) => r.items.length || r.total).catch(() => 0),
   ])
   return { ...found, hidden }
@@ -298,6 +304,19 @@ async function find(q: string, offset: number, only?: string[], limit?: number) 
   return { items, total: Math.max(d.total, items.length) }
 }
 
+/** MangaDex results plus Senkuro titles MangaDex doesn't have */
+async function withSenkuro(q: string, found: { items: Manga[]; total: number }) {
+  const sk = await skSearchManga(q).catch(() => [])
+  const known = new Set(found.items.flatMap((m) => [...m.names, m.ruTitle]).map(skNorm))
+  const extra = sk.filter((m) => !m.names.some((n) => known.has(skNorm(n))))
+  const nq = skNorm(q)
+  const close = extra.filter((m) => [...m.names, m.ruTitle].some((n) => skNorm(n).includes(nq)))
+  const rest = extra.filter((m) => !close.includes(m))
+  // close Senkuro matches go right after the first MangaDex hits, the rest at the end
+  const items = [...found.items.slice(0, 3), ...close, ...found.items.slice(3), ...rest]
+  return { items, total: found.total + extra.length }
+}
+
 const shikiHits = new Map<string, Promise<ShikiManga[]>>()
 function shikiSearch(q: string) {
   if (!shikiHits.has(q)) shikiHits.set(q, shiki<ShikiManga[]>(`mangas?search=${encodeURIComponent(q)}&limit=5&order=popularity`).catch(() => []))
@@ -305,6 +324,7 @@ function shikiSearch(q: string) {
 }
 
 export async function manga(id: string): Promise<Manga & { score: number | null; follows: number | null }> {
+  if (id.startsWith('sk-')) return { ...(await skManga(id.slice(3))), score: null, follows: null }
   const [r, st] = await Promise.all([
     get<{ data: RawManga }>(`/manga/${id}`, { includes: ['cover_art', 'author', 'artist'] }),
     get<{ statistics: Record<string, { rating: { bayesian: number | null }; follows: number | null }> }>(`/statistics/manga/${id}`).catch(() => null),
@@ -315,6 +335,9 @@ export async function manga(id: string): Promise<Manga & { score: number | null;
     const s = await shiki<ShikiManga>(`mangas/${m.mal}`).catch(() => null)
     if (s) m = { ...m, ruTitle: m.ruTitle || s.russian, description: s.description ? cleanShiki(s.description) : m.description }
   } else [m] = await withRussian([m])
+  // Russian chapters missing here are often on Senkuro
+  const sk = await skFind([m.title, m.altTitle, ...m.names.filter((n) => /^[\x00-\x7f]+$/.test(n))].filter(Boolean)).catch(() => null)
+  if (sk) m = { ...m, sk, langs: m.langs.includes('ru') ? m.langs : ['ru', ...m.langs] }
   const stat = st?.statistics[id]
   return { ...m, score: stat?.rating.bayesian ?? null, follows: stat?.follows ?? null }
 }
@@ -394,6 +417,7 @@ export const chapterLabel = (c: Pick<Chapter, 'num' | 'volume' | 'title'>) =>
 
 /** image urls for a chapter; the at-home server address is valid for ~15 minutes */
 export async function pages(chapterId: string, saver: boolean) {
+  if (chapterId.startsWith('sk:')) return skPages(chapterId)
   const r = await get<{ baseUrl: string; chapter: { hash: string; data: string[]; dataSaver: string[] } }>(`/at-home/server/${chapterId}`, {}, 10 * 60_000)
   const dir = saver ? 'data-saver' : 'data'
   const files = saver ? r.chapter.dataSaver : r.chapter.data

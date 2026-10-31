@@ -7,6 +7,7 @@ import { useChapters, pickLang } from './useChapters'
 import { PAPER } from './ui'
 import { useAsync } from '../lib/useAsync'
 import { cn } from '../lib/format'
+import { isElectron } from '../lib/platform'
 
 type Doc = Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void }
 type El = HTMLElement & { webkitRequestFullscreen?: () => void }
@@ -18,7 +19,7 @@ export default function MangaReader() {
   const entryLang = useManga((s) => s.entries[id]?.lang)
   const preferred = useManga((s) => s.prefs.lang)
   const lang = m.data ? pickLang(m.data.langs, entryLang, preferred) : null
-  const { list, all } = useChapters(id, lang)
+  const { list, all } = useChapters(id, lang, m.data?.sk)
   const chapter = all.find((c) => c.id === chapterId) ?? null
 
   // the shelf entry has to exist before progress can be saved
@@ -234,6 +235,8 @@ function ReaderView({
       <div
         className={cn(
           'absolute inset-x-0 top-0 z-10 flex items-center gap-2 bg-gradient-to-b from-black/85 to-black/0 px-3 pb-8 text-white transition duration-300 sm:px-5',
+          // Windows: keep clear of the minimize / maximize / close buttons
+          isElectron && !full && 'sm:pr-[150px]',
           !ui && !panel && '-translate-y-full opacity-0',
         )}
         style={{ paddingTop: 'calc(var(--safe-top) + 10px)' }}
@@ -577,7 +580,10 @@ function ChapterList({ list, current, mangaId, onPick }: { list: Chapter[]; curr
             className={cn('flex items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-white/10 disabled:opacity-40', cur && 'bg-accent/25 ring-1 ring-accent/50')}
           >
             <div className="min-w-0 flex-1">
-              <div className={cn('truncate text-sm font-bold', done.has(chapterKey(c)) && !cur && 'text-white/45')}>{chapterLabel(c)}</div>
+              <div className={cn('truncate text-sm font-bold', done.has(chapterKey(c)) && !cur && 'text-white/45')}>
+                {c.lang !== current?.lang && c.lang !== list[0]?.lang && <span className="mr-1.5 rounded bg-sky-500/20 px-1.5 text-[10px] font-extrabold text-sky-300 uppercase">{c.lang}</span>}
+                {chapterLabel(c)}
+              </div>
               {c.title && c.num != null && <div className="truncate text-xs text-white/50">{c.title}</div>}
             </div>
             {c.external ? <ExternalLink size={14} /> : done.has(chapterKey(c)) ? <Check size={15} className="text-emerald-400" /> : null}
@@ -654,7 +660,7 @@ function SettingsSheet({ prefs, set, close }: { prefs: ReaderPrefs; set: (p: Par
 export function Sheet({ title, close, children }: { title: string; close: () => void; children: ReactNode }) {
   return (
     <div
-      className="animate-pop absolute inset-y-0 right-0 z-30 flex w-full max-w-sm flex-col bg-[#15151d]/95 text-white shadow-2xl ring-1 ring-white/10 backdrop-blur-xl"
+      className={cn('animate-pop absolute inset-y-0 right-0 z-30 flex w-full max-w-sm flex-col bg-[#15151d]/95 text-white shadow-2xl ring-1 ring-white/10 backdrop-blur-xl', isElectron && 'pt-12')}
       style={{ paddingTop: 'var(--safe-top)', paddingBottom: 'var(--safe-bottom)' }}
     >
       <div className="flex items-center justify-between px-5 py-4">

@@ -53,7 +53,7 @@ export function EntryCard({ e }: { e: MangaEntry }) {
   const pct = e.lastPages ? ((e.lastPage ?? 0) + 1) / e.lastPages : 0
   return (
     <Link to={e.lastChapterId ? `/manga/read/${e.id}/${e.lastChapterId}` : `/manga/${e.id}`} className="group block">
-      <Cover src={e.cover ? `${e.cover}.256.jpg` : ''} className="aspect-[2/3] rounded-2xl ring-1 ring-white/5 transition duration-300 group-hover:-translate-y-1 group-hover:ring-white/15">
+      <Cover src={e.cover.includes('uploads.mangadex.org') ? `${e.cover}.256.jpg` : e.cover} className="aspect-[2/3] rounded-2xl ring-1 ring-white/5 transition duration-300 group-hover:-translate-y-1 group-hover:ring-white/15">
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
         {e.lastLabel && (
           <div className="absolute inset-x-2 bottom-2">

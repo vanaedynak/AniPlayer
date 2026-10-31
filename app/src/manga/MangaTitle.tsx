@@ -23,7 +23,7 @@ export default function MangaTitle() {
   const preferred = useManga((s) => s.prefs.lang)
   const { touch, toggleRead } = useManga.getState()
   const lang = m ? pickLang(m.langs, entry?.lang, preferred) : null
-  const { list, groups, loading } = useChapters(id, lang)
+  const { list, groups, loading } = useChapters(id, lang, m?.sk)
   const [desc, setDesc] = useState(false)
   const [newest, setNewest] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
@@ -229,6 +229,7 @@ export default function MangaTitle() {
                 <>
                   <div className="min-w-0 flex-1">
                     <div className={cn('truncate font-bold', done && !current && 'text-white/45')}>
+                      {c.lang !== lang && <span className="mr-1.5 rounded bg-sky-500/20 px-1.5 py-0.5 align-middle text-[10px] font-extrabold text-sky-300 uppercase">{c.lang}</span>}
                       {chapterLabel(c)}
                       {c.title && c.num != null && <span className="font-semibold text-muted"> · {c.title}</span>}
                     </div>

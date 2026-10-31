@@ -6,6 +6,7 @@ import { useManga, type BookPrefs } from './store'
 import { PAPER } from './ui'
 import { Sheet, Field, Seg, Toggle, IconBtn } from './Reader'
 import { cn } from '../lib/format'
+import { isElectron } from '../lib/platform'
 
 type Doc = Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void }
 type El = HTMLElement & { webkitRequestFullscreen?: () => void }
@@ -166,7 +167,7 @@ export default function BookReader() {
       )}
 
       <div
-        className={cn('absolute inset-x-0 top-0 z-10 flex items-center gap-2 bg-gradient-to-b from-black/80 to-black/0 px-3 pb-8 text-white transition duration-300 sm:px-5', !ui && !panel && '-translate-y-full opacity-0')}
+        className={cn('absolute inset-x-0 top-0 z-10 flex items-center gap-2 bg-gradient-to-b from-black/80 to-black/0 px-3 pb-8 text-white transition duration-300 sm:px-5', isElectron && !full && 'sm:pr-[150px]', !ui && !panel && '-translate-y-full opacity-0')}
         style={{ paddingTop: 'calc(var(--safe-top) + 10px)' }}
       >
         <IconBtn onClick={() => nav('/ranobe')} title="К книгам">

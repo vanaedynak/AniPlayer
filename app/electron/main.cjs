@@ -140,8 +140,9 @@ app.whenReady().then(() => {
     if (!file.startsWith(DIST) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(DIST, 'index.html')
     return net.fetch(pathToFileURL(file).toString())
   })
-  // MangaDex answers CORS only for web origins (https://localhost and the like), not app://
-  session.defaultSession.webRequest.onHeadersReceived({ urls: ['https://api.mangadex.org/*'] }, (d, cb) => {
+  // MangaDex answers CORS only for web origins (https://localhost and the like), not app://;
+  // Senkuro sends no CORS headers at all
+  session.defaultSession.webRequest.onHeadersReceived({ urls: ['https://api.mangadex.org/*', 'https://api.senkuro.com/*'] }, (d, cb) => {
     const headers = Object.fromEntries(Object.entries(d.responseHeaders ?? {}).filter(([k]) => k.toLowerCase() !== 'access-control-allow-origin'))
     headers['Access-Control-Allow-Origin'] = ['app://aniplayer']
     cb({ responseHeaders: headers })
