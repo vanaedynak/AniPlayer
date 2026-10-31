@@ -249,6 +249,7 @@ export interface ListOpts {
   lang?: string
   offset?: number
   limit?: number
+  ratings?: string[]
 }
 
 export async function list(o: ListOpts): Promise<{ items: Manga[]; total: number }> {
@@ -258,7 +259,7 @@ export async function list(o: ListOpts): Promise<{ items: Manga[]; total: number
     limit: o.limit ?? 24,
     offset: o.offset ?? 0,
     includes: ['cover_art'],
-    contentRating: ratings(),
+    contentRating: o.ratings ?? ratings(),
     availableTranslatedLanguage: o.lang && o.lang !== 'any' ? [o.lang] : undefined,
     hasAvailableChapters: o.title ? undefined : 'true',
     includedTags: tagId ? [tagId] : undefined,
@@ -268,15 +269,24 @@ export async function list(o: ListOpts): Promise<{ items: Manga[]; total: number
 }
 
 /** search by any name; Russian names also go through Shikimori, which knows them better */
-export async function search(q: string, offset = 0) {
-  const direct = list({ title: q, offset })
+export async function search(q: string, offset = 0): Promise<{ items: Manga[]; total: number; hidden: number }> {
+  // with 18+ off, also count what the filter hides, so the page can offer to show it
+  const [found, hidden] = await Promise.all([
+    find(q, offset),
+    adult || offset ? Promise.resolve(0) : find(q, 0, ['erotica'], 1).then((r) => r.items.length || r.total).catch(() => 0),
+  ])
+  return { ...found, hidden }
+}
+
+async function find(q: string, offset: number, only?: string[], limit?: number) {
+  const direct = list({ title: q, offset, ratings: only, limit })
   if (offset || !/[а-яё]/i.test(q)) return direct
   const viaShiki = (async () => {
-    const hits = await shiki<ShikiManga[]>(`mangas?search=${encodeURIComponent(q)}&limit=5&order=popularity`).catch(() => [])
+    const hits = await shikiSearch(q)
     const found = await Promise.all(
       hits.slice(0, 4).map(async (h) => {
         ruNames.set(h.id, h.russian)
-        const r = await list({ title: h.name, limit: 5 }).catch(() => null)
+        const r = await list({ title: h.name, limit: 5, ratings: only }).catch(() => null)
         return r?.items.find((m) => m.mal === h.id) ?? null
       }),
     )
@@ -286,6 +296,12 @@ export async function search(q: string, offset = 0) {
   const seen = new Set<string>()
   const items = [...s, ...d.items].filter((m) => !seen.has(m.id) && !!seen.add(m.id))
   return { items, total: Math.max(d.total, items.length) }
+}
+
+const shikiHits = new Map<string, Promise<ShikiManga[]>>()
+function shikiSearch(q: string) {
+  if (!shikiHits.has(q)) shikiHits.set(q, shiki<ShikiManga[]>(`mangas?search=${encodeURIComponent(q)}&limit=5&order=popularity`).catch(() => []))
+  return shikiHits.get(q)!
 }
 
 export async function manga(id: string): Promise<Manga & { score: number | null; follows: number | null }> {

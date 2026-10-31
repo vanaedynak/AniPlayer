@@ -10,8 +10,9 @@ import { cn } from '../lib/format'
 const GRID = 'grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6'
 
 /** grid that loads more pages on demand */
-function Feed({ load, deps }: { load: (offset: number) => Promise<{ items: Manga[]; total: number }>; deps: unknown[] }) {
+function Feed({ load, deps, onAdult }: { load: (offset: number) => Promise<{ items: Manga[]; total: number; hidden?: number }>; deps: unknown[]; onAdult?: () => void }) {
   const [items, setItems] = useState<Manga[]>([])
+  const [hidden, setHidden] = useState(0)
   const [total, setTotal] = useState(0)
   const [busy, setBusy] = useState(true)
   const [error, setError] = useState('')
@@ -19,10 +20,16 @@ function Feed({ load, deps }: { load: (offset: number) => Promise<{ items: Manga
   useEffect(() => {
     let alive = true
     setItems([])
+    setHidden(0)
     setBusy(true)
     setError('')
     load(0)
-      .then((r) => alive && (setItems(r.items), setTotal(r.total)))
+      .then((r) => {
+        if (!alive) return
+        setItems(r.items)
+        setTotal(r.total)
+        setHidden(r.hidden ?? 0)
+      })
       .catch((e) => alive && setError(String(e?.message ?? e)))
       .finally(() => alive && setBusy(false))
     return () => {
@@ -39,10 +46,25 @@ function Feed({ load, deps }: { load: (offset: number) => Promise<{ items: Manga
       .finally(() => setBusy(false))
   }
 
+  const adultNote = hidden > 0 && onAdult && (
+    <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-200 ring-1 ring-rose-500/20">
+      <span>По этому запросу есть тайтлы с пометкой 18+ — они скрыты фильтром.</span>
+      <button onClick={onAdult} className="rounded-full bg-rose-500/80 px-4 py-1.5 font-bold text-white hover:bg-rose-500">
+        Показать 18+
+      </button>
+    </div>
+  )
   if (error && !items.length) return <Empty icon={<SearchX />} title="Не удалось загрузить" text={error} />
-  if (!busy && !items.length) return <Empty icon={<SearchX />} title="Ничего не нашлось" text="Попробуйте английское или японское название — MangaDex знает их лучше всего." />
+  if (!busy && !items.length)
+    return (
+      <>
+        {adultNote}
+        <Empty icon={<SearchX />} title="Ничего не нашлось" text="Попробуйте английское или японское название — MangaDex знает их лучше всего." />
+      </>
+    )
   return (
     <>
+      {adultNote}
       <div className={GRID}>
         {items.map((m) => (
           <MangaCard key={m.id} m={m} />
@@ -125,12 +147,19 @@ export default function MangaHome() {
               <option value="any">Любой язык</option>
             </select>
           </label>
+          <button
+            onClick={() => setPrefs({ adult: !adult })}
+            title={adult ? 'Скрыть тайтлы 18+' : 'Показывать тайтлы 18+'}
+            className={cn('h-12 rounded-full px-4 text-sm font-extrabold ring-1 transition', adult ? 'bg-rose-500/20 text-rose-300 ring-rose-500/40' : 'bg-card-2 text-white/60 ring-white/5 hover:text-white')}
+          >
+            18+
+          </button>
         </div>
       </div>
 
       {q ? (
         <Section title={<>Поиск: «{q}»</>}>
-          <Feed load={(offset) => search(q, offset)} deps={[q, adult]} />
+          <Feed load={(offset) => search(q, offset)} deps={[q, adult]} onAdult={() => setPrefs({ adult: true })} />
         </Section>
       ) : (
         <>
