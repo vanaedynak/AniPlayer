@@ -95,6 +95,13 @@ input[type="range"].slider::-webkit-slider-thumb { -webkit-appearance: none; wid
 .no-drag { -webkit-app-region: no-drag; }
 
 /* ranobe text */
+/* the paragraph being read aloud */
+.book .narrating {
+  background: rgb(167 139 250 / 0.16);
+  box-shadow: 0 0 0 6px rgb(167 139 250 / 0.16);
+  border-radius: 6px;
+  transition: background 0.3s;
+}
 .book p {
   margin: 0 0 0.6em;
   text-indent: var(--indent);

@@ -23,6 +23,7 @@ interface ElectronBridge {
 }
 
 declare global {
+  const __APP_VERSION__: string
   interface Window {
     aniplayer?: ElectronBridge
     Capacitor?: { isNativePlatform(): boolean; getPlatform(): string }

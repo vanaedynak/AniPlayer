@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ChevronLeft, ChevronRight, List, Type, Maximize, Minimize, Loader2, AlertCircle, Languages } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, List, Type, Maximize, Minimize, Loader2, AlertCircle, Languages, Headphones } from 'lucide-react'
 import { openBook, useBooks, type Parsed } from './books'
 import { useManga, type BookPrefs } from './store'
 import { PAPER } from './ui'
@@ -8,6 +8,7 @@ import { Sheet, Field, Seg, Toggle, IconBtn, TranslatorSetup } from './Reader'
 import { isRussian, savedChapter, translateChapter } from './bookTranslate'
 import { DEFAULT_MODEL } from './translate'
 import { cn } from '../lib/format'
+import { Narrator } from './Narrator'
 import { isElectron } from '../lib/platform'
 
 type Doc = Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void }
@@ -36,6 +37,8 @@ export default function BookReader() {
   const [full, setFull] = useState(false)
   const [frac, setFrac] = useState(0)
   const scroller = useRef<HTMLDivElement>(null)
+  const text = useRef<HTMLDivElement>(null)
+  const [narrate, setNarrate] = useState(false)
   const restore = useRef(book?.frac ?? 0)
   const lastY = useRef(0)
   const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -188,7 +191,7 @@ export default function BookReader() {
             <div className="mb-8 text-center text-sm font-bold tracking-wide uppercase" style={{ color: paper.sub, fontFamily: FONTS.sans.css }}>
               {ch.title}
             </div>
-            <div dangerouslySetInnerHTML={{ __html: shownRu?.html || ch.html }} />
+            <div ref={text} dangerouslySetInnerHTML={{ __html: shownRu?.html || ch.html }} />
             <div className="mt-14 flex flex-col items-center gap-3" style={{ fontFamily: FONTS.sans.css }}>
               {chapter < count - 1 ? (
                 <button onClick={() => goChapter(chapter + 1)} className="flex items-center gap-2 rounded-full bg-accent px-7 py-3.5 font-bold text-white shadow-xl">
@@ -230,6 +233,9 @@ export default function BookReader() {
             <span className="hidden sm:inline">{!hasKey || !prefs.translate ? 'Перевести' : 'Перевод'}</span>
           </button>
         )}
+        <IconBtn onClick={() => setNarrate((v) => !v)} title={narrate ? 'Выключить озвучку' : 'Читать вслух'}>
+          <Headphones size={20} className={narrate ? 'text-accent-2' : undefined} />
+        </IconBtn>
         <IconBtn onClick={() => setPanel(panel === 'toc' ? null : 'toc')} title="Оглавление">
           <List size={20} />
         </IconBtn>
@@ -259,6 +265,15 @@ export default function BookReader() {
         </IconBtn>
       </div>
 
+      {narrate && ch && (
+        <Narrator
+          content={text}
+          chapterKey={`${id}:${chapter}:${shownRu ? 'ru' : 'src'}`}
+          ready={!trBusy}
+          onEnd={() => (chapter < count - 1 ? goChapter(chapter + 1) : setNarrate(false))}
+          close={() => setNarrate(false)}
+        />
+      )}
       {panel && <div className="absolute inset-0 z-20 bg-black/40" onClick={() => setPanel(null)} />}
       {panel === 'toc' && parsed && (
         <Sheet title="Оглавление" close={() => setPanel(null)}>

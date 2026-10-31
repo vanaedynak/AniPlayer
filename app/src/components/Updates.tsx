@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Download, RefreshCw, Loader2, Check, Sparkles } from 'lucide-react'
-import { installUpdate, type UpdateState } from '../lib/platform'
+import { installUpdate, isNative, isIOS, type UpdateState } from '../lib/platform'
 import { Panel, PanelTitle } from './ui'
 import { cn } from '../lib/format'
 
@@ -18,9 +18,53 @@ export function useUpdates() {
   return state
 }
 
-/** header pill that appears once a new version is downloaded */
+const RELEASE = 'https://api.github.com/repos/vanaedynak/AniPlayer/releases/tags/latest'
+const patch = (v: string) => Number(v.split('.')[2]) || 0
+
+/** the phone and iPad builds can't update themselves: they only learn that a newer build is out */
+function useMobileUpdate() {
+  const [next, setNext] = useState<{ version: string; apk?: string } | null>(null)
+  useEffect(() => {
+    if (!isNative) return
+    fetch(RELEASE)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((rel: { assets: { name: string; browser_download_url: string }[] } | null) => {
+        const exe = rel?.assets.find((a) => /Setup-[\d.]+\.exe$/.test(a.name))
+        const version = exe?.name.match(/Setup-([\d.]+)\.exe$/)?.[1]
+        if (!version || patch(version) <= patch(__APP_VERSION__)) return
+        setNext({ version, apk: rel!.assets.find((a) => a.name.endsWith('.apk'))?.browser_download_url })
+      })
+      .catch(() => {})
+  }, [])
+  return next
+}
+
+function MobileUpdatePill() {
+  const next = useMobileUpdate()
+  if (!next) return null
+  const open = () => {
+    if (isIOS) {
+      alert(`Вышла версия ${next.version}. Скачайте на ПК AniPlayer.ipa из релиза на GitHub и поставьте поверх через Sideloadly — данные сохранятся.`)
+      return
+    }
+    // a link outside the app opens in the system browser, which downloads the APK and offers to install it
+    if (next.apk) location.href = next.apk
+  }
+  return (
+    <button
+      onClick={open}
+      title={`Новая версия ${next.version}`}
+      className="animate-pop mr-1 flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-accent to-pink px-4 text-sm font-extrabold shadow-lg shadow-accent/30"
+    >
+      <Sparkles size={16} /> Обновить
+    </button>
+  )
+}
+
+/** header pill that appears once a new version is downloaded (on the phone and iPad: once one is out) */
 export function UpdatePill() {
   const s = useUpdates()
+  if (isNative) return <MobileUpdatePill />
   if (s?.status !== 'ready') return null
   return (
     <button
