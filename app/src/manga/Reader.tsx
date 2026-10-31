@@ -120,6 +120,11 @@ function ReaderView({
   const [trBusy, setTrBusy] = useState(false)
   const [trError, setTrError] = useState('')
   const [original, setOriginal] = useState(false)
+  const [trTry, setTrTry] = useState(0)
+  const retry = useCallback(() => {
+    setTrError('')
+    setTrTry((t) => t + 1)
+  }, [])
   useEffect(() => {
     if (!translating || !n) return
     let alive = true
@@ -145,7 +150,7 @@ function ReaderView({
     return () => {
       alive = false
     }
-  }, [translating, page, n, urls, bubbles, prefs.geminiKey, prefs.geminiModel, m?.title])
+  }, [translating, page, n, urls, bubbles, prefs.geminiKey, prefs.geminiModel, m?.title, trTry])
   const bubblesFor = useCallback((i: number) => (translating && !original ? bubbles[urls[i]] : undefined), [translating, original, bubbles, urls])
   const onImgError = (i: number) => setFailed((f) => (f[i] && f[i] > 2 ? f : { ...f, [i]: (f[i] ?? 0) + 1 }))
 
@@ -360,20 +365,31 @@ function ReaderView({
 
       {translating && (trBusy || trError) && (
         <div
-          className={cn('absolute left-1/2 z-10 -translate-x-1/2 rounded-full px-4 py-2 text-xs font-bold shadow-xl backdrop-blur', trError ? 'bg-rose-500/85 text-white' : 'bg-black/70 text-white')}
+          className={cn(
+            'absolute left-1/2 z-20 max-w-[90vw] -translate-x-1/2 rounded-2xl px-4 py-2 text-center text-xs font-bold shadow-xl backdrop-blur',
+            trError ? 'cursor-pointer bg-rose-500/90 text-white hover:bg-rose-500' : 'bg-black/70 text-white',
+          )}
           style={{ bottom: 'calc(var(--safe-bottom) + 76px)' }}
-          onClick={() => setTrError('')}
+          onClick={retry}
+          onPointerUp={(e) => e.stopPropagation()}
         >
-          {trError || 'Перевожу страницу…'}
+          {trError ? (
+            <>
+              {trError}
+              <span className="mt-0.5 block font-semibold opacity-80">Нажмите, чтобы попробовать ещё раз</span>
+            </>
+          ) : (
+            'Перевожу страницу…'
+          )}
         </div>
       )}
       {panel && <div className="absolute inset-0 z-20 bg-black/40" onClick={() => setPanel(null)} />}
       {panel === 'translate' && (
         <Sheet title="Переводчик" close={() => setPanel(null)}>
-          <TranslatorSetup prefs={prefs} set={setPrefs} />
+          <TranslatorSetup prefs={prefs} set={setPrefs} onSaved={() => (setPanel(null), retry())} />
         </Sheet>
       )}
-      {panel === 'settings' && <SettingsSheet prefs={prefs} set={setPrefs} close={() => setPanel(null)} />}
+      {panel === 'settings' && <SettingsSheet prefs={prefs} set={setPrefs} close={() => setPanel(null)} onSaved={() => (setPanel(null), retry())} />}
       {panel === 'chapters' && (
         <Sheet title="Главы" close={() => setPanel(null)}>
           <ChapterList list={list} current={chapter} mangaId={mangaId} onPick={(c) => (setPanel(null), onChapter(c))} />
@@ -661,7 +677,7 @@ function FitText({ b, height }: { b: Bubble; height: number }) {
 }
 
 /** key entry and switches for the Gemini translator */
-function TranslatorSetup({ prefs, set }: { prefs: ReaderPrefs; set: (p: Partial<ReaderPrefs>) => void }) {
+function TranslatorSetup({ prefs, set, onSaved }: { prefs: ReaderPrefs; set: (p: Partial<ReaderPrefs>) => void; onSaved?: () => void }) {
   const [key, setKey] = useState(prefs.geminiKey)
   return (
     <div className="flex flex-col gap-4 text-sm">
@@ -689,11 +705,14 @@ function TranslatorSetup({ prefs, set }: { prefs: ReaderPrefs; set: (p: Partial<
         className="h-11 rounded-xl bg-white/10 px-4 font-mono text-sm ring-1 ring-white/10 outline-none focus:ring-accent"
       />
       <button
-        onClick={() => set({ geminiKey: key, translate: true })}
-        disabled={!key || key === prefs.geminiKey}
-        className="h-11 rounded-xl bg-white font-bold text-black disabled:opacity-40"
+        onClick={() => {
+          set({ geminiKey: key, translate: true })
+          onSaved?.()
+        }}
+        disabled={!key}
+        className="h-11 rounded-xl bg-white font-bold text-black transition active:scale-[0.98] disabled:opacity-40"
       >
-        {prefs.geminiKey && key === prefs.geminiKey ? 'Ключ сохранён' : 'Сохранить ключ'}
+        {prefs.geminiKey && key === prefs.geminiKey ? 'Сохранить и перевести' : 'Сохранить ключ'}
       </button>
       <Toggle label="Переводить главы не на русском" value={prefs.translate} onChange={(translate) => set({ translate })} />
       <Field label="Модель">
@@ -777,7 +796,7 @@ function ChapterList({ list, current, mangaId, onPick }: { list: Chapter[]; curr
   )
 }
 
-function SettingsSheet({ prefs, set, close }: { prefs: ReaderPrefs; set: (p: Partial<ReaderPrefs>) => void; close: () => void }) {
+function SettingsSheet({ prefs, set, close, onSaved }: { prefs: ReaderPrefs; set: (p: Partial<ReaderPrefs>) => void; close: () => void; onSaved: () => void }) {
   const wide = window.innerWidth >= 900
   return (
     <Sheet title="Настройки чтения" close={close}>
@@ -837,7 +856,7 @@ function SettingsSheet({ prefs, set, close }: { prefs: ReaderPrefs; set: (p: Par
         <Toggle label="Экономия трафика (сжатые страницы)" value={prefs.saver} onChange={(saver) => set({ saver })} />
         <div className="mt-2 border-t border-white/10 pt-5">
           <div className="mb-3 text-xs font-extrabold tracking-wide text-white/50 uppercase">Переводчик</div>
-          <TranslatorSetup prefs={prefs} set={set} />
+          <TranslatorSetup prefs={prefs} set={set} onSaved={onSaved} />
         </div>
       </div>
     </Sheet>
@@ -847,7 +866,7 @@ function SettingsSheet({ prefs, set, close }: { prefs: ReaderPrefs; set: (p: Par
 export function Sheet({ title, close, children }: { title: string; close: () => void; children: ReactNode }) {
   return (
     <div
-      className={cn('animate-pop absolute inset-y-0 right-0 z-30 flex w-full max-w-sm flex-col bg-[#15151d]/95 text-white shadow-2xl ring-1 ring-white/10 backdrop-blur-xl', isElectron && 'pt-12')}
+      className={cn('animate-pop absolute inset-y-0 right-0 z-30 flex w-full max-w-sm flex-col bg-[#15151d]/95 text-white shadow-2xl ring-1 ring-white/10 backdrop-blur-xl', isElectron && 'pt-14')}
       style={{ paddingTop: 'var(--safe-top)', paddingBottom: 'var(--safe-bottom)' }}
     >
       <div className="flex items-center justify-between px-5 py-4">

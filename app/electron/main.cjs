@@ -141,8 +141,15 @@ app.whenReady().then(() => {
     return net.fetch(pathToFileURL(file).toString())
   })
   // MangaDex answers CORS only for web origins (https://localhost and the like), not app://;
-  // Senkuro sends no CORS headers at all
-  session.defaultSession.webRequest.onHeadersReceived({ urls: ['https://api.mangadex.org/*', 'https://api.senkuro.com/*'] }, (d, cb) => {
+  // Senkuro sends no CORS headers at all. Page images need it too: the translator reads their pixels.
+  const corsHosts = [
+    'https://api.mangadex.org/*',
+    'https://api.senkuro.com/*',
+    'https://*.mangadex.network/*',
+    'https://uploads.mangadex.org/*',
+    'https://mirai.senkuro.org/*',
+  ]
+  session.defaultSession.webRequest.onHeadersReceived({ urls: corsHosts }, (d, cb) => {
     const headers = Object.fromEntries(Object.entries(d.responseHeaders ?? {}).filter(([k]) => k.toLowerCase() !== 'access-control-allow-origin'))
     headers['Access-Control-Allow-Origin'] = ['app://aniplayer']
     cb({ responseHeaders: headers })

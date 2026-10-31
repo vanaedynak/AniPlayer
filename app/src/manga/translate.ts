@@ -66,8 +66,22 @@ export function translatePage(url: string, ctx: PageContext): Promise<Bubble[]> 
 }
 
 /** the page as a JPEG no larger than Gemini needs */
+/** the page's bytes, fetched fresh: the copy the reader already shows was cached without CORS
+ *  permission, and reusing it for pixel access fails with "Failed to fetch" */
+async function download(url: string) {
+  for (const u of [url, `${url}${url.includes('?') ? '&' : '?'}tr=1`]) {
+    try {
+      const res = await fetch(u, { cache: 'no-store', mode: 'cors' })
+      if (res.ok) return await res.blob()
+    } catch {
+      /* try the next way */
+    }
+  }
+  throw new Error('Не удалось загрузить страницу для перевода')
+}
+
 async function pageImage(url: string) {
-  const bmp = await createImageBitmap(await (await fetch(url)).blob())
+  const bmp = await createImageBitmap(await download(url))
   const scale = Math.min(1, 2000 / Math.max(bmp.width, bmp.height))
   const c = document.createElement('canvas')
   c.width = Math.round(bmp.width * scale)
@@ -132,7 +146,7 @@ async function run(url: string, ctx: PageContext): Promise<Bubble[]> {
     json = await res.json().catch(() => null)
     if (![403, 404, 429, 500, 503].includes(res.status)) break
   }
-  if (!res) throw new Error('Нет ответа Gemini')
+  if (!res) throw new Error('Нет связи с Gemini — проверьте интернет (или включите VPN, если Gemini недоступен в вашей стране)')
   if (!res.ok) {
     const msg: string = json?.error?.message ?? `HTTP ${res.status}`
     if (res.status === 429) throw new Error('Лимит бесплатных запросов Gemini исчерпан — подождите минуту или до завтра')
