@@ -6,3 +6,6 @@ app/ios/
 app/android/
 *.log
 .DS_Store
+
+# keys for the Supabase move: never in git
+secrets/
