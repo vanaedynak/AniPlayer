@@ -21,6 +21,9 @@ contextBridge.exposeInMainWorld('aniplayer', {
       return () => ipcRenderer.removeListener('update-state', fn)
     },
   },
+  fetchImage(url) {
+    return ipcRenderer.invoke('fetch-image', url)
+  },
   setZoom(factor) {
     webFrame.setZoomFactor(factor)
   },

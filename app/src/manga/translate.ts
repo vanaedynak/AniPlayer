@@ -52,6 +52,8 @@ export interface PageContext {
   key: string
   model: string
   title: string
+  /** another copy of the page (MangaDex's own server) to try when the first one won't load */
+  alt?: string
 }
 
 export function translatePage(url: string, ctx: PageContext): Promise<Bubble[]> {
@@ -68,20 +70,31 @@ export function translatePage(url: string, ctx: PageContext): Promise<Bubble[]> 
 /** the page as a JPEG no larger than Gemini needs */
 /** the page's bytes, fetched fresh: the copy the reader already shows was cached without CORS
  *  permission, and reusing it for pixel access fails with "Failed to fetch" */
-async function download(url: string) {
-  for (const u of [url, `${url}${url.includes('?') ? '&' : '?'}tr=1`]) {
-    try {
-      const res = await fetch(u, { cache: 'no-store', mode: 'cors' })
-      if (res.ok) return await res.blob()
-    } catch {
-      /* try the next way */
+async function download(url: string, alt?: string): Promise<Blob> {
+  const bridge = window.aniplayer?.fetchImage
+  for (const u of alt && alt !== url ? [url, alt] : [url]) {
+    // Windows app: the main process fetches it, no CORS in the way
+    if (bridge) {
+      try {
+        return new Blob([(await bridge(u)) as Uint8Array<ArrayBuffer>])
+      } catch {
+        /* fall back to fetch below */
+      }
+    }
+    for (const v of [u, `${u}${u.includes('?') ? '&' : '?'}tr=1`]) {
+      try {
+        const res = await fetch(v, { cache: 'no-store', mode: 'cors' })
+        if (res.ok) return await res.blob()
+      } catch {
+        /* try the next way */
+      }
     }
   }
   throw new Error('Не удалось загрузить страницу для перевода')
 }
 
-async function pageImage(url: string) {
-  const bmp = await createImageBitmap(await download(url))
+async function pageImage(url: string, alt?: string) {
+  const bmp = await createImageBitmap(await download(url, alt))
   const scale = Math.min(1, 2000 / Math.max(bmp.width, bmp.height))
   const c = document.createElement('canvas')
   c.width = Math.round(bmp.width * scale)
@@ -106,7 +119,7 @@ const SAFETY = ['HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH', 'HARM_C
 }))
 
 async function run(url: string, ctx: PageContext): Promise<Bubble[]> {
-  const image = await pageImage(url)
+  const image = await pageImage(url, ctx.alt)
   const body = {
     contents: [{ parts: [{ inline_data: { mime_type: 'image/jpeg', data: image } }, { text: PROMPT(ctx.title) }] }],
     safetySettings: SAFETY,

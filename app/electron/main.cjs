@@ -125,6 +125,15 @@ ipcMain.on('update-install', () => {
   autoUpdater.quitAndInstall(true, true)
 })
 
+// The manga translator needs a page's pixels; fetching here skips the browser's CORS rules.
+const imageHosts = /(^|\.)(mangadex\.network|mangadex\.org|senkuro\.org|senkuro\.com)$/
+ipcMain.handle('fetch-image', async (_e, url) => {
+  const u = new URL(url)
+  if (u.protocol !== 'https:' || !imageHosts.test(u.hostname)) throw new Error('host not allowed')
+  const res = await net.fetch(url, { cache: 'no-store' })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return new Uint8Array(await res.arrayBuffer())
+})
 ipcMain.on('close-ok', () => win && !win.isDestroyed() && win.destroy())
 
 app.on('second-instance', () => {

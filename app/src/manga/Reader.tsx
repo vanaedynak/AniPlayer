@@ -138,7 +138,7 @@ function ReaderView({
     if (!missing.length) return
     setTrBusy(missing[0] === urls[page])
     missing.forEach((u) =>
-      translatePage(u, { key: prefs.geminiKey, model: prefs.geminiModel || DEFAULT_MODEL, title: m?.title ?? '' })
+      translatePage(u, { key: prefs.geminiKey, model: prefs.geminiModel || DEFAULT_MODEL, title: m?.title ?? '', alt: src.data?.fallback[urls.indexOf(u)] })
         .then((b) => {
           if (!alive) return
           setBubbles((cur) => ({ ...cur, [u]: b }))

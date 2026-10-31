@@ -12,6 +12,7 @@ interface ElectronBridge {
   isElectron: true
   onBeforeClose: (cb: () => Promise<void>) => void
   setZoom: (factor: number) => void
+  fetchImage?: (url: string) => Promise<Uint8Array>
   version?: () => Promise<string>
   updates?: {
     get: () => Promise<UpdateState>
