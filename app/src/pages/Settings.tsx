@@ -142,6 +142,8 @@ function SyncSettings() {
   )
 }
 
+const ANILIST_PIN = 'https://anilist.co/api/v2/oauth/pin'
+
 function AniListSettings() {
   const prefs = useStore((s) => s.prefs)
   const setPrefs = useStore((s) => s.setPrefs)
@@ -184,7 +186,11 @@ function AniListSettings() {
               <a className="font-bold text-accent-2" href="https://anilist.co/settings/developer" target="_blank" rel="noreferrer">
                 anilist.co/settings/developer <ExternalLink size={12} className="inline" />
               </a>{' '}
-              → Create New Client. Name: AniPlayer, Redirect URL: <code className="rounded bg-white/10 px-1">https://anilist.co/api/v2/oauth/pin</code>
+              → Create New Client. Name: AniPlayer, Redirect URL (точно так, без пробелов — иначе после входа будет «API route not found»):{' '}
+              <code className="rounded bg-white/10 px-1">{ANILIST_PIN}</code>{' '}
+              <button className="font-bold text-accent-2" onClick={() => void navigator.clipboard.writeText(ANILIST_PIN)}>
+                Скопировать
+              </button>
             </Step>
             <Step n={2}>Скопируйте Client ID сюда и нажмите «Получить токен».</Step>
             <Step n={3}>Разрешите доступ, скопируйте показанный токен и вставьте ниже. Он синхронизируется на iPad сам.</Step>
