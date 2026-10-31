@@ -212,6 +212,7 @@ export interface FranchisePart {
   main: boolean
 }
 
+const RECAP = /рекап|recap|пролог|prologue|итоги|обзор|summary|digest/i
 const NOISE = /клип|проморолик|реклама|cm|pv|music/i
 
 /** every TV season, film and OVA of a franchise in airing order, seasons split into parts by title */
@@ -266,11 +267,14 @@ async function loadParts(id: number): Promise<FranchisePart[]> {
   // a special that is the sequel of a season and continues its title is that season's last part
   // ("Атака титанов: Финал — Заключительная глава")
   for (const a of all) {
-    if (saga.has(a.id) || !/special|ona/.test(a.kind ?? '')) continue
+    // recaps and one-episode prologues are not a part of the story (SAO "Рекап", Arifureta "Пролог")
+    if (saga.has(a.id) || !/special|ona/.test(a.kind ?? '') || (a.episodes || a.episodes_aired) < 2 || RECAP.test(shikiTitle(a) + ' ' + a.name)) continue
     const linked = g.links.some((l) => (l.relation === 'sequel' || l.relation === 'prequel') && l.source_id === a.id && saga.has(l.target_id))
     // a prologue aired before its season (High School DxD Hero, episode 0) stays with the extras
     if (linked && all.some((o) => saga.has(o.id) && continues(shikiTitle(a), shikiTitle(o)) && date(a) >= date(o))) saga.add(a.id)
   }
+  // an announced season with nothing aired yet waits with the extras instead of an empty tab
+  for (const a of all) if (saga.has(a.id) && a.status === 'anons' && !a.episodes_aired) saga.delete(a.id)
   let season = 0
   let base = ''
   let part = 1
@@ -286,7 +290,7 @@ async function loadParts(id: number): Promise<FranchisePart[]> {
       }
       const split = part > 1 || all.some((o) => o !== a && saga.has(o.id) && continues(shikiTitle(o), t))
       parts.push({ a, label: `Сезон ${season}${split ? ` · Часть ${part}` : ''}`, main: true })
-    } else parts.push({ a, label: [KINDS[a.kind ?? ''] ?? a.kind, a.aired_on?.slice(0, 4)].filter(Boolean).join(' · '), main: false })
+    } else parts.push({ a, label: [a.status === 'anons' ? 'Анонс' : (KINDS[a.kind ?? ''] ?? a.kind), a.aired_on?.slice(0, 4)].filter(Boolean).join(' · '), main: false })
   }
   return parts
 }

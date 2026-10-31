@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Layers, Check, Film } from 'lucide-react'
+import { Layers, Check, Film, Clapperboard, Sparkles, CalendarClock } from 'lucide-react'
 import { franchiseParts, shikiTitle, type FranchisePart } from '../lib/shikimori'
 import { useLibriaIndex } from '../lib/libriaIndex'
 import { useStore, LIST_COLORS } from '../lib/store'
@@ -19,7 +19,7 @@ export function SeasonTabs({ malId }: { malId: number }) {
   const nav = useNavigate()
   const loc = useLocation()
   const ref = useRef<HTMLDivElement>(null)
-  const [showExtra, setShowExtra] = useState(false)
+  const [shown, setShown] = useState<ExtraKind | 'none' | null>(null)
   const cameFromTabs = !!(loc.state as { seasons?: boolean } | null)?.seasons
 
   // switching seasons keeps the tabs in view instead of jumping back to the banner
@@ -30,7 +30,10 @@ export function SeasonTabs({ malId }: { malId: number }) {
   if (!data || data.length < 2) return null
   const main = data.filter((p) => p.main)
   const extra = data.filter((p) => !p.main)
-  const extraOpen = showExtra || extra.some((p) => p.a.id === malId)
+  // films, OVAs and spin-offs each get their own tab next to the seasons
+  const groups = EXTRA_KINDS.map((g) => ({ ...g, parts: extra.filter((p) => extraKind(p) === g.kind) })).filter((g) => g.parts.length)
+  // opens by itself on the group this page belongs to, until a tab is picked
+  const open = shown ? groups.find((g) => g.kind === shown) : groups.find((g) => g.parts.some((p) => p.a.id === malId))
   const entryOf = (id: number) => Object.values(titles).find((t) => t.malId === id)
   const statusOf = (id: number) => entryOf(id)?.status ?? null
   const go = (id: number) => {
@@ -76,26 +79,37 @@ export function SeasonTabs({ malId }: { malId: number }) {
     <div ref={ref} className="flex scroll-mt-24 flex-col gap-2">
       <div className="no-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1">
         {seasons.map(seasonChip)}
-        {extra.length > 0 && (
+        {groups.map((g) => (
           <button
-            onClick={() => setShowExtra((v) => !v)}
+            key={g.kind}
+            onClick={() => setShown(open?.kind === g.kind ? 'none' : g.kind)}
             className={cn(
               'flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold whitespace-nowrap ring-1 transition',
-              extraOpen ? 'bg-white/15 ring-white/20' : 'ring-white/10 hover:bg-white/10',
+              open?.kind === g.kind ? 'bg-white/15 ring-white/20' : 'ring-white/10 hover:bg-white/10',
             )}
           >
-            <Film size={14} /> Фильмы и OVA · {extra.length}
+            <g.icon size={14} /> {g.label} · {g.parts.length}
           </button>
-        )}
+        ))}
       </div>
-      {extraOpen && extra.length > 0 && (
+      {open && (
         <div className="no-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1">
-          {extra.map((p) => chip(p, `${p.label} · ${shikiTitle(p.a).split(/[:—]/).slice(1).join(':').trim() || shikiTitle(p.a)}`))}
+          {open.parts.map((p) => chip(p, `${p.label} · ${shikiTitle(p.a).split(/[:—]/).slice(1).join(':').trim() || shikiTitle(p.a)}`))}
         </div>
       )}
     </div>
   )
 }
+
+type ExtraKind = 'movie' | 'ova' | 'other' | 'soon'
+const EXTRA_KINDS = [
+  { kind: 'movie' as const, label: 'Фильмы', icon: Clapperboard },
+  { kind: 'ova' as const, label: 'OVA и спешлы', icon: Film },
+  { kind: 'other' as const, label: 'Спин-оффы и др.', icon: Sparkles },
+  { kind: 'soon' as const, label: 'Анонсы', icon: CalendarClock },
+]
+const extraKind = (p: FranchisePart): ExtraKind =>
+  p.a.status === 'anons' ? 'soon' : p.a.kind === 'movie' ? 'movie' : /ova|special/.test(p.a.kind ?? '') ? 'ova' : 'other'
 
 /** every season, film and OVA of the franchise, from Shikimori, in airing order */
 export function FranchiseRow({ malId, title }: { malId: number; title?: string }) {
