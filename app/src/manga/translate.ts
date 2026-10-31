@@ -17,8 +17,8 @@ export const KEY_URL = 'https://aistudio.google.com/apikey'
 
 // what free keys can use (late 2026); older names are gone for new users
 export const MODELS = [
+  { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash — переводит лучше; если занята, сам перейдёт на Flash-Lite' },
   { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite — быстро, пара секунд на страницу' },
-  { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash — чуть точнее, но часто перегружена' },
 ]
 export const DEFAULT_MODEL = MODELS[0].id
 
@@ -44,9 +44,35 @@ function remember(key: string, b: Bubble[]) {
 
 export const savedTranslation = (url: string) => saved[url]?.b ?? null
 
-// one page at a time keeps us inside the free tier's per-minute limit
-let queue: Promise<unknown> = Promise.resolve()
+// one page at a time keeps us inside the free tier's per-minute limit. The page asked for last goes
+// first: the reader asks for the far pages before the current one, so after a page turn the page
+// on screen jumps ahead of the ones queued in advance
+interface Job {
+  url: string
+  ctx: PageContext
+  rank: number
+  done: (b: Bubble[]) => void
+  fail: (e: unknown) => void
+}
+const waiting = new Map<string, Job>()
 const running = new Map<string, Promise<Bubble[]>>()
+let asked = 0
+let busy = false
+
+async function work() {
+  if (busy) return
+  busy = true
+  while (waiting.size) {
+    const job = [...waiting.values()].reduce((a, b) => (b.rank > a.rank ? b : a))
+    waiting.delete(job.url)
+    try {
+      job.done(await run(job.url, job.ctx))
+    } catch (e) {
+      job.fail(e)
+    }
+  }
+  busy = false
+}
 
 export interface PageContext {
   key: string
@@ -59,10 +85,15 @@ export interface PageContext {
 export function translatePage(url: string, ctx: PageContext): Promise<Bubble[]> {
   const hit = savedTranslation(url)
   if (hit) return Promise.resolve(hit)
+  const job = waiting.get(url)
+  if (job) job.rank = ++asked
   if (!running.has(url)) {
-    const p = (queue = queue.catch(() => {}).then(() => run(url, ctx))) as Promise<Bubble[]>
-    p.then((b) => remember(url, b)).finally(() => running.delete(url))
+    const p = new Promise<Bubble[]>((done, fail) => waiting.set(url, { url, ctx, rank: ++asked, done, fail }))
+    p.then((b) => remember(url, b))
+      .catch(() => {})
+      .finally(() => running.delete(url))
     running.set(url, p)
+    void work()
   }
   return running.get(url)!
 }
@@ -106,9 +137,13 @@ async function pageImage(url: string, alt?: string) {
 
 const PROMPT = (title: string) => `You are a professional manga translator working on "${title}".
 Find EVERY piece of text on this page: speech bubbles, thought bubbles, narration boxes, signs and handwritten notes.
-For each one give its box and translate it into natural, lively Russian as a skilled fan translator would:
+For each one give its box and translate it into natural, lively Russian the way a good Russian anime/manga fan-sub team would:
 keep each character's voice, jokes, puns and double meanings (adapt wordplay so it still works in Russian),
-honorifics like -san/-kun/-sama, names in their usual Russian spelling, and swearing or innuendo exactly as strong as the original.
+honorifics like -san/-kun/-chan/-senpai/-sama written the way Russian fansubs do (Сато-сан, сэмпай), names in their usual Russian spelling,
+and swearing or innuendo exactly as strong as the original.
+Keep the anime feel: emotional exclamations and interjections (Э?!, А-а-а!, Ня, Хм...), stretched words, stammering,
+ellipses and "!?" as in the original; cute speech stays cute, a tsundere stays tsundere, a narrator stays dramatic.
+Sound natural and short enough to fit the bubble, never stiff or bookish.
 Translate everything faithfully, whatever its content. Skip sound effects drawn as part of the art and scanlator credits.
 box_2d is [ymin, xmin, ymax, xmax] normalized to 0-1000, covering the whole bubble or text area.
 Return them in reading order.`
@@ -117,6 +152,9 @@ const SAFETY = ['HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH', 'HARM_C
   category,
   threshold: 'BLOCK_NONE',
 }))
+
+const resting = new Map<string, number>()
+const REST = 2 * 60_000
 
 async function run(url: string, ctx: PageContext): Promise<Bubble[]> {
   const image = await pageImage(url, ctx.alt)
@@ -140,8 +178,11 @@ async function run(url: string, ctx: PageContext): Promise<Bubble[]> {
       },
     },
   }
-  // the chosen model first; when it's overloaded or closed to free keys, the next one
-  const models = [...new Set([ctx.model, ...MODELS.map((m) => m.id)])]
+  // the chosen model first; when it's overloaded or closed to free keys, the next one.
+  // A model that just failed sits out a couple of minutes so pages don't each wait for its timeout
+  const all = [...new Set([ctx.model, ...MODELS.map((m) => m.id)])]
+  const ready = all.filter((m) => (resting.get(m) ?? 0) < Date.now())
+  const models = ready.length ? ready : all
   let res: Response | null = null
   let json: any = null // eslint-disable-line @typescript-eslint/no-explicit-any
   for (const model of models) {
@@ -154,10 +195,12 @@ async function run(url: string, ctx: PageContext): Promise<Bubble[]> {
         signal: AbortSignal.timeout(45_000),
       })
     } catch {
+      resting.set(model, Date.now() + REST)
       continue
     }
     json = await res.json().catch(() => null)
     if (![403, 404, 429, 500, 503].includes(res.status)) break
+    if (res.status !== 403) resting.set(model, Date.now() + REST)
   }
   if (!res) throw new Error('Нет связи с Gemini — проверьте интернет (или включите VPN, если Gemini недоступен в вашей стране)')
   if (!res.ok) {

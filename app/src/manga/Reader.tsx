@@ -11,7 +11,7 @@ import { useChapters, pickLang } from './useChapters'
 import { PAPER } from './ui'
 import { useAsync } from '../lib/useAsync'
 import { cn } from '../lib/format'
-import { isElectron } from '../lib/platform'
+import { isElectron, isIOS } from '../lib/platform'
 
 type Doc = Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void }
 type El = HTMLElement & { webkitRequestFullscreen?: () => void }
@@ -65,8 +65,12 @@ function ReaderView({
 }) {
   const prefs = useManga((s) => s.prefs)
   const setPrefs = useManga((s) => s.setPrefs)
-  const resume = useManga.getState().entries[mangaId]
-  const startPage = resume?.lastChapterId === chapterId && resume.lastPage && resume.lastPage < (resume.lastPages ?? 0) - 1 ? resume.lastPage : 0
+  // where reading stopped, read once per chapter: saved progress moves on as you read, and following
+  // it would yank the strip back to the top of the current page on every save
+  const startPage = useMemo(() => {
+    const resume = useManga.getState().entries[mangaId]
+    return resume?.lastChapterId === chapterId && resume.lastPage && resume.lastPage < (resume.lastPages ?? 0) - 1 ? resume.lastPage : 0
+  }, [mangaId, chapterId])
   const src = useAsync(() => pages(chapterId, prefs.saver), [chapterId, prefs.saver])
   const urls = src.data?.urls ?? []
   const n = urls.length
@@ -113,7 +117,7 @@ function ReaderView({
 
   const urlFor = (i: number) => (failed[i] ? `${src.data!.fallback[i]}${failed[i] > 1 ? `?r=${failed[i]}` : ''}` : urls[i])
 
-  // translator: chapters not in Russian get their bubbles translated, current page first, two ahead
+  // translator: chapters not in Russian get their bubbles translated, current page first, then AHEAD more
   const canTranslate = !!chapter && chapter.lang !== 'ru'
   const translating = canTranslate && prefs.translate && !!prefs.geminiKey
   const [bubbles, setBubbles] = useState<Record<string, Bubble[]>>({})
@@ -128,7 +132,7 @@ function ReaderView({
   useEffect(() => {
     if (!translating || !n) return
     let alive = true
-    const want = [page, page + 1, page + 2].filter((i) => i < n).map((i) => urls[i])
+    const want = Array.from({ length: AHEAD + 1 }, (_, k) => page + k).filter((i) => i < n).map((i) => urls[i])
     const todo = want.filter((u) => !bubbles[u])
     for (const u of todo) {
       const hit = savedTranslation(u)
@@ -137,7 +141,8 @@ function ReaderView({
     const missing = todo.filter((u) => !savedTranslation(u))
     if (!missing.length) return
     setTrBusy(missing[0] === urls[page])
-    missing.forEach((u) =>
+    // farthest first: the translator takes the last request first, so the page on screen leads
+    missing.slice().reverse().forEach((u) =>
       translatePage(u, { key: prefs.geminiKey, model: prefs.geminiModel || DEFAULT_MODEL, title: m?.title ?? '', alt: src.data?.fallback[urls.indexOf(u)] })
         .then((b) => {
           if (!alive) return
@@ -199,20 +204,19 @@ function ReaderView({
         else if (!full) onExit()
         return
       }
-      if (e.key === 'f' || e.key === 'а') return toggleFull()
-      if (!paged) {
-        if (e.key === 'ArrowRight' && next) onChapter(next)
-        if (e.key === 'ArrowLeft' && prev) onChapter(prev)
-        return
-      }
-      const fwd = rtl ? 'ArrowLeft' : 'ArrowRight'
-      const bwd = rtl ? 'ArrowRight' : 'ArrowLeft'
-      if (e.key === fwd || e.key === ' ' || e.key === 'PageDown') {
-        e.preventDefault()
-        forward()
-      } else if (e.key === bwd || e.key === 'PageUp') {
-        e.preventDefault()
-        back()
+      if (e.code === 'KeyF') return toggleFull()
+      // A / D and the arrows flip pages (by key position, so the Russian layout works too)
+      const right = e.key === 'ArrowRight' || e.code === 'KeyD'
+      const left = e.key === 'ArrowLeft' || e.code === 'KeyA'
+      const fwd = (rtl ? left : right) || e.key === ' ' || e.key === 'PageDown'
+      const bwd = (rtl ? right : left) || e.key === 'PageUp'
+      if (!fwd && !bwd) return
+      e.preventDefault()
+      if (paged) return fwd ? forward() : back()
+      const root = document.getElementById('manga-strip')
+      if (root && !stripStep(root, fwd ? 1 : -1)) {
+        if (fwd && next && !next.external) onChapter(next)
+        if (bwd && prev && !prev.external) onChapter(prev)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -399,6 +403,9 @@ function ReaderView({
   )
 }
 
+/** how many pages past the current one get translated in advance */
+const AHEAD = 5
+
 // --- modes --------------------------------------------------------------------------------------
 
 /** long strip: pages one under another, best for webtoons and phones */
@@ -442,10 +449,11 @@ function Strip({
   }, [onPage])
 
   // pages load with unknown heights: when one above the screen grows, scroll by the same amount
-  // so the page being read stays put (WebKit has no built-in scroll anchoring)
+  // so the page being read stays put. Only WebKit needs this: Chromium anchors by itself, and doing
+  // it by hand there fights its smooth wheel scrolling (pages jumped over each other)
   useEffect(() => {
     const root = ref.current
-    if (!root) return
+    if (!root || !isIOS) return
     const heights = new Map<Element, number>()
     const ro = new ResizeObserver((es) => {
       for (const e of es) {
@@ -464,7 +472,8 @@ function Strip({
   return (
     <div
       ref={ref}
-      className="no-scrollbar relative flex-1 overflow-y-auto overscroll-contain [overflow-anchor:none]"
+      id="manga-strip"
+      className={cn('no-scrollbar relative flex-1 overflow-y-auto overscroll-contain', isIOS && '[overflow-anchor:none]')}
       onScroll={(e) => {
         const y = e.currentTarget.scrollTop
         if (y > lastY.current + 30) hideUi()
@@ -485,6 +494,40 @@ function Strip({
       {end}
     </div>
   )
+}
+
+/** the strip moved by one page: a page taller than the screen goes by screenfuls.
+ *  False when there is nowhere further to go in that direction. */
+function stripStep(root: HTMLElement, dir: 1 | -1) {
+  const top = root.scrollTop
+  const h = root.clientHeight
+  const els = [...root.querySelectorAll<HTMLElement>('[data-i]')]
+  if (!h || !els.length) return true // not laid out yet: stay in this chapter
+  const at = els.findIndex((el) => el.offsetTop + el.offsetHeight > top + 2)
+  const cur = els[at]
+  if (!cur) {
+    // already below the last page, at the chapter's end card
+    if (dir > 0) return false
+    const last = els[els.length - 1]
+    root.scrollTo({ top: Math.max(last.offsetTop, last.offsetTop + last.offsetHeight - h), behavior: 'smooth' })
+    return true
+  }
+  let to: number
+  if (dir > 0) {
+    const bottom = cur.offsetTop + cur.offsetHeight
+    if (bottom > top + h + 2) to = Math.min(top + h * 0.85, bottom - h)
+    else to = els[at + 1]?.offsetTop ?? root.scrollHeight - h
+    if (to <= top + 1) return false
+  } else {
+    if (cur.offsetTop < top - 2) to = Math.max(cur.offsetTop, top - h * 0.85)
+    else {
+      const prev = els[at - 1]
+      if (!prev) return false
+      to = Math.max(prev.offsetTop, prev.offsetTop + prev.offsetHeight - h)
+    }
+  }
+  root.scrollTo({ top: to, behavior: 'smooth' })
+  return true
 }
 
 /** one page (or a two-page spread) at a time with tap zones and swipes */
@@ -614,7 +657,7 @@ function Page({ i, src, onError, eager, className }: { i: number; src: string; o
     return () => ro.disconnect()
   }, [bubbles, loaded])
   return (
-    <div id={`mp-${i}`} data-i={i} className={cn('relative', !loaded && 'min-h-[70vh] w-full')}>
+    <div id={`mp-${i}`} data-i={i} className={cn('relative', !loaded && 'aspect-[5/7] max-h-[90vh] w-full')}>
       {!loaded && (
         <div className="absolute inset-0 flex items-center justify-center opacity-40">
           <Loader2 className="animate-spin" />
@@ -642,32 +685,53 @@ function Page({ i, src, onError, eager, className }: { i: number; src: string; o
   )
 }
 
-/** one translated bubble: a white patch over the original, text shrunk until it fits */
+/** one translated bubble: a white patch over the original. The text shrinks to fit, but never below
+ *  a readable size; when it still does not fit, the patch grows around the bubble instead */
+const MIN_TEXT = 14
 function FitText({ b, height }: { b: Bubble; height: number }) {
   const ref = useRef<HTMLDivElement>(null)
+  // a little extra room: Russian runs longer than English
+  const padX = b.w * 0.1
+  const padY = b.h * 0.08
+  const pageW = height * 0.7 // pages are roughly this shape; only used to keep narrow bubbles wide enough
+  const w = Math.min(1, Math.max(b.w + padX * 2, 120 / pageW))
+  const left = Math.min(1 - w, Math.max(0, b.x + b.w / 2 - w / 2))
+  const top = Math.max(0, b.y - padY)
+  const hgt = Math.min(1 - top, b.h + padY * 2)
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
-    let size = Math.max(9, Math.min(26, height * 0.022))
+    el.style.height = `${hgt * 100}%`
+    el.style.marginTop = ''
+    let size = Math.max(MIN_TEXT + 2, Math.min(30, height * 0.026))
     el.style.fontSize = `${size}px`
-    while (size > 6 && (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1)) {
+    const over = () => el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1
+    while (size > MIN_TEXT && over()) {
       size -= 0.5
       el.style.fontSize = `${size}px`
     }
-  }, [b, height])
-  // a little extra room: Russian runs longer than English
-  const padX = b.w * 0.08
-  const padY = b.h * 0.06
+    el.style.width = `${w * 100}%`
+    el.style.left = `${left * 100}%`
+    if (over()) {
+      // first wider, still centred on the bubble
+      const wide = Math.min(1, Math.max(w * 1.7, 0.3))
+      el.style.width = `${wide * 100}%`
+      el.style.left = `${Math.min(1 - wide, Math.max(0, b.x + b.w / 2 - wide / 2)) * 100}%`
+    }
+    if (over()) {
+      // then taller: grow downwards and shift up by half, but not past the top of the page
+      const before = el.offsetHeight
+      el.style.height = 'auto'
+      el.style.marginTop = `${-Math.min(top * height, (el.offsetHeight - before) / 2)}px`
+    }
+  }, [b, height, hgt, w, left, top])
   return (
     <div
       ref={ref}
       title={b.text}
-      className="absolute flex items-center justify-center overflow-hidden rounded-[40%/30%] bg-white px-[3%] text-center leading-[1.15] font-bold text-black shadow-[0_0_6px_4px_white]"
+      className="absolute flex items-center justify-center rounded-[40%/30%] bg-white px-[3%] py-1 text-center leading-[1.15] font-bold text-black shadow-[0_0_6px_4px_white] [overflow-wrap:anywhere]"
       style={{
-        left: `${Math.max(0, b.x - padX) * 100}%`,
-        top: `${Math.max(0, b.y - padY) * 100}%`,
-        width: `${Math.min(1, b.w + padX * 2) * 100}%`,
-        height: `${Math.min(1, b.h + padY * 2) * 100}%`,
+        top: `${top * 100}%`,
         fontFamily: '"Comic Neue", "Manrope Variable", system-ui, sans-serif',
       }}
     >

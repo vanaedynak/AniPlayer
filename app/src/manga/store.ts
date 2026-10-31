@@ -83,7 +83,7 @@ export const useManga = create<MangaState>()(
   persist(
     (set, get) => ({
       entries: {},
-      prefs: { mode: 'scroll', fit: 'height', gap: false, width: 760, paper: 'dark', saver: false, brightness: 1, lang: 'ru', adult: false, spread: false, translate: true, geminiKey: '', geminiModel: 'gemini-3.5-flash-lite' },
+      prefs: { mode: 'scroll', fit: 'height', gap: false, width: 760, paper: 'dark', saver: false, brightness: 1, lang: 'ru', adult: false, spread: false, translate: true, geminiKey: '', geminiModel: 'gemini-3.8-flash' },
       book: { size: 19, leading: 1.7, font: 'serif', paper: 'dark', width: 720, justify: true, indent: true },
 
       touch: (m, patch) => {
@@ -151,7 +151,13 @@ export const useManga = create<MangaState>()(
     }),
     {
       name: 'aniplayer-manga',
-      version: 1,
+      version: 2,
+      // v2: Flash 3.8 is tried first now (Flash-Lite stays as its fallback)
+      migrate: (p, v) => {
+        const s = p as Partial<MangaState>
+        if (v < 2 && s.prefs) s.prefs = { ...s.prefs, geminiModel: 'gemini-3.8-flash' }
+        return s as MangaState
+      },
       // settings added later get their defaults
       merge: (p, cur) => {
         const saved = (p ?? {}) as Partial<MangaState>
