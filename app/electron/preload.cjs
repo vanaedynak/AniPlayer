@@ -21,6 +21,11 @@ contextBridge.exposeInMainWorld('aniplayer', {
       return () => ipcRenderer.removeListener('update-state', fn)
     },
   },
+  voice: {
+    start() {
+      return ipcRenderer.invoke('voice-start')
+    },
+  },
   fetchImage(url) {
     return ipcRenderer.invoke('fetch-image', url)
   },

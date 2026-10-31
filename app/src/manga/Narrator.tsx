@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 import { Pause, Play, SkipBack, SkipForward, X, Loader2 } from 'lucide-react'
 import { blocksOf, linesOf, type Line } from '../lib/narrate'
 import { piperPrepare, piperSpeak, voiceCaster, type Voice } from '../lib/piper'
+import { f5Ready, f5Speak, f5Voice } from '../lib/f5'
+import { isElectron } from '../lib/platform'
 import { cn } from '../lib/format'
 
 const RATES = [0.9, 1, 1.15, 1.3, 1.5]
@@ -31,6 +33,27 @@ export function Narrator({
   const [idx, setIdx] = useState(-1)
   const [busy, setBusy] = useState('')
   const [rate, setRate] = useState(() => Number(localStorage.getItem('aniplayer-narrator-rate')) || 1)
+  // on the PC the F5 module reads when it is installed; Piper everywhere else and as the fallback
+  const [engine, setEngine] = useState<'f5' | 'piper'>(() => {
+    const saved = localStorage.getItem('aniplayer-narrator-engine')
+    return saved === 'f5' || (isElectron && saved !== 'piper') ? 'f5' : 'piper'
+  })
+  const [f5, setF5] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (engine !== 'f5') return
+    let alive = true
+    setBusy('Запускаю голосовой модуль…')
+    void f5Ready().then((ok) => {
+      if (!alive) return
+      setF5(ok)
+      setBusy('')
+      if (!ok) setEngine('piper')
+    })
+    return () => {
+      alive = false
+    }
+  }, [engine])
+  const useF5 = engine === 'f5' && f5 === true
   const audio = useRef<HTMLAudioElement | null>(null)
   const lines = useRef<Line[]>([])
   const blocks = useRef<HTMLElement[]>([])
@@ -48,7 +71,7 @@ export function Narrator({
     const cast = voiceCaster()
     voices.current = lines.current.map((line) => ({ line, voice: cast(line.role, line.who) }))
     // every voice of the chapter downloads now, not in the middle of a dialogue
-    for (const id of new Set(voices.current.map((v) => v.voice.id))) piperPrepare(id, (_, part) => part < 1 && setBusy(`Скачиваю голоса… ${Math.round(part * 100)}%`))
+    if (engine === 'piper') for (const id of new Set(voices.current.map((v) => v.voice.id))) piperPrepare(id, (_, part) => part < 1 && setBusy(`Скачиваю голоса… ${Math.round(part * 100)}%`))
     let start = 0
     if (first.current) {
       const top = 90
@@ -66,7 +89,9 @@ export function Narrator({
     if (!v) return null
     let p = cache.current.get(i)
     if (!p) {
-      p = piperSpeak(v.line.text, v.voice, (_, part) => setBusy(`Скачиваю голос… ${Math.round(part * 100)}%`)).then((b) => URL.createObjectURL(b))
+      p = (useF5 ? f5Speak(v.line.text, f5Voice(v.voice.role, v.voice.n)) : piperSpeak(v.line.text, v.voice, (_, part) => setBusy(`Скачиваю голос… ${Math.round(part * 100)}%`))).then((b) =>
+        URL.createObjectURL(b),
+      )
       cache.current.set(i, p)
       p.catch(() => cache.current.delete(i))
     }
@@ -86,7 +111,7 @@ export function Narrator({
 
   // play the current line, prepare the next ones meanwhile
   useEffect(() => {
-    if (idx < 0 || !playing) return
+    if (idx < 0 || !playing || (engine === 'f5' && f5 === null)) return
     let alive = true
     const p = synth(idx)
     for (let k = 1; k <= AHEAD; k++) synth(idx + k)
@@ -97,9 +122,10 @@ export function Narrator({
       setBusy('')
       const a = (audio.current ??= new Audio())
       const v = voices.current[idx].voice
+      const pitch = useF5 ? 1 : v.pitch
       a.src = url
-      a.preservesPitch = v.pitch === 1
-      a.playbackRate = rate * v.pitch
+      a.preservesPitch = pitch === 1
+      a.playbackRate = rate * pitch
       a.onended = () => {
         if (!alive) return
         if (idx + 1 < lines.current.length) setIdx(idx + 1)
@@ -112,7 +138,13 @@ export function Narrator({
       audio.current?.pause()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx, playing, rate])
+  }, [idx, playing, rate, useF5, f5])
+
+  // another engine: the lines ahead are made again in its voices
+  useEffect(() => {
+    for (const u of cache.current.values()) void u.then(URL.revokeObjectURL).catch(() => {})
+    cache.current.clear()
+  }, [useF5])
 
   useEffect(
     () => () => {
@@ -160,6 +192,23 @@ export function Narrator({
       >
         {rate}×
       </button>
+      {(isElectron || f5) && (
+        <button
+          onClick={() => {
+            const next = engine === 'f5' ? 'piper' : 'f5'
+            setEngine(next)
+            try {
+              localStorage.setItem('aniplayer-narrator-engine', next)
+            } catch {
+              /* ignore */
+            }
+          }}
+          title={engine === 'f5' ? 'Живые голоса F5 (видеокарта). Нажмите для Piper' : f5 === false ? 'Голосовой модуль F5 не установлен' : 'Piper. Нажмите для живых голосов F5'}
+          className={cn('h-9 rounded-full px-2.5 text-xs font-extrabold hover:bg-white/10', useF5 && 'text-accent-2')}
+        >
+          {engine === 'f5' ? 'F5' : 'Piper'}
+        </button>
+      )}
       <button onClick={close} title="Выключить озвучку" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/10">
         <X size={17} />
       </button>

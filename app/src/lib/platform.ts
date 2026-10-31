@@ -13,6 +13,8 @@ interface ElectronBridge {
   onBeforeClose: (cb: () => Promise<void>) => void
   setZoom: (factor: number) => void
   fetchImage?: (url: string) => Promise<Uint8Array>
+  /** starts the F5 voice module if it is installed */
+  voice?: { start: () => Promise<{ installed: boolean }> }
   version?: () => Promise<string>
   updates?: {
     get: () => Promise<UpdateState>

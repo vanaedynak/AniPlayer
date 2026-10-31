@@ -13,6 +13,9 @@ export const PIPER_VOICES = {
 export interface Voice {
   id: string
   pitch: number
+  /** the speaker it stands for: the F5 module picks its own voice from these */
+  role: Role
+  n: number
 }
 
 export type DownloadProgress = (voice: string, part: number) => void
@@ -45,13 +48,13 @@ export function voiceCaster() {
   const given = new Map<string, Voice>()
   const used = { m: 0, f: 0 }
   return (role: Role, who?: string): Voice => {
-    if (role === 'narrator') return { id: PIPER_VOICES.narrator, pitch: 1 }
+    if (role === 'narrator') return { id: PIPER_VOICES.narrator, pitch: 1, role, n: 0 }
     const key = `${role}:${who ?? ''}`
     let v = given.get(key)
     if (!v) {
       const pool = PIPER_VOICES[role]
       const n = who ? used[role]++ : 0
-      v = { id: pool[n % pool.length], pitch: 1 + 0.07 * Math.floor(n / pool.length) * (role === 'f' ? 1 : -0.6) }
+      v = { id: pool[n % pool.length], pitch: 1 + 0.07 * Math.floor(n / pool.length) * (role === 'f' ? 1 : -0.6), role, n }
       given.set(key, v)
     }
     return v

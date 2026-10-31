@@ -4,6 +4,7 @@ const { app, BrowserWindow, protocol, net, ipcMain, shell, nativeTheme, Menu, se
 const path = require('node:path')
 const fs = require('node:fs')
 const { pathToFileURL } = require('node:url')
+const { spawn } = require('node:child_process')
 const { autoUpdater } = require('electron-updater')
 
 const DEV_URL = process.env.VITE_DEV_URL
@@ -141,6 +142,28 @@ ipcMain.handle('fetch-image', async (_e, url) => {
   return new Uint8Array(await res.arrayBuffer())
 })
 ipcMain.on('close-ok', () => win && !win.isDestroyed() && win.destroy())
+
+// Voice module: F5-TTS on the GPU, installed apart from the app (several GB) in %USERPROFILE%\AniPlayer-voice.
+// Started on the first read-aloud, not with the app, so the GPU memory stays free until then.
+const VOICE_HOME = path.join(app.getPath('home'), 'AniPlayer-voice')
+let voiceProc = null
+ipcMain.handle('voice-start', () => {
+  const py = path.join(VOICE_HOME, '.venv', 'Scripts', 'python.exe')
+  if (!fs.existsSync(py) || !fs.existsSync(path.join(VOICE_HOME, 'models'))) return { installed: false }
+  if (voiceProc) return { installed: true }
+  const script = path.join(VOICE_HOME, 'server.py')
+  try {
+    // the server ships with the app and updates with it
+    const src = fs.readFileSync(path.join(__dirname, 'voice-server.py'))
+    if (!fs.existsSync(script) || !fs.readFileSync(script).equals(src)) fs.writeFileSync(script, src)
+  } catch (e) {
+    console.warn('[voice]', e)
+  }
+  voiceProc = spawn(py, [script], { cwd: VOICE_HOME, windowsHide: true, stdio: 'ignore', env: { ...process.env, ANIPLAYER_VOICE_HOME: VOICE_HOME, PYTHONUTF8: '1' } })
+  voiceProc.on('exit', () => (voiceProc = null))
+  return { installed: true }
+})
+app.on('will-quit', () => voiceProc?.kill())
 
 app.on('second-instance', () => {
   if (!win) return
