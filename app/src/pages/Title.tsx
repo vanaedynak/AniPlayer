@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Play, Star, Calendar, Clock, Film, Users, ArrowDownUp } from 'lucide-react'
 import { api, posterUrl, episodePreview, sortedEpisodes } from '../lib/api'
@@ -6,7 +6,7 @@ import { useAsync } from '../lib/useAsync'
 import { useStore, progressKey } from '../lib/store'
 import { EpisodeCard, Skeleton, Chip, Empty } from '../components/ui'
 import { StatusPicker } from '../components/TitleBits'
-import { FranchiseRow } from '../components/FranchiseRow'
+import { FranchiseRow, SeasonTabs } from '../components/FranchiseRow'
 import { DownloadSeason } from '../components/Downloads'
 import { releaseOrOffline } from '../lib/downloads'
 import { ThemesSection } from '../components/Music'
@@ -63,6 +63,8 @@ export default function Title() {
   const [page, setPage] = useState<number | null>(null)
   const [reverse, setReverse] = useState(false)
   const [more, setMore] = useState(false)
+  // another season opens in this same page: start it from its own resume point
+  useEffect(() => setPage(null), [alias])
 
   const list = reverse ? [...episodes].reverse() : episodes
   const resumeIdx = resume ? list.findIndex((e) => e.ordinal === resume.ordinal) : 0
@@ -174,10 +176,13 @@ export default function Title() {
         </div>
       )}
 
-      {r.mal?.id ? <FranchiseRow malId={r.mal.id} /> : null}
-
       <div>
-        <section>
+        <section className="flex flex-col">
+          {r.mal?.id ? (
+            <div className="mb-5">
+              <SeasonTabs malId={r.mal.id} />
+            </div>
+          ) : null}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-2xl font-extrabold">Серии</h2>
             <EpisodeRanges count={list.length} page={curPage} setPage={setPage} reverse={reverse} setReverse={setReverse} />
@@ -194,6 +199,7 @@ export default function Title() {
         </section>
       </div>
 
+      {r.mal?.id ? <FranchiseRow malId={r.mal.id} /> : null}
       {r.mal?.id ? <ThemesSection malId={r.mal.id} /> : null}
     </div>
   )

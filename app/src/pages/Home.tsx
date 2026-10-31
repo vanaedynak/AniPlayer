@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Play, Info, Star, Shuffle, ChevronRight } from 'lucide-react'
 import { api, episodePreview, posterUrl, type Release } from '../lib/api'
 import { useAsync } from '../lib/useAsync'
-import { useStore, progressKey, watchHref } from '../lib/store'
+import { useStore, progressKey, watchHref, startedReleases } from '../lib/store'
 import { Section, Row, ReleaseCard, WideCard, CardSkeletons, Skeleton } from '../components/ui'
 import { fmtTime, fmtOrdinal, cn } from '../lib/format'
 
@@ -76,13 +76,14 @@ function Hero({ items }: { items: Release[] }) {
 export function ContinueRow() {
   const titles = useStore((s) => s.titles)
   const progress = useStore((s) => s.progress)
+  const started = useMemo(() => startedReleases(progress), [progress])
   const items = useMemo(
     () =>
       Object.values(titles)
-        .filter((t) => t.lastWatchedAt && t.lastOrdinal != null)
+        .filter((t) => t.lastWatchedAt && t.lastOrdinal != null && started.has(t.releaseId))
         .sort((a, b) => (b.lastWatchedAt ?? 0) - (a.lastWatchedAt ?? 0))
         .slice(0, 12),
-    [titles],
+    [titles, started],
   )
   if (!items.length) return null
   return (
@@ -96,6 +97,7 @@ export function ContinueRow() {
               key={t.releaseId}
               to={watchHref(t.alias, t.lastOrdinal!)}
               image={p?.preview || t.lastPreview || t.poster}
+              malId={t.malId}
               title={t.name}
               subtitle={`${fmtOrdinal(t.lastOrdinal!)} серия`}
               badge={p?.watched ? 'Просмотрено' : p && p.time > 5 ? fmtTime(p.time) : undefined}

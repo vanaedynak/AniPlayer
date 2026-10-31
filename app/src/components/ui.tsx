@@ -4,8 +4,9 @@ import { ChevronLeft, ChevronRight, Star, Check, Play } from 'lucide-react'
 import { posterUrl, episodePreview, type Release, type Episode } from '../lib/api'
 import { useStore, progressKey, releaseProgress } from '../lib/store'
 import { fmtTime, fmtOrdinal, cn } from '../lib/format'
-import { shImg, shikiTitle, KINDS, type ShikiAnime } from '../lib/shikimori'
+import { shImg, shikiTitle, useShikiPoster, KINDS, type ShikiAnime } from '../lib/shikimori'
 import { useLibriaIndex } from '../lib/libriaIndex'
+import { episodeFrame, screenshotFor } from '../lib/frames'
 
 export function Section({ title, action, children, className }: { title: ReactNode; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
@@ -112,6 +113,7 @@ export function WideCard({
   badge,
   ratio,
   className,
+  malId,
 }: {
   to: string
   image: string
@@ -120,10 +122,13 @@ export function WideCard({
   badge?: string
   ratio?: number
   className?: string
+  /** lets a Shikimori «404» placeholder be swapped for the real poster */
+  malId?: number | null
 }) {
+  const src = useShikiPoster(image, malId)
   return (
     <Link to={to} className={cn('group relative block aspect-video overflow-hidden rounded-3xl bg-card ring-1 ring-white/5', className)}>
-      <img src={image} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+      <img src={src} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
       {badge && <span className="glass absolute top-3 right-3 rounded-full px-3 py-1 text-sm font-semibold">{badge}</span>}
       <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
@@ -144,15 +149,43 @@ export function WideCard({
   )
 }
 
+/** the episode's own preview; without one, a frame grabbed from the episode once the card is on screen */
+function useEpisodeThumb(r: Release, e: Episode) {
+  const own = episodePreview(e)
+  const ref = useRef<HTMLDivElement>(null)
+  const [thumb, setThumb] = useState('')
+  useEffect(() => {
+    if (own || !ref.current) return
+    let alive = true
+    const io = new IntersectionObserver(
+      ([hit]) => {
+        if (!hit.isIntersecting) return
+        io.disconnect()
+        void episodeFrame(e)
+          .then((src) => src ?? (r.mal?.id ? screenshotFor(r.mal.id, e.ordinal) : null))
+          .then((src) => alive && src && setThumb(src))
+      },
+      { rootMargin: '200px' },
+    )
+    io.observe(ref.current)
+    return () => {
+      alive = false
+      io.disconnect()
+    }
+  }, [own, e, r.mal?.id])
+  return { ref, src: own || thumb }
+}
+
 export function EpisodeCard({ r, e, active, onClick }: { r: Release; e: Episode; active?: boolean; onClick?: () => void }) {
   const p = useStore((s) => s.progress[progressKey(r.id, e.ordinal)])
+  const thumb = useEpisodeThumb(r, e)
   const dur = p?.duration || e.duration || 0
   const ratio = p ? (p.watched ? 1 : dur ? p.time / dur : 0) : 0
   const body = (
     <>
-      <div className="relative aspect-video overflow-hidden rounded-2xl bg-card ring-1 ring-white/5">
-        {episodePreview(e) ? (
-          <img src={episodePreview(e)} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+      <div ref={thumb.ref} className="relative aspect-video overflow-hidden rounded-2xl bg-card ring-1 ring-white/5">
+        {thumb.src ? (
+          <img src={thumb.src} alt="" loading="lazy" className="animate-fade-in h-full w-full object-cover transition duration-500 group-hover:scale-105" />
         ) : (
           <img src={posterUrl(r)} alt="" loading="lazy" className="h-full w-full object-cover opacity-40 blur-sm" />
         )}
@@ -256,6 +289,7 @@ export function PanelTitle({ icon, title, sub }: { icon: ReactNode; title: strin
 /** card for a Shikimori entry; marks titles AniLibria has voiced */
 export function ShikiCard({ a, badge, active }: { a: ShikiAnime; badge?: string; active?: boolean }) {
   const libria = useLibriaIndex((s) => s.byMal[a.id])
+  const poster = useShikiPoster(shImg(a.image.original), a.id)
   return (
     <Link to={libria ? `/title/${libria.alias}` : `/anime/${a.id}`} className="group block">
       <div
@@ -264,7 +298,7 @@ export function ShikiCard({ a, badge, active }: { a: ShikiAnime; badge?: string;
           active ? 'ring-2 ring-accent-2' : 'ring-1 ring-white/5 group-hover:ring-white/15',
         )}
       >
-        <img src={shImg(a.image.original)} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+        <img src={poster} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-80" />
         <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
           {Number(a.score) > 0 && (

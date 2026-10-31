@@ -82,6 +82,12 @@ function createWindow() {
   })
   win.on('enter-full-screen', () => win.webContents.send('fullscreen', true))
   win.on('leave-full-screen', () => win.webContents.send('fullscreen', false))
+  // a page leaving fullscreen (or losing its fullscreen element) never leaves the window stuck fullscreen
+  let fullBeforeVideo = false
+  win.webContents.on('enter-html-full-screen', () => (fullBeforeVideo = win.isFullScreen()))
+  win.webContents.on('leave-html-full-screen', () => {
+    if (win && !win.isDestroyed() && win.isFullScreen() && !fullBeforeVideo) win.setFullScreen(false)
+  })
 
   if (DEV_URL) win.loadURL(DEV_URL)
   else win.loadURL('app://aniplayer/index.html')

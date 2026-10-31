@@ -559,15 +559,61 @@ function Paged({
   toggleUi: () => void
   end: ReactNode
 }) {
-  const [zoom, setZoom] = useState(false)
-  const down = useRef<{ x: number; y: number; t: number } | null>(null)
+  const setPrefs = useManga((s) => s.setPrefs)
+  const zoom = prefs.pageZoom ?? 1
+  const zoomed = zoom > 1.01
+  const down = useRef<{ x: number; y: number; t: number; sx: number; sy: number } | null>(null)
   const lastTap = useRef(0)
   const box = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    setZoom(false)
     box.current?.scrollTo({ top: 0, left: 0 })
   }, [page])
+
+  // zoom keeps the point under the cursor (or the middle of the screen) where it was
+  const setZoom = useCallback(
+    (z: number, at?: { x: number; y: number }) => {
+      const el = box.current
+      const next = Math.round(Math.min(ZOOM_MAX, Math.max(1, z)) * 100) / 100
+      if (!el || next === zoom) return
+      const r = el.getBoundingClientRect()
+      const px = at ? at.x - r.left : el.clientWidth / 2
+      const py = at ? at.y - r.top : el.clientHeight / 2
+      const k = next / zoom
+      const left = (el.scrollLeft + px) * k - px
+      const top = (el.scrollTop + py) * k - py
+      setPrefs({ pageZoom: next })
+      requestAnimationFrame(() => el.scrollTo({ left, top }))
+    },
+    [zoom, setPrefs],
+  )
+
+  // Ctrl + wheel (and pinch on a touchpad) zooms; the plain wheel just scrolls the page
+  useEffect(() => {
+    const el = box.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      setZoom(zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12), { x: e.clientX, y: e.clientY })
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [zoom, setZoom])
+
+  // + / - / 0 on the keyboard
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement)?.closest?.('input, textarea')) return
+      if (e.key === '+' || e.key === '=') setZoom(zoom + ZOOM_STEP)
+      else if (e.key === '-' || e.key === '_') setZoom(zoom - ZOOM_STEP)
+      else if (e.key === '0') setZoom(1)
+      else return
+      e.preventDefault()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [zoom, setZoom])
 
   // keep the next few pages in the browser cache
   useEffect(() => {
@@ -581,31 +627,28 @@ function Paged({
     return a + 1 < urls.length ? [a, a + 1] : [a]
   }, [page, last, spread, urls.length])
 
-  const fit = zoom ? 'original' : prefs.fit
+  const fit = prefs.fit
   const imgCls =
     fit === 'height'
-      ? 'max-h-full w-auto max-w-full object-contain'
+      ? cn('max-h-full w-auto object-contain', !zoomed && 'max-w-full')
       : fit === 'width'
-        ? cn('h-auto', shown.length > 1 ? 'w-1/2' : 'w-full', 'max-w-[1100px]')
+        ? cn('h-auto', shown.length > 1 ? 'w-1/2' : 'w-full', !zoomed && 'max-w-[1100px]')
         : 'max-w-none'
+  // zoom: the fitted size times the zoom, so the page grows and the box scrolls over it
+  const zoomBox: React.CSSProperties | undefined = !zoomed
+    ? undefined
+    : fit === 'height'
+      ? { height: `${zoom * 100}%` }
+      : fit === 'width'
+        ? { width: `calc(min(100%, ${shown.length > 1 ? 2200 : 1100}px) * ${zoom})` }
+        : { zoom }
 
-  // the wheel scrolls a page taller than the screen; at its top or bottom it turns the page
-  const edge = useRef(0)
-  const onWheel = (e: React.WheelEvent) => {
+  // a zoomed page is dragged around with the mouse
+  const onMove = (e: React.PointerEvent) => {
+    const d = down.current
     const el = box.current
-    if (!el || zoom || !e.deltaY || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
-    const atEnd = e.deltaY > 0 ? el.scrollTop + el.clientHeight >= el.scrollHeight - 2 : el.scrollTop <= 1
-    if (!atEnd) {
-      edge.current = Date.now() // still scrolling: the page turns only on a fresh flick at the edge
-      return
-    }
-    if (Date.now() - edge.current < 350) {
-      edge.current = Date.now()
-      return
-    }
-    edge.current = Date.now() + 250
-    if (e.deltaY > 0) forward()
-    else back()
+    if (!d || !el || !zoomed || e.pointerType !== 'mouse' || !(e.buttons & 1)) return
+    el.scrollTo({ left: d.sx - (e.clientX - d.x), top: d.sy - (e.clientY - d.y) })
   }
 
   const onUp = (e: React.PointerEvent) => {
@@ -615,16 +658,16 @@ function Paged({
     const dx = e.clientX - d.x
     const dy = e.clientY - d.y
     // swipe
-    if (!zoom && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+    if (!zoomed && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
       if (dx < 0) (rtl ? back : forward)()
       else (rtl ? forward : back)()
       return
     }
     if (Math.abs(dx) > 8 || Math.abs(dy) > 8) return
-    // double tap zooms in
+    // double tap zooms in to 2× and back
     const now = Date.now()
     if (now - lastTap.current < 280) {
-      setZoom((z) => !z)
+      setZoom(zoomed ? 1 : 2, { x: e.clientX, y: e.clientY })
       lastTap.current = 0
       return
     }
@@ -639,25 +682,58 @@ function Paged({
   }
 
   return (
+    <div className="relative flex min-h-0 flex-1 flex-col">
+    <ZoomPill zoom={zoom} set={(z) => setZoom(z)} />
     <div
       ref={box}
-      className="no-scrollbar relative flex-1 overflow-auto overscroll-contain"
-      onWheel={onWheel}
-      onPointerDown={(e) => (down.current = { x: e.clientX, y: e.clientY, t: Date.now() })}
+      className={cn('no-scrollbar relative flex-1 overflow-auto overscroll-contain', zoomed && 'cursor-grab active:cursor-grabbing')}
+      onPointerDown={(e) => (down.current = { x: e.clientX, y: e.clientY, t: Date.now(), sx: box.current?.scrollLeft ?? 0, sy: box.current?.scrollTop ?? 0 })}
+      onPointerMove={onMove}
       onPointerUp={onUp}
     >
       {page >= last ? (
         <div className="flex min-h-full items-center justify-center">{end}</div>
       ) : (
         <div
-          className={cn('flex min-h-full justify-center', fit === 'height' ? 'h-full items-center' : 'items-start', rtl && 'flex-row-reverse')}
-          style={{ filter: prefs.brightness < 1 ? `brightness(${prefs.brightness})` : undefined }}
+          className={cn(
+            'flex min-h-full justify-center',
+            fit === 'height' ? cn('items-center', !zoomed && 'h-full') : 'items-start',
+            rtl && 'flex-row-reverse',
+            zoomed && 'mx-auto min-w-full',
+            zoomed && fit === 'height' && 'w-max',
+          )}
+          style={{ filter: prefs.brightness < 1 ? `brightness(${prefs.brightness})` : undefined, ...zoomBox }}
         >
           {shown.map((i) => (
             <Page key={i} i={i} src={urlFor(i)} onError={onError} eager className={imgCls} wrap={fit === 'height' ? 'flex h-full items-center' : undefined} />
           ))}
         </div>
       )}
+    </div>
+    </div>
+  )
+}
+
+const ZOOM_MAX = 4
+const ZOOM_STEP = 0.25
+
+/** − 150% + in the corner of page mode */
+function ZoomPill({ zoom, set }: { zoom: number; set: (z: number) => void }) {
+  return (
+    <div
+      className="absolute right-3 bottom-24 z-20 flex items-center gap-1 rounded-full bg-black/60 p-1 text-white opacity-40 backdrop-blur transition hover:opacity-100"
+      onPointerDown={(e) => e.stopPropagation()}
+      onPointerUp={(e) => e.stopPropagation()}
+    >
+      <button onClick={() => set(zoom - ZOOM_STEP)} disabled={zoom <= 1} title="Уменьшить (−)" className="flex h-8 w-8 items-center justify-center rounded-full text-lg font-bold hover:bg-white/15 disabled:opacity-30">
+        −
+      </button>
+      <button onClick={() => set(1)} title="Как было (0)" className="min-w-12 rounded-full px-1 text-xs font-bold tabular-nums hover:bg-white/15">
+        {Math.round(zoom * 100)}%
+      </button>
+      <button onClick={() => set(zoom + ZOOM_STEP)} disabled={zoom >= ZOOM_MAX} title="Увеличить (+, Ctrl + колёсико)" className="flex h-8 w-8 items-center justify-center rounded-full text-lg font-bold hover:bg-white/15 disabled:opacity-30">
+        +
+      </button>
     </div>
   )
 }

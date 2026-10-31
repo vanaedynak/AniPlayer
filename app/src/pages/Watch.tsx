@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChevronRight, ChevronLeft, Check, Film, RotateCcw } from 'lucide-react'
-import { api, posterUrl, episodePreview, sortedEpisodes, type Episode } from '../lib/api'
+import { api, posterUrl, sortedEpisodes, type Episode } from '../lib/api'
 import { useAsync } from '../lib/useAsync'
 import { useStore, progressKey } from '../lib/store'
 import Player from '../components/Player'
@@ -25,15 +25,10 @@ export default function Watch() {
   const p = useStore((s) => (r && episode ? s.progress[progressKey(r.id, episode.ordinal)] : undefined))
   const setWatched = useStore((s) => s.setWatched)
 
-  // opening an episode puts it at the top of history on every device
+  // opening an episode only remembers the title; it reaches history once the episode plays (saveProgress)
   useEffect(() => {
     if (!r || !episode) return
-    touchTitle(r, {
-      lastOrdinal: episode.ordinal,
-      lastWatchedAt: Date.now(),
-      lastPreview: episodePreview(episode) || undefined,
-      status: useStore.getState().titles[r.id]?.status ?? 'watching',
-    })
+    if (!useStore.getState().titles[r.id]) touchTitle(r, {})
     setPage(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [r?.id, episode?.ordinal])

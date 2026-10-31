@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Clock, History as HistoryIcon, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { useStore, watchHref, type Progress, type TitleEntry } from '../lib/store'
+import { useStore, watchHref, startedReleases, STARTED_SECONDS, type Progress, type TitleEntry } from '../lib/store'
 import { WideCard, Empty, Chip } from '../components/ui'
 import { fmtTime, fmtOrdinal, cn } from '../lib/format'
 
@@ -18,6 +18,7 @@ function dayLabel(ts: number) {
 export default function History() {
   const progress = useStore((s) => s.progress)
   const titles = useStore((s) => s.titles)
+  const started = useMemo(() => startedReleases(progress), [progress])
   const removeFromHistory = useStore((s) => s.removeFromHistory)
   const [mode, setMode] = useState<'episodes' | 'titles'>('episodes')
 
@@ -25,7 +26,7 @@ export default function History() {
     const list: { p: Progress; t: TitleEntry }[] = []
     for (const p of Object.values(progress)) {
       const t = titles[p.releaseId]
-      if (!t || !t.lastWatchedAt || (p.time < 5 && !p.watched)) continue
+      if (!t || !t.lastWatchedAt || (p.time < STARTED_SECONDS && !p.watched)) continue
       list.push({ p, t })
     }
     list.sort((a, b) => b.p.updatedAt - a.p.updatedAt)
@@ -41,9 +42,9 @@ export default function History() {
   const byTitle = useMemo(
     () =>
       Object.values(titles)
-        .filter((t) => t.lastWatchedAt)
+        .filter((t) => t.lastWatchedAt && started.has(t.releaseId))
         .sort((a, b) => b.lastWatchedAt! - a.lastWatchedAt!),
-    [titles],
+    [titles, started],
   )
 
   return (
@@ -86,6 +87,7 @@ export default function History() {
                   key={`${p.releaseId}_${p.ordinal}`}
                   to={watchHref(t.alias, p.ordinal)}
                   image={p.preview || t.poster}
+                  malId={t.malId}
                   title={t.name}
                   subtitle={`${fmtOrdinal(p.ordinal)} серия · ${new Date(p.updatedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`}
                   badge={p.watched ? 'Просмотрено' : fmtTime(p.time)}
@@ -102,6 +104,7 @@ export default function History() {
               <WideCard
                 to={watchHref(t.alias, t.lastOrdinal ?? 1)}
                 image={t.lastPreview || t.poster}
+                malId={t.malId}
                 title={t.name}
                 subtitle={`${fmtOrdinal(t.lastOrdinal ?? 1)} серия${t.episodesTotal ? ` из ${t.episodesTotal}` : ''}`}
               />

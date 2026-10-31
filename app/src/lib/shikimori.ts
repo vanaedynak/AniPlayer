@@ -1,5 +1,6 @@
 // Shikimori: full anime catalog with Russian titles. Shikimori ids equal MyAnimeList ids,
 // which is how titles are matched to AniLibria releases and AniSkip/AniList.
+import { useEffect, useState } from 'react'
 import type { Release } from './api'
 
 const HOST = 'https://shikimori.io'
@@ -55,6 +56,94 @@ function get<T>(path: string, params: Record<string, string | number | undefined
   p.catch(() => cache.delete(url))
   cache.set(url, p)
   return p
+}
+
+function gql<T>(query: string): Promise<T> {
+  return (chain = chain.then(() => new Promise((r) => setTimeout(r, 220)))).then(async () => {
+    const res = await fetch(`${HOST}/api/graphql`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ query }),
+    })
+    if (!res.ok) throw new Error(`Shikimori HTTP ${res.status}`)
+    const json = (await res.json()) as { data?: T; errors?: { message: string }[] }
+    if (!json.data) throw new Error(json.errors?.[0]?.message ?? 'Shikimori: пустой ответ')
+    return json.data
+  }) as Promise<T>
+}
+
+// GraphQL knows what REST leaves out: which franchise a title belongs to, and the poster of brand-new
+// titles that REST still shows as the «404 not found» placeholder
+export interface ShikiMeta {
+  franchise: string | null
+  poster: string | null
+}
+const META_KEY = 'aniplayer-shiki-meta'
+const meta: Record<number, ShikiMeta> = (() => {
+  try {
+    return JSON.parse(localStorage.getItem(META_KEY) ?? '{}')
+  } catch {
+    return {}
+  }
+})()
+let wanted = new Set<number>()
+let flush: Promise<void> | null = null
+
+/** franchise and poster for many titles at once, batched and remembered on this device */
+export function shikiMeta(ids: number[]): Promise<Record<number, ShikiMeta>> {
+  const missing = ids.filter((id) => id > 0 && !(id in meta))
+  if (!missing.length) return Promise.resolve(meta)
+  missing.forEach((id) => wanted.add(id))
+  flush ??= new Promise((r) => setTimeout(r, 30)).then(async () => {
+    const all = [...wanted]
+    wanted = new Set()
+    flush = null
+    for (let i = 0; i < all.length; i += 50) {
+      const chunk = all.slice(i, i + 50)
+      const data = await gql<{ animes: { id: string; franchise: string | null; poster: { mainUrl: string } | null }[] }>(
+        `{ animes(ids: "${chunk.join(',')}", limit: 50, censored: false) { id franchise poster { mainUrl } } }`,
+      ).catch(() => null)
+      if (!data) continue
+      for (const id of chunk) meta[id] = { franchise: null, poster: null }
+      for (const a of data.animes) meta[Number(a.id)] = { franchise: a.franchise, poster: a.poster?.mainUrl ?? null }
+    }
+    // a title without a poster yet is asked again next time
+    const keep = Object.fromEntries(Object.entries(meta).filter(([, m]) => m.poster))
+    try {
+      localStorage.setItem(META_KEY, JSON.stringify(keep))
+    } catch {
+      /* full */
+    }
+  })
+  return flush.then(() => meta)
+}
+
+const screens = new Map<number, Promise<string[]>>()
+/** screenshots of an anime, the stand-in when an episode has no frame of its own */
+export function shikiScreens(id: number): Promise<string[]> {
+  if (!screens.has(id)) {
+    const p = gql<{ animes: { screenshots: { x332Url: string }[] }[] }>(`{ animes(ids: "${id}", censored: false) { screenshots { x332Url } } }`).then(
+      (d) => d.animes[0]?.screenshots.map((s) => s.x332Url) ?? [],
+    )
+    screens.set(id, p)
+    p.catch(() => screens.delete(id))
+  }
+  return screens.get(id)!
+}
+
+/** the real poster in place of Shikimori's «404 not found» placeholder */
+export function useShikiPoster(src: string, malId?: number | null) {
+  const broken = !src || src.includes('/missing_')
+  const [fixed, setFixed] = useState(() => (broken && malId ? meta[malId]?.poster ?? '' : ''))
+  useEffect(() => {
+    if (!broken || !malId) return
+    let alive = true
+    void shikiMeta([malId]).then((m) => alive && setFixed(m[malId]?.poster ?? ''))
+    return () => {
+      alive = false
+    }
+  }, [broken, malId])
+  return broken ? fixed || src : src
 }
 
 export interface ShikiListParams {
@@ -126,7 +215,17 @@ export interface FranchisePart {
 const NOISE = /клип|проморолик|реклама|cm|pv|music/i
 
 /** every TV season, film and OVA of a franchise in airing order, seasons split into parts by title */
-export async function franchiseParts(id: number): Promise<FranchisePart[]> {
+const partsCache = new Map<number, Promise<FranchisePart[]>>()
+export function franchiseParts(id: number): Promise<FranchisePart[]> {
+  if (!partsCache.has(id)) {
+    const p = loadParts(id)
+    partsCache.set(id, p)
+    p.catch(() => partsCache.delete(id))
+  }
+  return partsCache.get(id)!
+}
+
+async function loadParts(id: number): Promise<FranchisePart[]> {
   const g = await shiki.franchise(id)
   const ids = g.nodes.filter((n) => !NOISE.test(n.kind)).map((n) => n.id)
   if (ids.length < 2) return []

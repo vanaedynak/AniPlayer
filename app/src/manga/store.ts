@@ -54,6 +54,8 @@ export interface ReaderPrefs {
   /** up to five Gemini keys (one per Google account): when one runs out, the next takes over */
   geminiKeys: string[]
   geminiModel: string
+  /** page mode magnification on top of the fit (1 = as fitted), kept from page to page */
+  pageZoom?: number
 }
 
 export interface BookPrefs {

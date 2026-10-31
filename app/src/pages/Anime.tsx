@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { Star, Film, Calendar, Clock, Loader2, Check, Mic, Captions, MonitorPlay } from 'lucide-react'
-import { shiki, shikiToRelease, shImg, shikiTitle, stripBB, KINDS, STATUSES } from '../lib/shikimori'
+import { shiki, shikiToRelease, shImg, shikiTitle, stripBB, useShikiPoster, KINDS, STATUSES } from '../lib/shikimori'
 import { findYummy, yummyDubs, dubLabel, type YDub } from '../lib/yummy'
 import { useLibriaIndex } from '../lib/libriaIndex'
 import { useAsync } from '../lib/useAsync'
 import { useStore, progressKey } from '../lib/store'
 import KodikPlayer from '../components/KodikPlayer'
 import { StatusPicker } from '../components/TitleBits'
-import { FranchiseRow } from '../components/FranchiseRow'
+import { FranchiseRow, SeasonTabs } from '../components/FranchiseRow'
 import { ThemesSection } from '../components/Music'
 import { Skeleton, Empty, Chip } from '../components/ui'
 import { cn, fmtOrdinal } from '../lib/format'
@@ -34,6 +34,7 @@ export default function Anime() {
   const [playerIdx, setPlayerIdx] = useState(0)
   const [page, setPage] = useState<number | null>(null)
   const [altPoster, setAltPoster] = useState('')
+  const shikiPoster = useShikiPoster(a ? shImg(a.image.original) : '', a?.id)
 
   useEffect(() => {
     if (!a || (libria && !forceKodik)) return
@@ -94,10 +95,10 @@ export default function Anime() {
     }
   }
 
-  // watching here also feeds history and "continue watching"
+  // the title is remembered here; history and "continue watching" pick it up once an episode plays
   useEffect(() => {
     if (!r || !dub) return
-    touchTitle(r, { lastOrdinal: episode, lastWatchedAt: Date.now(), status: useStore.getState().titles[r.id]?.status ?? 'watching' })
+    if (!useStore.getState().titles[r.id]) touchTitle(r, {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [r?.id, dub?.key, episode])
 
@@ -107,7 +108,7 @@ export default function Anime() {
 
   const desc = stripBB(a.description)
   // Shikimori has no art for brand-new titles yet
-  const poster = a.image.original.includes('missing') && altPoster ? altPoster : shImg(a.image.original)
+  const poster = shikiPoster.includes('/missing_') && altPoster ? altPoster : shikiPoster
   return (
     <div className="flex flex-col gap-8">
       <div className="animate-fade-up relative z-10 rounded-[32px] ring-1 ring-white/5">
@@ -162,6 +163,8 @@ export default function Anime() {
           </div>
         </div>
       </div>
+
+      <SeasonTabs malId={a.id} />
 
       {dubErr ? (
         <Empty icon={<Film />} title="Источник не ответил" text={dubErr} />

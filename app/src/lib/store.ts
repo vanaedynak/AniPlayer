@@ -72,6 +72,16 @@ export const progressKey = (releaseId: number, ordinal: number) => `${releaseId}
 export const dayKey = (d = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
+/** seconds of an episode that put the title into history */
+export const STARTED_SECONDS = 10
+
+/** releases where some episode played for real (older history also kept titles that were only opened) */
+export function startedReleases(progress: Record<string, Progress>) {
+  const out = new Set<number>()
+  for (const p of Object.values(progress)) if (p.watched || p.time >= STARTED_SECONDS) out.add(p.releaseId)
+  return out
+}
+
 /** an episode counts as watched past 88% or once the ending begins */
 export const WATCHED_RATIO = 0.88
 
@@ -150,6 +160,23 @@ export const useStore = create<State>()(
         const next: Progress = { ...p, watched, updatedAt: Date.now() }
         set((s) => ({ progress: { ...s.progress, [key]: next } }))
         syncHooks.progress?.(next, force)
+        // a title joins history and "continue watching" only once an episode really plays
+        const t = get().titles[p.releaseId]
+        if (t && (next.time >= STARTED_SECONDS || watched)) {
+          const now = Date.now()
+          if (t.lastOrdinal !== p.ordinal || !t.lastWatchedAt || now - t.lastWatchedAt > 60_000 || !t.status) {
+            const entry: TitleEntry = {
+              ...t,
+              lastOrdinal: p.ordinal,
+              lastWatchedAt: now,
+              lastPreview: p.preview || t.lastPreview,
+              status: t.status ?? 'watching',
+              updatedAt: now,
+            }
+            set((s) => ({ titles: { ...s.titles, [p.releaseId]: entry } }))
+            syncHooks.title?.(entry)
+          }
+        }
         return next
       },
 

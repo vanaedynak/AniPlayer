@@ -107,11 +107,30 @@ export default function KodikPlayer({
       setSkip({})
       if (malId) aniskip(malId, episode).then(setSkip)
     }
-    return () => save(true)
+    ducked.current = false
+    return () => {
+      save(true)
+      // Kodik's own fullscreen (taken during an ad) would outlive its frame and leave the window stuck
+      const fs = document.fullscreenElement
+      if (fs && fs !== wrapRef.current) void document.exitFullscreen().catch(() => {})
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src, malId, save])
 
   const cmd = useCallback((method: string, extra?: Record<string, unknown>) => kodikCommand(frameRef.current, method, extra), [])
+
+  // ads come in much louder than the anime: half volume while one plays, the user's volume after
+  const ducked = useRef(false)
+  const duck = useCallback(() => {
+    if (ducked.current) return
+    ducked.current = true
+    cmd('volume', { volume: useStore.getState().local.volume * 0.5 })
+  }, [cmd])
+  const unduck = useCallback(() => {
+    if (!ducked.current) return
+    ducked.current = false
+    cmd('volume', { volume: useStore.getState().local.volume })
+  }, [cmd])
   const seek = useCallback(
     (t: number) => {
       const d = st.current.duration
@@ -173,6 +192,11 @@ export default function KodikPlayer({
       if (e.source !== frameRef.current?.contentWindow) return
       const { key, value } = (e.data ?? {}) as { key?: string; value?: unknown }
       const s = st.current
+      if (key && /advert|(^|_)ads?(_|$)|vast|preroll|midroll/i.test(key)) {
+        if (/end|complete|skip|stop|finish|close/i.test(key)) unduck()
+        else duck()
+        return
+      }
       if (key === 'kodik_player_duration_update' && typeof value === 'number') {
         s.duration = value
         setDuration(value)
@@ -185,7 +209,7 @@ export default function KodikPlayer({
         s.playing = false
         setPlaying(false)
         save(true)
-      } else if (key === 'kodik_player_volume_change' && value && typeof value === 'object') {
+      } else if (key === 'kodik_player_volume_change' && value && typeof value === 'object' && !ducked.current) {
         const v = value as { volume?: number; muted?: boolean }
         setVol({ volume: v.volume ?? 1, muted: !!v.muted })
       } else if ((key === 'kodik_player_time_update' || key === 'kodik_player_time') && typeof value === 'number') {
@@ -193,6 +217,8 @@ export default function KodikPlayer({
         // Kodik only announces play/pause for clicks inside it, so a moving clock is the real "playing" signal
         if (d > 0.05 && d < 3) {
           s.lastTick = Date.now()
+          // the anime itself plays again: the ad is over
+          unduck()
           if (!s.playing) {
             s.playing = true
             setPlaying(true)
@@ -220,7 +246,7 @@ export default function KodikPlayer({
     }
     window.addEventListener('message', onMsg)
     return () => window.removeEventListener('message', onMsg)
-  }, [save, markWatched, hasNext, skip.ed, resume])
+  }, [save, markWatched, hasNext, skip.ed, resume, duck, unduck])
 
   // the clock is also polled: a stopped clock means paused (or buffering, or an ad)
   useEffect(() => {
@@ -240,15 +266,25 @@ export default function KodikPlayer({
     if (!ours || !wantPlay || playing) return
     const t = setTimeout(() => {
       setNative('auto')
+      duck()
       setToast(started ? 'Реклама или загрузка — управление у плеера Kodik' : 'Нажмите ▶ в плеере, дальше управление снова наше')
     }, STALL_MS)
     return () => clearTimeout(t)
-  }, [ours, wantPlay, playing, started])
+  }, [ours, wantPlay, playing, started, duck])
 
   // once the video really runs again after an ad / manual start, our controls come back
   useEffect(() => {
     if (native === 'auto' && isKodik && playing && st.current.played > 1) {
-      const t = setTimeout(() => setNative(false), 1500)
+      const t = setTimeout(() => {
+        setNative(false)
+        // fullscreen taken inside Kodik would sit under our controls with no way out: it becomes ours
+        const fs = document.fullscreenElement
+        if (fs && fs !== wrapRef.current)
+          void document
+            .exitFullscreen()
+            .then(() => wrapRef.current?.requestFullscreen())
+            .catch(() => {})
+      }, 1500)
       return () => clearTimeout(t)
     }
   }, [native, isKodik, playing])
@@ -379,6 +415,18 @@ export default function KodikPlayer({
     const t = setTimeout(() => setRipple(null), 700)
     return () => clearTimeout(t)
   }, [ripple])
+
+  // Esc and F work even while Kodik has the controls (an ad, its own menus)
+  useEffect(() => {
+    if (ours) return
+    const onKey = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase()
+      if (k === 'escape' && document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+      else if ((k === 'f' || k === 'а') && !(e.target as HTMLElement)?.closest?.('input, textarea')) toggleFullscreen()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [ours, toggleFullscreen])
 
   // ---------- keyboard (same keys as our own player) ----------
   useEffect(() => {
