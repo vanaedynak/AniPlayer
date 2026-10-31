@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ChevronLeft, ChevronRight, List, Settings2, Maximize, Minimize, Loader2, X, Check, ExternalLink, AlertCircle } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, List, Settings2, Maximize, Minimize, Loader2, X, Check, ExternalLink, AlertCircle, Languages, Eye, EyeOff } from 'lucide-react'
 import { manga, pages, chapterKey, chapterLabel, mangaName, type Chapter, type Manga } from './md'
 import { useManga, type ReaderPrefs } from './store'
+import { translatePage, savedTranslation, KEY_URL, type Bubble } from './translate'
+
+/** translated bubbles for page i, if any */
+const BubblesCtx = createContext<(i: number) => Bubble[] | undefined>(() => undefined)
 import { useChapters, pickLang } from './useChapters'
 import { PAPER } from './ui'
 import { useAsync } from '../lib/useAsync'
@@ -68,7 +72,7 @@ function ReaderView({
   const n = urls.length
   const [page, setPage] = useState(startPage)
   const [ui, setUi] = useState(true)
-  const [panel, setPanel] = useState<null | 'settings' | 'chapters'>(null)
+  const [panel, setPanel] = useState<null | 'settings' | 'chapters' | 'translate'>(null)
   const [failed, setFailed] = useState<Record<number, number>>({})
   const [full, setFull] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -108,6 +112,41 @@ function ReaderView({
   }, [page, n, next, prefs.saver])
 
   const urlFor = (i: number) => (failed[i] ? `${src.data!.fallback[i]}${failed[i] > 1 ? `?r=${failed[i]}` : ''}` : urls[i])
+
+  // translator: chapters not in Russian get their bubbles translated, current page first, two ahead
+  const canTranslate = !!chapter && chapter.lang !== 'ru'
+  const translating = canTranslate && prefs.translate && !!prefs.geminiKey
+  const [bubbles, setBubbles] = useState<Record<string, Bubble[]>>({})
+  const [trBusy, setTrBusy] = useState(false)
+  const [trError, setTrError] = useState('')
+  const [original, setOriginal] = useState(false)
+  useEffect(() => {
+    if (!translating || !n) return
+    let alive = true
+    const want = [page, page + 1, page + 2].filter((i) => i < n).map((i) => urls[i])
+    const todo = want.filter((u) => !bubbles[u])
+    for (const u of todo) {
+      const hit = savedTranslation(u)
+      if (hit) setBubbles((b) => ({ ...b, [u]: hit }))
+    }
+    const missing = todo.filter((u) => !savedTranslation(u))
+    if (!missing.length) return
+    setTrBusy(missing[0] === urls[page])
+    missing.forEach((u) =>
+      translatePage(u, { key: prefs.geminiKey, model: prefs.geminiModel || 'gemini-flash-latest', title: m?.title ?? '' })
+        .then((b) => {
+          if (!alive) return
+          setBubbles((cur) => ({ ...cur, [u]: b }))
+          setTrError('')
+        })
+        .catch((e) => alive && setTrError(String(e?.message ?? e)))
+        .finally(() => alive && u === urls[page] && setTrBusy(false)),
+    )
+    return () => {
+      alive = false
+    }
+  }, [translating, page, n, urls, bubbles, prefs.geminiKey, prefs.geminiModel, m?.title])
+  const bubblesFor = useCallback((i: number) => (translating && !original ? bubbles[urls[i]] : undefined), [translating, original, bubbles, urls])
   const onImgError = (i: number) => setFailed((f) => (f[i] && f[i] > 2 ? f : { ...f, [i]: (f[i] ?? 0) + 1 }))
 
   const go = useCallback(
@@ -203,6 +242,7 @@ function ReaderView({
           )}
         </Center>
       ) : paged ? (
+        <BubblesCtx.Provider value={bubblesFor}>
         <Paged
           urls={urls}
           urlFor={urlFor}
@@ -217,7 +257,9 @@ function ReaderView({
           toggleUi={() => setUi((v) => !v)}
           end={<ChapterEnd chapter={chapter} next={next} onNext={() => next && onChapter(next)} onExit={onExit} fg={paper.fg} />}
         />
+        </BubblesCtx.Provider>
       ) : (
+        <BubblesCtx.Provider value={bubblesFor}>
         <Strip
           urls={urls}
           urlFor={urlFor}
@@ -229,6 +271,7 @@ function ReaderView({
           hideUi={() => setUi(false)}
           end={<ChapterEnd chapter={chapter} next={next} onNext={() => next && onChapter(next)} onExit={onExit} fg={paper.fg} />}
         />
+        </BubblesCtx.Provider>
       )}
 
       {/* top bar */}
@@ -254,6 +297,23 @@ function ReaderView({
         <IconBtn onClick={() => setPanel(panel === 'chapters' ? null : 'chapters')} title="Главы">
           <List size={20} />
         </IconBtn>
+        {canTranslate && (
+          <button
+            onClick={() => {
+              if (!prefs.geminiKey) setPanel('translate')
+              else if (!prefs.translate) setPrefs({ translate: true })
+              else setOriginal((o) => !o)
+            }}
+            title={!prefs.geminiKey ? 'Переводчик' : original ? 'Показать перевод' : 'Показать оригинал'}
+            className={cn(
+              'flex h-11 shrink-0 items-center gap-2 rounded-full px-3 text-sm font-bold transition hover:bg-white/15',
+              translating && !original && 'bg-accent/30 text-accent-2',
+            )}
+          >
+            {trBusy ? <Loader2 size={18} className="animate-spin" /> : translating && original ? <EyeOff size={18} /> : translating ? <Eye size={18} /> : <Languages size={18} />}
+            <span className="hidden sm:inline">{translating ? (original ? 'Оригинал' : 'Перевод') : 'Перевести'}</span>
+          </button>
+        )}
         <IconBtn onClick={() => setPanel(panel === 'settings' ? null : 'settings')} title="Настройки чтения">
           <Settings2 size={20} />
         </IconBtn>
@@ -298,7 +358,21 @@ function ReaderView({
         </div>
       )}
 
+      {translating && (trBusy || trError) && (
+        <div
+          className={cn('absolute left-1/2 z-10 -translate-x-1/2 rounded-full px-4 py-2 text-xs font-bold shadow-xl backdrop-blur', trError ? 'bg-rose-500/85 text-white' : 'bg-black/70 text-white')}
+          style={{ bottom: 'calc(var(--safe-bottom) + 76px)' }}
+          onClick={() => setTrError('')}
+        >
+          {trError || 'Перевожу страницу…'}
+        </div>
+      )}
       {panel && <div className="absolute inset-0 z-20 bg-black/40" onClick={() => setPanel(null)} />}
+      {panel === 'translate' && (
+        <Sheet title="Переводчик" close={() => setPanel(null)}>
+          <TranslatorSetup prefs={prefs} set={setPrefs} />
+        </Sheet>
+      )}
       {panel === 'settings' && <SettingsSheet prefs={prefs} set={setPrefs} close={() => setPanel(null)} />}
       {panel === 'chapters' && (
         <Sheet title="Главы" close={() => setPanel(null)}>
@@ -510,6 +584,19 @@ function Paged({
 
 function Page({ i, src, onError, eager, className }: { i: number; src: string; onError: (i: number) => void; eager?: boolean; className?: string }) {
   const [loaded, setLoaded] = useState(false)
+  const bubbles = useContext(BubblesCtx)(i)
+  const img = useRef<HTMLImageElement>(null)
+  const [box, setBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null)
+  // the translation layer sits exactly over the drawn image, however it is scaled
+  useEffect(() => {
+    const el = img.current
+    if (!el || !bubbles) return
+    const measure = () => setBox({ left: el.offsetLeft, top: el.offsetTop, width: el.offsetWidth, height: el.offsetHeight })
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [bubbles, loaded])
   return (
     <div id={`mp-${i}`} data-i={i} className={cn('relative', !loaded && 'min-h-[70vh] w-full')}>
       {!loaded && (
@@ -523,10 +610,104 @@ function Page({ i, src, onError, eager, className }: { i: number; src: string; o
         draggable={false}
         loading={eager ? 'eager' : 'lazy'}
         decoding="async"
+        ref={img}
         onLoad={() => setLoaded(true)}
         onError={() => onError(i)}
         className={cn('mx-auto block', className)}
       />
+      {loaded && bubbles && box && (
+        <div className="pointer-events-none absolute" style={box}>
+          {bubbles.map((b, k) => (
+            <FitText key={k} b={b} height={box.height} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** one translated bubble: a white patch over the original, text shrunk until it fits */
+function FitText({ b, height }: { b: Bubble; height: number }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    let size = Math.max(9, Math.min(26, height * 0.022))
+    el.style.fontSize = `${size}px`
+    while (size > 6 && (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1)) {
+      size -= 0.5
+      el.style.fontSize = `${size}px`
+    }
+  }, [b, height])
+  // a little extra room: Russian runs longer than English
+  const padX = b.w * 0.08
+  const padY = b.h * 0.06
+  return (
+    <div
+      ref={ref}
+      title={b.text}
+      className="absolute flex items-center justify-center overflow-hidden rounded-[40%/30%] bg-white px-[3%] text-center leading-[1.15] font-bold text-black shadow-[0_0_6px_4px_white]"
+      style={{
+        left: `${Math.max(0, b.x - padX) * 100}%`,
+        top: `${Math.max(0, b.y - padY) * 100}%`,
+        width: `${Math.min(1, b.w + padX * 2) * 100}%`,
+        height: `${Math.min(1, b.h + padY * 2) * 100}%`,
+        fontFamily: '"Comic Neue", "Manrope Variable", system-ui, sans-serif',
+      }}
+    >
+      {b.ru}
+    </div>
+  )
+}
+
+/** key entry and switches for the Gemini translator */
+function TranslatorSetup({ prefs, set }: { prefs: ReaderPrefs; set: (p: Partial<ReaderPrefs>) => void }) {
+  const [key, setKey] = useState(prefs.geminiKey)
+  return (
+    <div className="flex flex-col gap-4 text-sm">
+      <div className="leading-relaxed text-white/75">
+        Перевод делает нейросеть <b className="text-white">Gemini</b>: она видит страницу целиком, находит все реплики и переводит их на русский с учётом сцены,
+        характера героев и игры слов — поверх оригинальных облачков. Работает для глав на английском и японском.
+      </div>
+      <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-white/75">
+        <li>
+          Откройте{' '}
+          <a href={KEY_URL} target="_blank" rel="noreferrer" className="font-bold text-accent-2 underline">
+            aistudio.google.com/apikey
+          </a>{' '}
+          и войдите в Google-аккаунт.
+        </li>
+        <li>Нажмите «Create API key» и скопируйте ключ.</li>
+        <li>Вставьте его сюда. Это бесплатно: хватает на несколько глав в день.</li>
+      </ol>
+      <input
+        value={key}
+        onChange={(e) => setKey(e.target.value.trim())}
+        placeholder="AIza…"
+        spellCheck={false}
+        autoComplete="off"
+        className="h-11 rounded-xl bg-white/10 px-4 font-mono text-sm ring-1 ring-white/10 outline-none focus:ring-accent"
+      />
+      <button
+        onClick={() => set({ geminiKey: key, translate: true })}
+        disabled={!key || key === prefs.geminiKey}
+        className="h-11 rounded-xl bg-white font-bold text-black disabled:opacity-40"
+      >
+        {prefs.geminiKey && key === prefs.geminiKey ? 'Ключ сохранён' : 'Сохранить ключ'}
+      </button>
+      <Toggle label="Переводить главы не на русском" value={prefs.translate} onChange={(translate) => set({ translate })} />
+      <Field label="Модель">
+        <select
+          value={prefs.geminiModel}
+          onChange={(e) => set({ geminiModel: e.target.value })}
+          className="h-10 w-full rounded-xl bg-white/10 px-3 text-sm font-bold ring-1 ring-white/10 outline-none"
+        >
+          <option value="gemini-flash-latest">Gemini Flash — быстро, лучший выбор</option>
+          <option value="gemini-flash-lite-latest">Gemini Flash-Lite — больше страниц в день</option>
+          <option value="gemini-pro-latest">Gemini Pro — точнее, но медленнее и меньше лимит</option>
+        </select>
+      </Field>
+      <div className="text-xs text-white/45">Ключ хранится только на этом устройстве. Готовые переводы запоминаются, повторное чтение квоту не тратит.</div>
     </div>
   )
 }
@@ -652,6 +833,10 @@ function SettingsSheet({ prefs, set, close }: { prefs: ReaderPrefs; set: (p: Par
           <input type="range" min={0.3} max={1} step={0.05} value={prefs.brightness} onChange={(e) => set({ brightness: Number(e.target.value) })} className="w-full accent-[#a78bfa]" />
         </Field>
         <Toggle label="Экономия трафика (сжатые страницы)" value={prefs.saver} onChange={(saver) => set({ saver })} />
+        <div className="mt-2 border-t border-white/10 pt-5">
+          <div className="mb-3 text-xs font-extrabold tracking-wide text-white/50 uppercase">Переводчик</div>
+          <TranslatorSetup prefs={prefs} set={set} />
+        </div>
       </div>
     </Sheet>
   )
