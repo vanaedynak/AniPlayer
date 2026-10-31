@@ -176,7 +176,28 @@ function useEpisodeThumb(r: Release, e: Episode) {
   return { ref, src: own || thumb }
 }
 
-export function EpisodeCard({ r, e, active, onClick }: { r: Release; e: Episode; active?: boolean; onClick?: () => void }) {
+export function EpisodeCard({
+  r,
+  e,
+  active,
+  onClick,
+  to,
+  replace,
+  num,
+  missing,
+}: {
+  r: Release
+  e: Episode
+  active?: boolean
+  onClick?: () => void
+  /** where the card leads (the AniLibria watch page by default) */
+  to?: string
+  replace?: boolean
+  /** number shown on the card when it differs from the ordinal (seasons made of several parts) */
+  num?: number
+  /** no source has this episode yet */
+  missing?: boolean
+}) {
   const p = useStore((s) => s.progress[progressKey(r.id, e.ordinal)])
   const thumb = useEpisodeThumb(r, e)
   const dur = p?.duration || e.duration || 0
@@ -203,8 +224,9 @@ export function EpisodeCard({ r, e, active, onClick }: { r: Release; e: Episode;
         {active && (
           <span className="absolute top-2 left-2 rounded-full bg-accent px-2.5 py-1 text-xs font-bold">Сейчас</span>
         )}
+        {missing && <span className="absolute top-2 left-2 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white/70">Пока нет</span>}
         <div className="absolute inset-x-0 bottom-0 p-3">
-          <div className="text-[17px] font-extrabold">Серия {fmtOrdinal(e.ordinal)}</div>
+          <div className="text-[17px] font-extrabold">Серия {fmtOrdinal(num ?? e.ordinal)}</div>
           {e.name && <div className="line-clamp-1 text-xs font-medium text-white/70">{e.name}</div>}
         </div>
         {ratio > 0 && (
@@ -215,6 +237,7 @@ export function EpisodeCard({ r, e, active, onClick }: { r: Release; e: Episode;
       </div>
     </>
   )
+  if (missing) return <div className="pointer-events-none opacity-40">{body}</div>
   if (onClick)
     return (
       <button onClick={onClick} className={cn('group block w-full text-left', p?.watched && !active && 'opacity-80')}>
@@ -222,7 +245,7 @@ export function EpisodeCard({ r, e, active, onClick }: { r: Release; e: Episode;
       </button>
     )
   return (
-    <Link to={`/watch/${r.alias}/${e.ordinal}`} className={cn('group block', p?.watched && 'opacity-80')}>
+    <Link to={to ?? `/watch/${r.alias}/${e.ordinal}`} replace={replace} className={cn('group block', p?.watched && !active && 'opacity-80')}>
       {body}
     </Link>
   )

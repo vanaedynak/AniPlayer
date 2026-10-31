@@ -1,18 +1,17 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Play, Star, Calendar, Clock, Film, Users, ArrowDownUp } from 'lucide-react'
+import { Play, Star, Calendar, Clock, Film, Users } from 'lucide-react'
 import { api, posterUrl, episodePreview, sortedEpisodes } from '../lib/api'
 import { useAsync } from '../lib/useAsync'
 import { useStore, progressKey } from '../lib/store'
-import { EpisodeCard, Skeleton, Chip, Empty } from '../components/ui'
+import { Skeleton, Empty } from '../components/ui'
+import { SeasonEpisodes } from '../components/SeasonEpisodes'
 import { StatusPicker } from '../components/TitleBits'
 import { FranchiseRow, SeasonTabs } from '../components/FranchiseRow'
 import { DownloadSeason } from '../components/Downloads'
 import { releaseOrOffline } from '../lib/downloads'
 import { ThemesSection } from '../components/Music'
 import { fmtOrdinal, fmtTime, cn } from '../lib/format'
-
-export const PAGE = 24
 
 export function useResumeTarget(releaseId: number | undefined, episodes: { ordinal: number }[]) {
   const entry = useStore((s) => (releaseId ? s.titles[releaseId] : undefined))
@@ -32,43 +31,12 @@ export function useResumeTarget(releaseId: number | undefined, episodes: { ordin
   }, [releaseId, entry?.lastOrdinal, progress, episodes])
 }
 
-export function EpisodeRanges({ count, page, setPage, reverse, setReverse }: { count: number; page: number; setPage: (n: number) => void; reverse?: boolean; setReverse?: (v: boolean) => void }) {
-  const pages = Math.ceil(count / PAGE)
-  return (
-    <div className="no-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1">
-      {setReverse && (
-        <button
-          onClick={() => setReverse(!reverse)}
-          title="Порядок"
-          className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-1 ring-white/10', reverse ? 'bg-white text-black' : 'bg-card-2')}
-        >
-          <ArrowDownUp size={16} />
-        </button>
-      )}
-      {pages > 1 &&
-        Array.from({ length: pages }, (_, i) => (
-          <Chip key={i} active={i === page} onClick={() => setPage(i)}>
-            {i * PAGE + 1}–{Math.min(count, (i + 1) * PAGE)}
-          </Chip>
-        ))}
-    </div>
-  )
-}
-
 export default function Title() {
   const { alias = '' } = useParams()
   const { data: r, error } = useAsync(() => releaseOrOffline(alias, () => api.release(alias)), [alias])
   const episodes = useMemo(() => (r ? sortedEpisodes(r) : []), [r])
   const resume = useResumeTarget(r?.id, episodes)
-  const [page, setPage] = useState<number | null>(null)
-  const [reverse, setReverse] = useState(false)
   const [more, setMore] = useState(false)
-  // another season opens in this same page: start it from its own resume point
-  useEffect(() => setPage(null), [alias])
-
-  const list = reverse ? [...episodes].reverse() : episodes
-  const resumeIdx = resume ? list.findIndex((e) => e.ordinal === resume.ordinal) : 0
-  const curPage = page ?? Math.max(0, Math.floor(resumeIdx / PAGE))
 
   if (error) return <Empty icon={<Film />} title="Не удалось загрузить тайтл" text={error} />
   if (!r)
@@ -183,19 +151,7 @@ export default function Title() {
               <SeasonTabs malId={r.mal.id} />
             </div>
           ) : null}
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-2xl font-extrabold">Серии</h2>
-            <EpisodeRanges count={list.length} page={curPage} setPage={setPage} reverse={reverse} setReverse={setReverse} />
-          </div>
-          {episodes.length ? (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 2xl:grid-cols-4">
-              {list.slice(curPage * PAGE, (curPage + 1) * PAGE).map((e) => (
-                <EpisodeCard key={e.id} r={r} e={e} active={resume?.ordinal === e.ordinal && resume.label !== 'Смотреть'} />
-              ))}
-            </div>
-          ) : (
-            <Empty icon={<Clock />} title="Серий пока нет" text={r.notification ?? 'Тайтл ещё в работе у команды AniLibria.'} />
-          )}
+          <SeasonEpisodes release={r} malId={r.mal?.id} current={resume && resume.label !== 'Смотреть' ? { releaseId: r.id, ordinal: resume.ordinal } : undefined} />
         </section>
       </div>
 

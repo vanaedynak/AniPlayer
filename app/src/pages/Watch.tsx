@@ -1,15 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChevronRight, ChevronLeft, Check, Film, RotateCcw } from 'lucide-react'
 import { api, posterUrl, sortedEpisodes, type Episode } from '../lib/api'
 import { useAsync } from '../lib/useAsync'
 import { useStore, progressKey } from '../lib/store'
 import Player from '../components/Player'
-import { EpisodeCard, Skeleton, Empty, Panel } from '../components/ui'
+import { Skeleton, Empty, Panel } from '../components/ui'
+import { SeasonEpisodes } from '../components/SeasonEpisodes'
 import { StatusPicker, Franchise } from '../components/TitleBits'
 import { DownloadEpisodeButton } from '../components/Downloads'
 import { releaseOrOffline } from '../lib/downloads'
-import { EpisodeRanges, PAGE } from './Title'
 import { fmtOrdinal, cn } from '../lib/format'
 
 export default function Watch() {
@@ -19,8 +19,6 @@ export default function Watch() {
   const episodes = useMemo(() => (r ? sortedEpisodes(r) : []), [r])
   const idx = Math.max(0, episodes.findIndex((e) => String(e.ordinal) === ordinal))
   const episode = episodes[idx] as Episode | undefined
-  const [page, setPage] = useState<number | null>(null)
-  const curPage = page ?? Math.floor(idx / PAGE)
   const touchTitle = useStore((s) => s.touchTitle)
   const p = useStore((s) => (r && episode ? s.progress[progressKey(r.id, episode.ordinal)] : undefined))
   const setWatched = useStore((s) => s.setWatched)
@@ -29,7 +27,6 @@ export default function Watch() {
   useEffect(() => {
     if (!r || !episode) return
     if (!useStore.getState().titles[r.id]) touchTitle(r, {})
-    setPage(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [r?.id, episode?.ordinal])
 
@@ -105,15 +102,7 @@ export default function Watch() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-xl font-extrabold">Все серии · {episodes.length}</h2>
-          </div>
-          <EpisodeRanges count={episodes.length} page={curPage} setPage={setPage} />
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 2xl:grid-cols-4">
-            {episodes.slice(curPage * PAGE, (curPage + 1) * PAGE).map((e) => (
-              <EpisodeCard key={e.id} r={r} e={e} active={e.id === episode.id} onClick={() => select(e)} />
-            ))}
-          </div>
+          <SeasonEpisodes release={r} malId={r.mal?.id} current={{ releaseId: r.id, ordinal: episode.ordinal }} replace />
         </div>
 
         <aside className="flex flex-col gap-6">

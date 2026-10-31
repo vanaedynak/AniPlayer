@@ -92,7 +92,26 @@ const PLAYERS = [/kodik/i, /aksor/i, /alloha/i]
 
 const seg = (s?: YSeg | null): Seg | undefined => (s && s.length > 0 ? { start: s.time, stop: s.time + s.length } : undefined)
 
-export async function yummyDubs(yummyId: number): Promise<YDub[]> {
+const dubsCache = new Map<number, Promise<YDub[]>>()
+export function yummyDubs(yummyId: number): Promise<YDub[]> {
+  if (!dubsCache.has(yummyId)) {
+    const p = loadDubs(yummyId)
+    dubsCache.set(yummyId, p)
+    p.catch(() => dubsCache.delete(yummyId))
+  }
+  return dubsCache.get(yummyId)!
+}
+
+/** every episode number any dub has, for listing episodes AniLibria lacks */
+export async function kodikNumbers(a: Pick<ShikiAnime, 'id' | 'russian' | 'name'>): Promise<number[]> {
+  const y = await findYummy(a)
+  if (!y) return []
+  const all = new Set<number>()
+  for (const d of await yummyDubs(y.id)) for (const n of d.episodes.keys()) all.add(n)
+  return [...all].sort((x, z) => x - z)
+}
+
+async function loadDubs(yummyId: number): Promise<YDub[]> {
   const videos = await get<YVideo[]>(`/anime/${yummyId}/videos`)
   const map = new Map<string, YDub>()
   for (const v of videos) {

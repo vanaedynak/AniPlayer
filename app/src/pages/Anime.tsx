@@ -1,20 +1,20 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
-import { Star, Film, Calendar, Clock, Loader2, Check, Mic, Captions, MonitorPlay } from 'lucide-react'
+import { Star, Film, Calendar, Clock, Loader2, Mic, Captions, MonitorPlay, Play } from 'lucide-react'
 import { shiki, shikiToRelease, shImg, shikiTitle, stripBB, useShikiPoster, KINDS, STATUSES } from '../lib/shikimori'
 import { findYummy, yummyDubs, dubLabel, type YDub } from '../lib/yummy'
 import { useLibriaIndex } from '../lib/libriaIndex'
 import { useAsync } from '../lib/useAsync'
-import { useStore, progressKey } from '../lib/store'
+import { useStore } from '../lib/store'
 import KodikPlayer from '../components/KodikPlayer'
 import { StatusPicker } from '../components/TitleBits'
 import { FranchiseRow, SeasonTabs } from '../components/FranchiseRow'
 import { ThemesSection } from '../components/Music'
 import { Skeleton, Empty, Chip } from '../components/ui'
+import { SeasonEpisodes } from '../components/SeasonEpisodes'
 import { cn, fmtOrdinal } from '../lib/format'
 
 const DUB_KEY = 'aniplayer-yummy-dub' // remembered dub per title, on this device
-const EP_PAGE = 100
 
 /** any anime from Shikimori: AniLibria titles go to our player, the rest play every dub YummyAnime knows */
 export default function Anime() {
@@ -25,14 +25,12 @@ export default function Anime() {
   const { data: a, error } = useAsync(() => shiki.anime(id), [id])
   const r = useMemo(() => (a ? shikiToRelease(a) : null), [a])
   const entry = useStore((s) => (r ? s.titles[r.id] : undefined))
-  const progress = useStore((s) => s.progress)
   const touchTitle = useStore((s) => s.touchTitle)
 
   const [dubs, setDubs] = useState<YDub[] | null>(null)
   const [dubErr, setDubErr] = useState('')
   const [dubKey, setDubKey] = useState<string | null>(null)
   const [playerIdx, setPlayerIdx] = useState(0)
-  const [page, setPage] = useState<number | null>(null)
   const [altPoster, setAltPoster] = useState('')
   const shikiPoster = useShikiPoster(a ? shImg(a.image.original) : '', a?.id)
 
@@ -72,8 +70,13 @@ export default function Anime() {
   const players = dub?.episodes.get(episode) ?? []
   const video = players[Math.min(playerIdx, players.length - 1)]
   const nextEp = numbers[numbers.indexOf(episode) + 1]
-  const pages = Math.ceil(numbers.length / EP_PAGE)
-  const curPage = page ?? Math.max(0, Math.floor(numbers.indexOf(episode) / EP_PAGE))
+  // the page opens on the episode list; the player comes up once an episode is picked
+  const showPlayer = epParam > 0
+  const playerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (showPlayer && video) playerRef.current?.scrollIntoView({ block: 'start' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [epParam, !!video])
 
   const selectEp = (n: number) => {
     const next = new URLSearchParams(sp)
@@ -97,7 +100,7 @@ export default function Anime() {
 
   // the title is remembered here; history and "continue watching" pick it up once an episode plays
   useEffect(() => {
-    if (!r || !dub) return
+    if (!r || !dub || !showPlayer) return
     if (!useStore.getState().titles[r.id]) touchTitle(r, {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [r?.id, dub?.key, episode])
@@ -153,6 +156,14 @@ export default function Anime() {
             </div>
             {desc && <p className="line-clamp-4 max-w-3xl text-[15px] leading-relaxed text-white/80">{desc}</p>}
             <div className="flex flex-wrap gap-3">
+              {!showPlayer && dub && numbers.length > 0 && (
+                <button
+                  onClick={() => selectEp(episode)}
+                  className="flex h-12 items-center gap-2 rounded-full bg-white px-7 font-extrabold text-black transition hover:scale-[1.03]"
+                >
+                  <Play size={18} fill="currentColor" /> {entry?.lastOrdinal ? `Продолжить · ${fmtOrdinal(episode)} серия` : 'Смотреть'}
+                </button>
+              )}
               <StatusPicker r={r} />
               {libria && (
                 <Link to={`/title/${libria.alias}`} className="flex h-12 items-center rounded-full bg-white px-6 font-extrabold text-black">
@@ -164,8 +175,6 @@ export default function Anime() {
         </div>
       </div>
 
-      <SeasonTabs malId={a.id} />
-
       {dubErr ? (
         <Empty icon={<Film />} title="Источник не ответил" text={dubErr} />
       ) : !dubs ? (
@@ -174,8 +183,8 @@ export default function Anime() {
         </div>
       ) : dubs.length === 0 || !dub || !video ? (
         <Empty icon={<Film />} title="Серий пока нет" text="Ни одной озвучки этого аниме не нашлось. Загляните позже." />
-      ) : (
-        <div className="flex flex-col gap-6">
+      ) : !showPlayer ? null : (
+        <div ref={playerRef} className="flex scroll-mt-20 flex-col gap-6">
           <KodikPlayer release={r} src={video.url} episode={episode} op={video.op} ed={video.ed} hasNext={nextEp != null} onNext={() => nextEp != null && selectEp(nextEp)} />
           <div className="-mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-semibold text-muted">
             <span className="text-white">
@@ -213,44 +222,15 @@ export default function Anime() {
               ))}
             </div>
           </section>
-          {numbers.length > 1 && (
-            <section>
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-xl font-extrabold">Серии · {numbers.length}</h2>
-                {pages > 1 && (
-                  <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
-                    {Array.from({ length: pages }, (_, i) => (
-                      <Chip key={i} active={i === curPage} onClick={() => setPage(i)}>
-                        {numbers[i * EP_PAGE]}–{numbers[Math.min(numbers.length, (i + 1) * EP_PAGE) - 1]}
-                      </Chip>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-2">
-                {numbers.slice(curPage * EP_PAGE, (curPage + 1) * EP_PAGE).map((n) => {
-                  const p = progress[progressKey(r.id, n)]
-                  const ratio = p ? (p.watched ? 1 : p.duration ? p.time / p.duration : 0) : 0
-                  return (
-                    <button
-                      key={n}
-                      onClick={() => selectEp(n)}
-                      className={cn(
-                        'relative h-12 overflow-hidden rounded-xl font-bold ring-1 transition',
-                        n === episode ? 'bg-white text-black ring-white' : 'bg-card-2 ring-white/5 hover:bg-white/10',
-                        p?.watched && n !== episode && 'text-white/50',
-                      )}
-                    >
-                      {p?.watched && n !== episode ? <Check size={16} className="mx-auto" /> : n}
-                      {ratio > 0 && ratio < 1 && <span className="absolute bottom-0 left-0 h-1 bg-accent-2" style={{ width: `${ratio * 100}%` }} />}
-                    </button>
-                  )
-                })}
-              </div>
-            </section>
-          )}
         </div>
       )}
+      <SeasonTabs malId={a.id} />
+      <SeasonEpisodes
+        release={null}
+        malId={a.id}
+        current={showPlayer || entry?.lastOrdinal ? { releaseId: r.id, ordinal: episode } : undefined}
+        replace={showPlayer}
+      />
       <ThemesSection malId={a.id} />
       <FranchiseRow malId={a.id} />
     </div>

@@ -31,20 +31,37 @@ export function SeasonTabs({ malId }: { malId: number }) {
   const main = data.filter((p) => p.main)
   const extra = data.filter((p) => !p.main)
   const extraOpen = showExtra || extra.some((p) => p.a.id === malId)
-  const statusOf = (id: number) => Object.values(titles).find((t) => t.malId === id && t.status)?.status ?? null
+  const entryOf = (id: number) => Object.values(titles).find((t) => t.malId === id)
+  const statusOf = (id: number) => entryOf(id)?.status ?? null
   const go = (id: number) => {
     if (id === malId) return
     const l = byMal[id]
     nav(l ? `/title/${l.alias}` : `/anime/${id}`, { replace: true, state: { seasons: true } })
   }
-  const chip = (p: FranchisePart, label: string) => {
-    const st = statusOf(p.a.id)
-    const active = p.a.id === malId
+  // the parts of a season ("Сезон 2 · Часть 1…4") are one tab: its page lists them all
+  const seasons: FranchisePart[][] = []
+  for (const p of main) {
+    const name = p.label.split(' · ')[0]
+    const last = seasons[seasons.length - 1]
+    if (last && last[0].label.split(' · ')[0] === name) last.push(p)
+    else seasons.push([p])
+  }
+  if (seasons.length < 2 && !extra.length) return null
+  const seasonChip = (group: FranchisePart[]) => {
+    const sts = group.map((p) => statusOf(p.a.id))
+    const st = sts.every((x) => x === 'completed') ? 'completed' : (['watching', 'postponed', 'planned', 'completed', 'dropped'] as const).find((x) => sts.includes(x)) ?? null
+    // opens the part watched last, or the first one
+    const target = [...group].sort((x, y) => (entryOf(y.a.id)?.lastWatchedAt ?? 0) - (entryOf(x.a.id)?.lastWatchedAt ?? 0))[0]
+    const pick = group.some((p) => entryOf(p.a.id)?.lastWatchedAt) ? target : group[0]
+    return chipFor(group[0].a.id + '', group.some((p) => p.a.id === malId), st, group[0].label.split(' · ')[0], () => !group.some((p) => p.a.id === malId) && go(pick.a.id), group.map((p) => shikiTitle(p.a)).join(' / '))
+  }
+  const chip = (p: FranchisePart, label: string) => chipFor(p.a.id + '', p.a.id === malId, statusOf(p.a.id), label, () => go(p.a.id), shikiTitle(p.a))
+  const chipFor = (key: string, active: boolean, st: ReturnType<typeof statusOf>, label: string, onClick: () => void, title: string) => {
     return (
       <button
-        key={p.a.id}
-        onClick={() => go(p.a.id)}
-        title={shikiTitle(p.a)}
+        key={key}
+        onClick={onClick}
+        title={title}
         className={cn(
           'flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold whitespace-nowrap transition',
           active ? 'bg-white text-black' : 'bg-card-2 text-white/80 ring-1 ring-white/5 hover:bg-white/10 hover:text-white',
@@ -58,7 +75,7 @@ export function SeasonTabs({ malId }: { malId: number }) {
   return (
     <div ref={ref} className="flex scroll-mt-24 flex-col gap-2">
       <div className="no-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1">
-        {main.map((p) => chip(p, p.label))}
+        {seasons.map(seasonChip)}
         {extra.length > 0 && (
           <button
             onClick={() => setShowExtra((v) => !v)}
