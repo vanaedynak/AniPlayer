@@ -304,43 +304,47 @@ function ReaderView({
             {chapter?.group ? ` · ${chapter.group}` : ''}
           </div>
         </div>
-        <IconBtn onClick={() => setPanel(panel === 'chapters' ? null : 'chapters')} title="Главы">
-          <List size={20} />
-        </IconBtn>
-        {canTranslate && (
-          <button
-            onClick={() => {
-              if (!hasKey) setPanel('translate')
-              else if (!prefs.translate) setPrefs({ translate: true })
-              else setOriginal((o) => !o)
-            }}
-            title={!hasKey ? 'Переводчик' : original ? 'Показать перевод' : 'Показать оригинал'}
-            className={cn(
-              'flex h-11 shrink-0 items-center gap-2 rounded-full px-3 text-sm font-bold transition hover:bg-white/15',
-              translating && !original && 'bg-accent/30 text-accent-2',
-            )}
-          >
-            {trBusy ? <Loader2 size={18} className="animate-spin" /> : translating && original ? <EyeOff size={18} /> : translating ? <Eye size={18} /> : <Languages size={18} />}
-            <span className="hidden sm:inline">{translating ? (original ? 'Оригинал' : 'Перевод') : 'Перевести'}</span>
-          </button>
-        )}
-        <IconBtn onClick={() => setPanel(panel === 'settings' ? null : 'settings')} title="Настройки чтения">
-          <Settings2 size={20} />
-        </IconBtn>
-        <IconBtn onClick={toggleFull} title="Во весь экран (F)">
-          {full ? <Minimize size={20} /> : <Maximize size={20} />}
-        </IconBtn>
       </div>
 
       {/* bottom bar */}
-      {n > 0 && (
         <div
           className={cn(
-            'absolute inset-x-0 bottom-0 z-10 flex items-center gap-3 bg-gradient-to-t from-black/85 to-black/0 px-3 pt-10 text-white transition duration-300 sm:px-5',
+            'absolute inset-x-0 bottom-0 z-10 flex flex-col gap-1 bg-gradient-to-t from-black/90 via-black/60 to-black/0 px-3 pt-12 text-white transition duration-300 sm:px-5',
             !ui && !panel && 'translate-y-full opacity-0',
           )}
           style={{ paddingBottom: 'calc(var(--safe-bottom) + 12px)' }}
         >
+          {/* the reader's controls sit at the bottom, where the thumb and the mouse already are */}
+          <div className="flex items-center justify-center gap-1 sm:gap-2">
+            <IconBtn onClick={() => setPanel(panel === 'chapters' ? null : 'chapters')} title="Главы">
+              <List size={20} />
+            </IconBtn>
+            {canTranslate && (
+              <button
+                onClick={() => {
+                  if (!hasKey) setPanel('translate')
+                  else if (!prefs.translate) setPrefs({ translate: true })
+                  else setOriginal((o) => !o)
+                }}
+                title={!hasKey ? 'Переводчик' : original ? 'Показать перевод' : 'Показать оригинал'}
+                className={cn(
+                  'flex h-11 shrink-0 items-center gap-2 rounded-full px-3 text-sm font-bold transition hover:bg-white/15',
+                  translating && !original && 'bg-accent/30 text-accent-2',
+                )}
+              >
+                {trBusy ? <Loader2 size={18} className="animate-spin" /> : translating && original ? <EyeOff size={18} /> : translating ? <Eye size={18} /> : <Languages size={18} />}
+                <span className="hidden sm:inline">{translating ? (original ? 'Оригинал' : 'Перевод') : 'Перевести'}</span>
+              </button>
+            )}
+            <IconBtn onClick={() => setPanel(panel === 'settings' ? null : 'settings')} title="Настройки чтения">
+              <Settings2 size={20} />
+            </IconBtn>
+            <IconBtn onClick={toggleFull} title="Во весь экран (F)">
+              {full ? <Minimize size={20} /> : <Maximize size={20} />}
+            </IconBtn>
+            {paged && <ZoomPill zoom={prefs.pageZoom ?? 1} set={(z) => setPrefs({ pageZoom: Math.round(Math.min(ZOOM_MAX, Math.max(1, z)) * 100) / 100 })} />}
+          </div>
+          {n > 0 && <div className="flex items-center gap-3">
           <IconBtn onClick={() => prev && onChapter(prev)} disabled={!prev || !!prev.external} title="Предыдущая глава">
             <ChevronLeft size={22} />
           </IconBtn>
@@ -365,8 +369,8 @@ function ReaderView({
           <IconBtn onClick={() => next && onChapter(next)} disabled={!next || !!next.external} title="Следующая глава">
             <ChevronRight size={22} />
           </IconBtn>
+          </div>}
         </div>
-      )}
 
       {translating && (trBusy || trError) && (
         <div
@@ -683,7 +687,6 @@ function Paged({
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
-    <ZoomPill zoom={zoom} set={(z) => setZoom(z)} />
     <div
       ref={box}
       className={cn('no-scrollbar relative flex-1 overflow-auto overscroll-contain', zoomed && 'cursor-grab active:cursor-grabbing')}
@@ -717,11 +720,11 @@ function Paged({
 const ZOOM_MAX = 4
 const ZOOM_STEP = 0.25
 
-/** − 150% + in the corner of page mode */
+/** − 150% + among the page mode controls */
 function ZoomPill({ zoom, set }: { zoom: number; set: (z: number) => void }) {
   return (
     <div
-      className="absolute right-3 bottom-24 z-20 flex items-center gap-1 rounded-full bg-black/60 p-1 text-white opacity-40 backdrop-blur transition hover:opacity-100"
+      className="ml-1 flex items-center gap-1 rounded-full bg-white/10 p-1"
       onPointerDown={(e) => e.stopPropagation()}
       onPointerUp={(e) => e.stopPropagation()}
     >
