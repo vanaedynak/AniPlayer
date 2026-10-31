@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Cloud, LogOut, Link2, PlayCircle, Database, Check, ExternalLink, Loader2, ZoomIn } from 'lucide-react'
+import { Cloud, LogOut, Link2, PlayCircle, Database, Check, ExternalLink, Loader2, ZoomIn, Info, Activity, LifeBuoy } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useSync, getFirebaseConfig, saveFirebaseConfig, signIn, logOut, accountName } from '../lib/sync'
 import { anilistViewer, anilistAuthUrl } from '../lib/anilist'
 import { useStore } from '../lib/store'
@@ -7,6 +8,7 @@ import { Panel, PanelTitle } from '../components/ui'
 import { UpdateSettings } from '../components/Updates'
 import { cn } from '../lib/format'
 import { SCALES } from '../lib/platform'
+import { SUPPORT_URL } from '../lib/links'
 
 const input = 'h-12 w-full rounded-2xl bg-white/[0.06] px-4 font-semibold ring-1 ring-white/10 outline-none focus:ring-accent/60 placeholder:text-dim'
 const btn = 'h-12 rounded-2xl px-5 font-bold transition disabled:opacity-50'
@@ -308,6 +310,24 @@ function DataSettings() {
   )
 }
 
+/** the way to "О приложении", support and the connection check on phones, where there is no sidebar */
+function AboutLinks() {
+  const row = 'flex items-center gap-3 rounded-2xl px-3 py-3 font-bold transition hover:bg-white/5'
+  return (
+    <Panel className="!p-3">
+      <Link to="/about" className={row}>
+        <Info size={20} className="text-accent-2" /> О приложении, лицензии, правила
+      </Link>
+      <Link to="/status" className={row}>
+        <Activity size={20} className="text-lime-400" /> Проверка соединения
+      </Link>
+      <a href={SUPPORT_URL} target="_blank" rel="noreferrer" className={row}>
+        <LifeBuoy size={20} className="text-sky-400" /> Техподдержка
+      </a>
+    </Panel>
+  )
+}
+
 export default function Settings() {
   return (
     <div className="flex max-w-4xl flex-col gap-6">
@@ -318,6 +338,7 @@ export default function Settings() {
       <AniListSettings />
       <PlayerSettings />
       <DataSettings />
+      <AboutLinks />
       <div className="px-2 text-xs text-dim">AniPlayer · видео и озвучка AniLibria (anilibria.top) · неофициальный клиент для личного использования</div>
     </div>
   )

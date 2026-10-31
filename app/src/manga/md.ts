@@ -133,6 +133,9 @@ async function fetchJson<T>(url: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
+/** a fresh request the way the app makes them, for the connection check */
+export const mdPing = () => fetchJson(`${API}/manga?limit=1`)
+
 function get<T>(path: string, params: Params = {}, ttl = 10 * 60_000): Promise<T> {
   const qs = query(params)
   const url = `${API}${path}${qs ? '?' + qs : ''}`

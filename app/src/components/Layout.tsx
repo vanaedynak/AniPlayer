@@ -28,6 +28,8 @@ import { UpdatePill } from './Updates'
 import { MiniPlayer } from './Music'
 import { RoomBridge, RoomButton } from './Room'
 import { cn } from '../lib/format'
+import { CrashGuard, Welcome } from './Crash'
+import { SUPPORT_URL } from '../lib/links'
 
 const NAV = [
   { to: '/', label: 'Главная', icon: Home },
@@ -299,10 +301,23 @@ function Sidebar() {
           {label}
         </NavLink>
       ))}
-      <div className="mt-auto pt-6 text-xs leading-relaxed text-dim">
-        Озвучка и видео — <span className="font-bold text-muted">AniLibria</span>.
-        <br />
-        Неофициальный клиент.
+      <div className="mt-auto flex flex-col gap-2 pt-6 text-xs leading-relaxed text-dim">
+        <div className="flex flex-wrap gap-x-3 gap-y-1 font-bold text-muted">
+          <Link to="/about" className="hover:text-white">
+            О приложении
+          </Link>
+          <Link to="/status" className="hover:text-white">
+            Соединение
+          </Link>
+          <a href={SUPPORT_URL} target="_blank" rel="noreferrer" className="hover:text-white">
+            Поддержка
+          </a>
+        </div>
+        <div>
+          Озвучка и видео — <span className="font-bold text-muted">AniLibria</span>.
+          <br />
+          Неофициальный клиент.
+        </div>
       </div>
     </aside>
   )
@@ -347,12 +362,13 @@ export default function Layout({ children }: { children: ReactNode }) {
       <div className="flex gap-8">
         <Sidebar />
         <main ref={mainRef} className="min-w-0 flex-1 px-4 pt-4 pb-28 sm:px-6 lg:pr-10 lg:pb-12 lg:pl-0">
-          {children}
+          <CrashGuard key={loc.pathname}>{children}</CrashGuard>
         </main>
       </div>
       <TabBar />
       <MiniPlayer />
       <RoomBridge />
+      <Welcome />
     </div>
   )
 }

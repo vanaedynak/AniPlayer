@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/licenses.mjs && tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
     "electron:dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV_URL=http://localhost:5173 electron .\"",
     "electron:build": "npm run build && electron-builder --win --x64",
-    "icons": "node scripts/icons.mjs"
+    "icons": "node scripts/icons.mjs",
+    "licenses": "node scripts/licenses.mjs"
   },
   "dependencies": {
     "@aparajita/capacitor-secure-storage": "^8.0.1",

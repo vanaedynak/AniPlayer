@@ -1,0 +1,782 @@
+[
+ {
+  "name": "@aparajita/capacitor-secure-storage",
+  "version": "8.0.1",
+  "license": "MIT",
+  "url": "https://github.com/aparajita/capacitor-secure-storage"
+ },
+ {
+  "name": "@capacitor/android",
+  "version": "8.6.0",
+  "license": "MIT",
+  "url": "https://capacitorjs.com"
+ },
+ {
+  "name": "@capacitor/app",
+  "version": "8.1.2",
+  "license": "MIT",
+  "url": "https://github.com/ionic-team/capacitor-plugins"
+ },
+ {
+  "name": "@capacitor/core",
+  "version": "8.6.0",
+  "license": "MIT",
+  "url": "https://capacitorjs.com"
+ },
+ {
+  "name": "@capacitor/filesystem",
+  "version": "8.1.5",
+  "license": "MIT",
+  "url": "https://github.com/ionic-team/capacitor-filesystem"
+ },
+ {
+  "name": "@capacitor/ios",
+  "version": "8.6.0",
+  "license": "MIT",
+  "url": "https://capacitorjs.com"
+ },
+ {
+  "name": "@capacitor/keyboard",
+  "version": "8.0.6",
+  "license": "MIT",
+  "url": "https://github.com/ionic-team/capacitor-keyboard"
+ },
+ {
+  "name": "@capacitor/status-bar",
+  "version": "8.0.4",
+  "license": "MIT",
+  "url": "https://github.com/ionic-team/capacitor-plugins"
+ },
+ {
+  "name": "@capacitor/synapse",
+  "version": "1.0.4",
+  "license": "ISC",
+  "url": "https://www.npmjs.com/package/@capacitor/synapse"
+ },
+ {
+  "name": "@firebase/ai",
+  "version": "3.0.0",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/analytics",
+  "version": "0.10.25",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/analytics-compat",
+  "version": "0.2.31",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/analytics-types",
+  "version": "0.8.5",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/app",
+  "version": "0.16.4",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/app-check",
+  "version": "0.13.1",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/app-check-compat",
+  "version": "0.4.7",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/app-check-interop-types",
+  "version": "0.3.5",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/app-check-types",
+  "version": "0.5.5",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/app-compat",
+  "version": "0.5.20",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/app-types",
+  "version": "0.9.6",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/auth",
+  "version": "1.13.8",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/auth-compat",
+  "version": "0.6.13",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/auth-interop-types",
+  "version": "0.2.6",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/auth-types",
+  "version": "0.13.2",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/component",
+  "version": "0.7.5",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/data-connect",
+  "version": "0.7.4",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/database",
+  "version": "1.1.5",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/database-compat",
+  "version": "2.1.7",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/database-types",
+  "version": "1.0.22",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/firestore",
+  "version": "4.19.0",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/firestore-compat",
+  "version": "0.4.16",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/firestore-types",
+  "version": "3.0.5",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/functions",
+  "version": "0.14.0",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/functions-compat",
+  "version": "0.5.0",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/functions-types",
+  "version": "0.6.5",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/installations",
+  "version": "0.6.24",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/installations-compat",
+  "version": "0.2.24",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/installations-types",
+  "version": "0.5.5",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/logger",
+  "version": "0.5.2",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/messaging",
+  "version": "0.13.3",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/messaging-compat",
+  "version": "0.2.30",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/messaging-interop-types",
+  "version": "0.2.6",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/performance",
+  "version": "0.7.14",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/performance-compat",
+  "version": "0.2.27",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/performance-types",
+  "version": "0.2.5",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/remote-config",
+  "version": "0.9.3",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/remote-config-compat",
+  "version": "0.2.30",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/remote-config-types",
+  "version": "0.5.2",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/storage",
+  "version": "0.14.6",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/storage-compat",
+  "version": "0.4.6",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/storage-types",
+  "version": "0.8.5",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/util",
+  "version": "1.15.3",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@firebase/webchannel-wrapper",
+  "version": "1.0.7",
+  "license": "Apache-2.0",
+  "url": "https://github.com/firebase/firebase-js-sdk"
+ },
+ {
+  "name": "@fontsource-variable/manrope",
+  "version": "5.3.0",
+  "license": "OFL-1.1",
+  "url": "https://fontsource.org/fonts/manrope"
+ },
+ {
+  "name": "@grpc/grpc-js",
+  "version": "1.9.16",
+  "license": "Apache-2.0",
+  "url": "https://grpc.io/"
+ },
+ {
+  "name": "@grpc/proto-loader",
+  "version": "0.7.15",
+  "license": "Apache-2.0",
+  "url": "https://grpc.io/"
+ },
+ {
+  "name": "@mintplex-labs/piper-tts-web",
+  "version": "1.0.5",
+  "license": "MIT",
+  "url": "https://github.com/Mintplex-Labs/piper-tts-web#readme"
+ },
+ {
+  "name": "@protobufjs/aspromise",
+  "version": "1.1.2",
+  "license": "BSD-3-Clause",
+  "url": "https://github.com/dcodeIO/protobuf.js"
+ },
+ {
+  "name": "@protobufjs/base64",
+  "version": "1.1.2",
+  "license": "BSD-3-Clause",
+  "url": "https://github.com/dcodeIO/protobuf.js"
+ },
+ {
+  "name": "@protobufjs/codegen",
+  "version": "2.0.5",
+  "license": "BSD-3-Clause",
+  "url": "https://github.com/dcodeIO/protobuf.js"
+ },
+ {
+  "name": "@protobufjs/eventemitter",
+  "version": "1.1.1",
+  "license": "BSD-3-Clause",
+  "url": "https://github.com/dcodeIO/protobuf.js"
+ },
+ {
+  "name": "@protobufjs/fetch",
+  "version": "1.1.1",
+  "license": "BSD-3-Clause",
+  "url": "https://github.com/dcodeIO/protobuf.js"
+ },
+ {
+  "name": "@protobufjs/float",
+  "version": "1.0.2",
+  "license": "BSD-3-Clause",
+  "url": "https://github.com/dcodeIO/protobuf.js"
+ },
+ {
+  "name": "@protobufjs/path",
+  "version": "1.1.2",
+  "license": "BSD-3-Clause",
+  "url": "https://github.com/dcodeIO/protobuf.js"
+ },
+ {
+  "name": "@protobufjs/pool",
+  "version": "1.1.0",
+  "license": "BSD-3-Clause",
+  "url": "https://github.com/dcodeIO/protobuf.js"
+ },
+ {
+  "name": "@protobufjs/utf8",
+  "version": "1.1.2",
+  "license": "BSD-3-Clause",
+  "url": "https://github.com/protobufjs/protobuf.js"
+ },
+ {
+  "name": "@types/node",
+  "version": "24.19.2",
+  "license": "MIT",
+  "url": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node"
+ },
+ {
+  "name": "anime4k-webgpu",
+  "version": "1.0.0",
+  "license": "MIT",
+  "url": "https://github.com/Anime4KWebBoost/Anime4K-WebGPU#readme"
+ },
+ {
+  "name": "ansi-regex",
+  "version": "5.0.1",
+  "license": "MIT",
+  "url": "chalk/ansi-regex"
+ },
+ {
+  "name": "ansi-styles",
+  "version": "4.3.0",
+  "license": "MIT",
+  "url": "chalk/ansi-styles"
+ },
+ {
+  "name": "argparse",
+  "version": "2.0.1",
+  "license": "Python-2.0",
+  "url": "nodeca/argparse"
+ },
+ {
+  "name": "builder-util-runtime",
+  "version": "9.7.0",
+  "license": "MIT",
+  "url": "https://github.com/electron-userland/electron-builder"
+ },
+ {
+  "name": "cliui",
+  "version": "8.0.1",
+  "license": "ISC",
+  "url": "yargs/cliui"
+ },
+ {
+  "name": "color-convert",
+  "version": "2.0.1",
+  "license": "MIT",
+  "url": "Qix-/color-convert"
+ },
+ {
+  "name": "color-name",
+  "version": "1.1.4",
+  "license": "MIT",
+  "url": "https://github.com/colorjs/color-name"
+ },
+ {
+  "name": "cookie",
+  "version": "1.1.1",
+  "license": "MIT",
+  "url": "jshttp/cookie"
+ },
+ {
+  "name": "debug",
+  "version": "4.4.3",
+  "license": "MIT",
+  "url": "https://github.com/debug-js/debug"
+ },
+ {
+  "name": "electron-updater",
+  "version": "6.8.11",
+  "license": "MIT",
+  "url": "https://github.com/electron-userland/electron-builder"
+ },
+ {
+  "name": "emoji-regex",
+  "version": "8.0.0",
+  "license": "MIT",
+  "url": "https://mths.be/emoji-regex"
+ },
+ {
+  "name": "escalade",
+  "version": "3.2.0",
+  "license": "MIT",
+  "url": "lukeed/escalade"
+ },
+ {
+  "name": "faye-websocket",
+  "version": "0.11.4",
+  "license": "Apache-2.0",
+  "url": "https://github.com/faye/faye-websocket-node"
+ },
+ {
+  "name": "fflate",
+  "version": "0.8.2",
+  "license": "MIT",
+  "url": "https://101arrowz.github.io/fflate"
+ },
+ {
+  "name": "firebase",
+  "version": "13.1.0",
+  "license": "Apache-2.0",
+  "url": "https://firebase.google.com/"
+ },
+ {
+  "name": "flatbuffers",
+  "version": "1.12.0",
+  "license": "SEE LICENSE IN LICENSE.txt",
+  "url": "https://google.github.io/flatbuffers/"
+ },
+ {
+  "name": "fs-extra",
+  "version": "10.1.0",
+  "license": "MIT",
+  "url": "https://github.com/jprichardson/node-fs-extra"
+ },
+ {
+  "name": "get-caller-file",
+  "version": "2.0.5",
+  "license": "ISC",
+  "url": "https://github.com/stefanpenner/get-caller-file#readme"
+ },
+ {
+  "name": "graceful-fs",
+  "version": "4.2.11",
+  "license": "ISC",
+  "url": "https://github.com/isaacs/node-graceful-fs"
+ },
+ {
+  "name": "guid-typescript",
+  "version": "1.0.9",
+  "license": "ISC",
+  "url": "https://github.com/NicolasDeveloper/guid-typescript"
+ },
+ {
+  "name": "hls.js",
+  "version": "1.7.4",
+  "license": "Apache-2.0",
+  "url": "https://github.com/video-dev/hls.js"
+ },
+ {
+  "name": "http-parser-js",
+  "version": "0.5.10",
+  "license": "MIT",
+  "url": "https://github.com/creationix/http-parser-js"
+ },
+ {
+  "name": "idb",
+  "version": "7.1.1",
+  "license": "ISC",
+  "url": "https://github.com/jakearchibald/idb"
+ },
+ {
+  "name": "is-fullwidth-code-point",
+  "version": "3.0.0",
+  "license": "MIT",
+  "url": "sindresorhus/is-fullwidth-code-point"
+ },
+ {
+  "name": "js-yaml",
+  "version": "4.3.2",
+  "license": "MIT",
+  "url": "nodeca/js-yaml"
+ },
+ {
+  "name": "jsonfile",
+  "version": "6.2.1",
+  "license": "MIT",
+  "url": "git@github.com:jprichardson/node-jsonfile"
+ },
+ {
+  "name": "lazy-val",
+  "version": "1.0.5",
+  "license": "MIT",
+  "url": "https://github.com/develar/lazy-val"
+ },
+ {
+  "name": "lodash.camelcase",
+  "version": "4.3.0",
+  "license": "MIT",
+  "url": "https://lodash.com/"
+ },
+ {
+  "name": "lodash.escaperegexp",
+  "version": "4.1.2",
+  "license": "MIT",
+  "url": "https://lodash.com/"
+ },
+ {
+  "name": "lodash.isequal",
+  "version": "4.5.0",
+  "license": "MIT",
+  "url": "https://lodash.com/"
+ },
+ {
+  "name": "long",
+  "version": "5.3.2",
+  "license": "Apache-2.0",
+  "url": "https://github.com/dcodeIO/long.js"
+ },
+ {
+  "name": "lucide-react",
+  "version": "1.64.0",
+  "license": "ISC",
+  "url": "https://lucide.dev"
+ },
+ {
+  "name": "ms",
+  "version": "2.1.3",
+  "license": "MIT",
+  "url": "vercel/ms"
+ },
+ {
+  "name": "onnxruntime-common",
+  "version": "1.18.0",
+  "license": "MIT",
+  "url": "https://github.com/Microsoft/onnxruntime"
+ },
+ {
+  "name": "onnxruntime-web",
+  "version": "1.18.0",
+  "license": "MIT",
+  "url": "https://github.com/Microsoft/onnxruntime"
+ },
+ {
+  "name": "platform",
+  "version": "1.3.6",
+  "license": "MIT",
+  "url": "bestiejs/platform.js"
+ },
+ {
+  "name": "protobufjs",
+  "version": "7.6.6",
+  "license": "BSD-3-Clause",
+  "url": "https://protobufjs.github.io/protobuf.js/"
+ },
+ {
+  "name": "re2js",
+  "version": "2.9.1",
+  "license": "MIT",
+  "url": "https://github.com/le0pard/re2js#readme"
+ },
+ {
+  "name": "react",
+  "version": "19.3.1",
+  "license": "MIT",
+  "url": "https://react.dev/"
+ },
+ {
+  "name": "react-dom",
+  "version": "19.3.1",
+  "license": "MIT",
+  "url": "https://react.dev/"
+ },
+ {
+  "name": "react-router",
+  "version": "7.18.5",
+  "license": "MIT",
+  "url": "https://github.com/remix-run/react-router"
+ },
+ {
+  "name": "react-router-dom",
+  "version": "7.18.5",
+  "license": "MIT",
+  "url": "https://github.com/remix-run/react-router"
+ },
+ {
+  "name": "require-directory",
+  "version": "2.1.1",
+  "license": "MIT",
+  "url": "https://github.com/troygoode/node-require-directory/"
+ },
+ {
+  "name": "safe-buffer",
+  "version": "5.2.1",
+  "license": "MIT",
+  "url": "https://github.com/feross/safe-buffer"
+ },
+ {
+  "name": "sax",
+  "version": "1.6.1",
+  "license": "BlueOak-1.0.0",
+  "url": "ssh://git@github.com/isaacs/sax-js"
+ },
+ {
+  "name": "scheduler",
+  "version": "0.28.0",
+  "license": "MIT",
+  "url": "https://react.dev/"
+ },
+ {
+  "name": "semver",
+  "version": "7.8.5",
+  "license": "ISC",
+  "url": "https://github.com/npm/node-semver"
+ },
+ {
+  "name": "set-cookie-parser",
+  "version": "2.7.3",
+  "license": "MIT",
+  "url": "https://github.com/nfriedly/set-cookie-parser"
+ },
+ {
+  "name": "string-width",
+  "version": "4.2.3",
+  "license": "MIT",
+  "url": "sindresorhus/string-width"
+ },
+ {
+  "name": "strip-ansi",
+  "version": "6.0.1",
+  "license": "MIT",
+  "url": "chalk/strip-ansi"
+ },
+ {
+  "name": "tiny-typed-emitter",
+  "version": "2.1.0",
+  "license": "MIT",
+  "url": "https://github.com/binier/tiny-typed-emitter"
+ },
+ {
+  "name": "tslib",
+  "version": "2.8.1",
+  "license": "0BSD",
+  "url": "https://www.typescriptlang.org/"
+ },
+ {
+  "name": "undici-types",
+  "version": "7.24.6",
+  "license": "MIT",
+  "url": "https://undici.nodejs.org"
+ },
+ {
+  "name": "universalify",
+  "version": "2.0.1",
+  "license": "MIT",
+  "url": "https://github.com/RyanZim/universalify#readme"
+ },
+ {
+  "name": "web-vitals",
+  "version": "4.2.4",
+  "license": "Apache-2.0",
+  "url": "https://github.com/GoogleChrome/web-vitals"
+ },
+ {
+  "name": "websocket-driver",
+  "version": "0.7.5",
+  "license": "Apache-2.0",
+  "url": "https://github.com/faye/websocket-driver-node"
+ },
+ {
+  "name": "websocket-extensions",
+  "version": "0.1.4",
+  "license": "Apache-2.0",
+  "url": "http://github.com/faye/websocket-extensions-node"
+ },
+ {
+  "name": "wrap-ansi",
+  "version": "7.0.0",
+  "license": "MIT",
+  "url": "chalk/wrap-ansi"
+ },
+ {
+  "name": "y18n",
+  "version": "5.0.8",
+  "license": "ISC",
+  "url": "https://github.com/yargs/y18n"
+ },
+ {
+  "name": "yargs",
+  "version": "17.7.3",
+  "license": "MIT",
+  "url": "https://yargs.js.org/"
+ },
+ {
+  "name": "yargs-parser",
+  "version": "21.1.1",
+  "license": "ISC",
+  "url": "https://github.com/yargs/yargs-parser"
+ },
+ {
+  "name": "zustand",
+  "version": "5.0.16",
+  "license": "MIT",
+  "url": "https://github.com/pmndrs/zustand"
+ }
+]
