@@ -17,6 +17,7 @@ import {
   ArrowLeft,
   ArrowRight,
   HardDriveDownload,
+  BookOpen,
 } from 'lucide-react'
 import { api, posterUrl, type Release } from '../lib/api'
 import { shiki, shImg, shikiTitle, KINDS } from '../lib/shikimori'
@@ -34,6 +35,7 @@ const NAV = [
   { to: '/schedule', label: 'Расписание', icon: CalendarDays },
   { to: '/history', label: 'История', icon: History },
   { to: '/collection', label: 'Моя коллекция', icon: Library },
+  { to: '/manga', label: 'Манга и ранобэ', icon: BookOpen },
   { to: '/stats', label: 'Статистика', icon: BarChart3 },
   { to: '/downloads', label: 'Загрузки', icon: HardDriveDownload },
 ]
@@ -42,7 +44,7 @@ const TABS = [
   { to: '/', label: 'Главная', icon: Home },
   { to: '/catalog', label: 'Каталог', icon: LayoutGrid },
   { to: '/search', label: 'Поиск', icon: Search },
-  { to: '/history', label: 'История', icon: History },
+  { to: '/manga', label: 'Манга', icon: BookOpen },
   { to: '/collection', label: 'Коллекция', icon: Library },
   { to: '/stats', label: 'Профиль', icon: BarChart3 },
 ]

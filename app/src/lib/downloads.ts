@@ -218,4 +218,4 @@ export async function releaseOrOffline(alias: string, load: () => Promise<Releas
   }
 }
 
-export const fmtBytes = (b: number) => (b > 1e9 ? `${(b / 1e9).toFixed(1)} ГБ` : `${Math.round(b / 1e6)} МБ`)
+export const fmtBytes = (b: number) => (b > 1e9 ? `${(b / 1e9).toFixed(1)} ГБ` : b < 1e6 ? `${Math.max(1, Math.round(b / 1e3))} КБ` : `${Math.round(b / 1e6)} МБ`)

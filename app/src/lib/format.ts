@@ -26,7 +26,8 @@ export function relTime(ts: number) {
   const days = Math.floor(diff / 86400)
   if (days === 1) return 'вчера'
   if (days < 7) return `${days} ${plural(days, 'день', 'дня', 'дней')} назад`
-  return new Date(ts).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+  const d = new Date(ts)
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' })
 }
 
 export function fmtOrdinal(n: number) {

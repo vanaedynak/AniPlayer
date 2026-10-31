@@ -6,9 +6,11 @@ import { initSync } from './lib/sync'
 import { initLibriaIndex } from './lib/libriaIndex'
 import { initLifecycle, initScale, applyScale, initStatusBar } from './lib/platform'
 import { useStore } from './lib/store'
+import { initMangaSync } from './manga/store'
 
 initSync()
 initLibriaIndex()
+initMangaSync()
 initLifecycle()
 initStatusBar()
 initScale(

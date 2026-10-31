@@ -1,6 +1,6 @@
 // Electron shell for Windows. Serves the built app from app://aniplayer so the
 // page has a proper secure origin (IndexedDB, Firebase Auth and CORS all behave).
-const { app, BrowserWindow, protocol, net, ipcMain, shell, nativeTheme, Menu } = require('electron')
+const { app, BrowserWindow, protocol, net, ipcMain, shell, nativeTheme, Menu, session } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 const { pathToFileURL } = require('node:url')
@@ -139,6 +139,12 @@ app.whenReady().then(() => {
     let file = path.normalize(path.join(DIST, decodeURIComponent(pathname)))
     if (!file.startsWith(DIST) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(DIST, 'index.html')
     return net.fetch(pathToFileURL(file).toString())
+  })
+  // MangaDex answers CORS only for web origins (https://localhost and the like), not app://
+  session.defaultSession.webRequest.onHeadersReceived({ urls: ['https://api.mangadex.org/*'] }, (d, cb) => {
+    const headers = Object.fromEntries(Object.entries(d.responseHeaders ?? {}).filter(([k]) => k.toLowerCase() !== 'access-control-allow-origin'))
+    headers['Access-Control-Allow-Origin'] = ['app://aniplayer']
+    cb({ responseHeaders: headers })
   })
   createWindow()
   initUpdater()
