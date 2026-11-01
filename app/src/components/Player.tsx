@@ -295,14 +295,14 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
   }, [local.volume, local.muted])
 
   // ---------- controls visibility ----------
+  // an open settings menu keeps the controls up: on a touch screen nothing else would keep extending the timer
+  const menuOpen = useRef(false)
+  menuOpen.current = menu !== null
   const poke = useCallback(() => {
     setControls(true)
     clearTimeout(hideTimer.current)
     hideTimer.current = setTimeout(() => {
-      if (!videoRef.current?.paused) {
-        setControls(false)
-        setMenu(null)
-      }
+      if (!videoRef.current?.paused && !menuOpen.current) setControls(false)
     }, 2800)
   }, [])
 
@@ -310,6 +310,11 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
     if (!playing) setControls(true)
     else poke()
   }, [playing, poke])
+
+  // closing the menu starts the usual countdown again
+  useEffect(() => {
+    if (menu === null && playing) poke()
+  }, [menu, playing, poke])
 
   useEffect(() => {
     if (!toast) return
@@ -548,10 +553,8 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
   const lastTap = useRef<{ t: number; x: number }>({ t: 0, x: 0 })
   const tapTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const onSurfacePointerUp = (e: RPointerEvent<HTMLDivElement>) => {
-    if (menu) {
-      setMenu(null)
-      return
-    }
+    // the menu closes only by picking something or by the gear again, not by a stray tap on the picture
+    if (menu) return
     const rect = e.currentTarget.getBoundingClientRect()
     const x = e.clientX - rect.left
     const now = Date.now()
@@ -639,7 +642,9 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
         !controls && playing && 'cursor-none',
       )}
       onPointerMove={(e) => e.pointerType === 'mouse' && poke()}
-      onMouseLeave={() => playing && setControls(false)}
+      // a touch on any control (button, slider, menu) counts as activity, like a mouse move does
+      onPointerDownCapture={(e) => e.pointerType !== 'mouse' && (e.target as HTMLElement).closest('button, input, [role="slider"], [data-controls]') && poke()}
+      onMouseLeave={() => playing && !menuOpen.current && setControls(false)}
     >
       <video
         ref={videoRef}
@@ -900,7 +905,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
                 upscale={upscaleMode}
                 setUpscale={(m) => {
                   setLocal({ upscale: m })
-                  setMenu('main')
+                  setMenu(null)
                 }}
               />
             )}
@@ -1058,8 +1063,13 @@ function SettingsMenu({
         <>
           <Row label="Качество" value={`${quality}p`} onClick={() => setMenu('quality')} />
           <Row label="Скорость" value={rate === 1 ? 'Обычная' : `${rate}×`} onClick={() => setMenu('speed')} />
-          {upscaleSupported() && (
+          {upscaleSupported() ? (
             <Row label="Апскейл Anime4K" value={UPSCALE_MODES.find((m) => m.id === upscale)!.label} onClick={() => setMenu('upscale')} />
+          ) : (
+            <div className="flex items-center justify-between gap-6 rounded-xl px-3 py-2.5 text-white/40">
+              <span className="font-semibold">Апскейл Anime4K</span>
+              <span className="text-right text-xs">Недоступно на этом устройстве</span>
+            </div>
           )}
           <div className="my-1 h-px bg-white/10" />
           <Toggle label="Пропускать опенинг" on={prefs.autoSkipOpening} set={(v) => setPrefs({ autoSkipOpening: v })} />
@@ -1102,7 +1112,10 @@ function SettingsMenu({
         <>
           <Back title="Скорость" />
           {RATES.map((r) => (
-            <button key={r} className="flex w-full items-center justify-between rounded-xl px-3 py-2 hover:bg-white/10" onClick={() => setRate(r)}>
+            <button key={r} className="flex w-full items-center justify-between rounded-xl px-3 py-2 hover:bg-white/10" onClick={() => {
+                setRate(r)
+                setMenu(null)
+              }}>
               <span className="font-semibold">{r === 1 ? 'Обычная' : `${r}×`}</span>
               {r === rate && <Check size={18} className="text-accent-2" />}
             </button>
