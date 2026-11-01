@@ -5,6 +5,8 @@ import { api, SORTINGS, TYPES, SEASONS, type Release, type CatalogParams } from 
 import { useAsync } from '../lib/useAsync'
 import { ReleaseCard, CardSkeletons, Chip, Empty } from '../components/ui'
 import { cn } from '../lib/format'
+import { useFolded } from '../lib/franchise'
+import { useStore } from '../lib/store'
 import ShikiCatalog from './ShikiCatalog'
 
 function Select({ value, onChange, options, placeholder }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; placeholder: string }) {
@@ -96,6 +98,8 @@ function LibriaCatalog() {
   }
 
   const [items, setItems] = useState<Release[]>([])
+  const titles = useStore((s) => s.titles)
+  const groups = useFolded(items, (r) => r.mal?.id, (r) => `r${r.id}`, (r) => r.name.main, (r) => titles[r.id]?.lastWatchedAt ?? 0)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState<number | null>(null)
   const [pages, setPages] = useState(1)
@@ -194,8 +198,8 @@ function LibriaCatalog() {
         <Empty icon={<SearchX />} title="Ничего не найдено" text="Попробуйте убрать часть фильтров." />
       ) : (
         <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-          {items.map((r) => (
-            <ReleaseCard key={r.id} r={r} />
+          {groups.map((g) => (
+            <ReleaseCard key={g.key} r={g.lead} title={g.name} parts={g.parts.length} />
           ))}
           {loading && <CardSkeletons n={items.length ? 6 : 18} />}
         </div>

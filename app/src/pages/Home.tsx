@@ -4,6 +4,7 @@ import { Play, Info, Star, Shuffle, ChevronRight } from 'lucide-react'
 import { api, episodePreview, posterUrl, type Release } from '../lib/api'
 import { useAsync } from '../lib/useAsync'
 import { useStore, progressKey, watchHref, startedReleases } from '../lib/store'
+import { useTitleGroups } from '../lib/franchise'
 import { Section, Row, ReleaseCard, WideCard, CardSkeletons, Skeleton } from '../components/ui'
 import { fmtTime, fmtOrdinal, cn } from '../lib/format'
 
@@ -77,14 +78,19 @@ export function ContinueRow() {
   const titles = useStore((s) => s.titles)
   const progress = useStore((s) => s.progress)
   const started = useMemo(() => startedReleases(progress), [progress])
-  const items = useMemo(
-    () =>
-      Object.values(titles)
-        .filter((t) => t.lastWatchedAt && t.lastOrdinal != null && started.has(t.releaseId))
-        .sort((a, b) => (b.lastWatchedAt ?? 0) - (a.lastWatchedAt ?? 0))
-        .slice(0, 12),
-    [titles, started],
-  )
+  const { groupOf, labelOf, nameOf } = useTitleGroups()
+  // one card per anime: the season watched last stands for all of them
+  const items = useMemo(() => {
+    const seen = new Set<unknown>()
+    return Object.values(titles)
+      .filter((t) => t.lastWatchedAt && t.lastOrdinal != null && started.has(t.releaseId))
+      .sort((a, b) => (b.lastWatchedAt ?? 0) - (a.lastWatchedAt ?? 0))
+      .filter((t) => {
+        const g = groupOf(t.releaseId) ?? t
+        return !seen.has(g) && !!seen.add(g)
+      })
+      .slice(0, 12)
+  }, [titles, started, groupOf])
   if (!items.length) return null
   return (
     <Section title="Продолжить просмотр" action={<Link to="/history" className="flex items-center text-sm font-bold text-muted hover:text-white">Вся история <ChevronRight size={16} /></Link>}>
@@ -98,8 +104,8 @@ export function ContinueRow() {
               to={watchHref(t.alias, t.lastOrdinal!)}
               image={p?.preview || t.lastPreview || t.poster}
               malId={t.malId}
-              title={t.name}
-              subtitle={`${fmtOrdinal(t.lastOrdinal!)} серия`}
+              title={nameOf(t)}
+              subtitle={[labelOf(t), `${fmtOrdinal(t.lastOrdinal!)} серия`].filter(Boolean).join(' · ')}
               badge={p?.watched ? 'Просмотрено' : p && p.time > 5 ? fmtTime(p.time) : undefined}
               ratio={ratio}
             />

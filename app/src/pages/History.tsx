@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { useStore, watchHref, startedReleases, STARTED_SECONDS, type Progress, type TitleEntry } from '../lib/store'
 import { WideCard, Empty, Chip } from '../components/ui'
 import { fmtTime, fmtOrdinal, cn } from '../lib/format'
+import { useTitleGroups } from '../lib/franchise'
 
 function dayLabel(ts: number) {
   const d = new Date(ts)
@@ -21,6 +22,7 @@ export default function History() {
   const started = useMemo(() => startedReleases(progress), [progress])
   const removeFromHistory = useStore((s) => s.removeFromHistory)
   const [mode, setMode] = useState<'episodes' | 'titles'>('episodes')
+  const { groupOf, labelOf, nameOf } = useTitleGroups()
 
   const groups = useMemo(() => {
     const list: { p: Progress; t: TitleEntry }[] = []
@@ -39,13 +41,17 @@ export default function History() {
     return out
   }, [progress, titles])
 
-  const byTitle = useMemo(
-    () =>
-      Object.values(titles)
-        .filter((t) => t.lastWatchedAt && started.has(t.releaseId))
-        .sort((a, b) => b.lastWatchedAt! - a.lastWatchedAt!),
-    [titles, started],
-  )
+  // one card per anime, showing the season watched last
+  const byTitle = useMemo(() => {
+    const seen = new Set<unknown>()
+    return Object.values(titles)
+      .filter((t) => t.lastWatchedAt && started.has(t.releaseId))
+      .sort((a, b) => b.lastWatchedAt! - a.lastWatchedAt!)
+      .filter((t) => {
+        const g = groupOf(t.releaseId) ?? t
+        return !seen.has(g) && !!seen.add(g)
+      })
+  }, [titles, started, groupOf])
 
   return (
     <div className="flex flex-col gap-8">
@@ -88,8 +94,8 @@ export default function History() {
                   to={watchHref(t.alias, p.ordinal)}
                   image={p.preview || t.poster}
                   malId={t.malId}
-                  title={t.name}
-                  subtitle={`${fmtOrdinal(p.ordinal)} серия · ${new Date(p.updatedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`}
+                  title={nameOf(t)}
+                  subtitle={`${labelOf(t) ? labelOf(t) + ' · ' : ''}${fmtOrdinal(p.ordinal)} серия · ${new Date(p.updatedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`}
                   badge={p.watched ? 'Просмотрено' : fmtTime(p.time)}
                   ratio={p.watched ? 1 : p.duration ? p.time / p.duration : 0}
                 />
@@ -105,11 +111,11 @@ export default function History() {
                 to={watchHref(t.alias, t.lastOrdinal ?? 1)}
                 image={t.lastPreview || t.poster}
                 malId={t.malId}
-                title={t.name}
-                subtitle={`${fmtOrdinal(t.lastOrdinal ?? 1)} серия${t.episodesTotal ? ` из ${t.episodesTotal}` : ''}`}
+                title={nameOf(t)}
+                subtitle={`${labelOf(t) ? labelOf(t) + ' · ' : ''}${fmtOrdinal(t.lastOrdinal ?? 1)} серия${t.episodesTotal ? ` из ${t.episodesTotal}` : ''}`}
               />
               <button
-                onClick={() => removeFromHistory(t.releaseId)}
+                onClick={() => (groupOf(t.releaseId)?.parts ?? [t]).filter((p) => p.lastWatchedAt).forEach((p) => removeFromHistory(p.releaseId))}
                 title="Убрать из истории"
                 className={cn('glass absolute top-3 left-3 flex h-9 w-9 items-center justify-center rounded-full opacity-0 transition group-hover:opacity-100 hover:text-rose-400')}
               >

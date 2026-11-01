@@ -1,12 +1,23 @@
 import { useRef, useState, useEffect, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Star, Check, Play } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Star, Check, Play, Layers } from 'lucide-react'
 import { posterUrl, episodePreview, type Release, type Episode } from '../lib/api'
 import { useStore, progressKey, releaseProgress } from '../lib/store'
 import { fmtTime, fmtOrdinal, cn } from '../lib/format'
 import { shImg, shikiTitle, useShikiPoster, KINDS, type ShikiAnime } from '../lib/shikimori'
 import { useLibriaIndex } from '../lib/libriaIndex'
 import { episodeFrame, screenshotFor } from '../lib/frames'
+import { partsWord } from '../lib/franchise'
+
+/** «3 части»: the card stands for every season of the anime */
+function PartsBadge({ n }: { n?: number }) {
+  if (!n || n < 2) return null
+  return (
+    <span className="flex items-center gap-1 rounded-lg bg-white/90 px-2 py-1 text-xs font-extrabold text-black">
+      <Layers size={12} /> {partsWord(n)}
+    </span>
+  )
+}
 
 export function Section({ title, action, children, className }: { title: ReactNode; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
@@ -60,7 +71,7 @@ export function Row({ children, itemClass = 'w-[160px] sm:w-[190px]' }: { childr
   )
 }
 
-export function ReleaseCard({ r, sub }: { r: Release; sub?: string }) {
+export function ReleaseCard({ r, sub, title, parts }: { r: Release; sub?: string; title?: string; parts?: number }) {
   const entry = useStore((s) => s.titles[r.id])
   const progress = useStore((s) => s.progress)
   const watchedCount = entry ? releaseProgress(progress, r.id).filter((p) => p.watched).length : 0
@@ -83,6 +94,7 @@ export function ReleaseCard({ r, sub }: { r: Release; sub?: string }) {
             </span>
           ) : null}
           {r.is_ongoing && <span className="rounded-lg bg-accent px-2 py-1 text-xs font-bold">Онгоинг</span>}
+          <PartsBadge n={parts} />
         </div>
         {entry?.favorite && <span className="absolute top-2 right-2 text-pink">♥</span>}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 transition group-hover:opacity-100">
@@ -96,7 +108,7 @@ export function ReleaseCard({ r, sub }: { r: Release; sub?: string }) {
           </div>
         )}
       </div>
-      <div className="mt-2.5 line-clamp-2 text-[15px] leading-snug font-bold">{r.name.main}</div>
+      <div className="mt-2.5 line-clamp-2 text-[15px] leading-snug font-bold">{title ?? r.name.main}</div>
       <div className="mt-0.5 text-xs font-medium text-muted">
         {sub ?? [r.type?.description, r.year, r.episodes_total ? `${r.episodes_total} эп.` : null].filter(Boolean).join(' · ')}
       </div>
@@ -310,7 +322,7 @@ export function PanelTitle({ icon, title, sub }: { icon: ReactNode; title: strin
 }
 
 /** card for a Shikimori entry; marks titles AniLibria has voiced */
-export function ShikiCard({ a, badge, active }: { a: ShikiAnime; badge?: string; active?: boolean }) {
+export function ShikiCard({ a, badge, active, title, parts }: { a: ShikiAnime; badge?: string; active?: boolean; title?: string; parts?: number }) {
   const libria = useLibriaIndex((s) => s.byMal[a.id])
   const poster = useShikiPoster(shImg(a.image.original), a.id)
   return (
@@ -330,6 +342,7 @@ export function ShikiCard({ a, badge, active }: { a: ShikiAnime; badge?: string;
             </span>
           )}
           {a.status === 'ongoing' && <span className="rounded-lg bg-accent px-2 py-1 text-xs font-bold">Онгоинг</span>}
+          <PartsBadge n={parts} />
         </div>
         {badge && <span className="absolute bottom-2 left-2 rounded-lg bg-black/70 px-2 py-1 text-[11px] font-extrabold backdrop-blur">{badge}</span>}
         {libria && <span className="absolute right-2 bottom-2 rounded-lg bg-white px-2 py-1 text-[11px] font-extrabold text-black">AniLibria</span>}
@@ -339,7 +352,7 @@ export function ShikiCard({ a, badge, active }: { a: ShikiAnime; badge?: string;
           </span>
         </div>
       </div>
-      <div className="mt-2.5 line-clamp-2 text-[15px] leading-snug font-bold">{shikiTitle(a)}</div>
+      <div className="mt-2.5 line-clamp-2 text-[15px] leading-snug font-bold">{title ?? shikiTitle(a)}</div>
       <div className="mt-0.5 text-xs font-medium text-muted">
         {[a.kind ? KINDS[a.kind] ?? a.kind : null, a.aired_on?.slice(0, 4), a.episodes ? `${a.episodes} эп.` : null].filter(Boolean).join(' · ')}
       </div>

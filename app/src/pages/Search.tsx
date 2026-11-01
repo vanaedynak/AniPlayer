@@ -4,8 +4,9 @@ import { Search as SearchIcon, X, SearchX } from 'lucide-react'
 import { api, type Release } from '../lib/api'
 import { shiki, type ShikiAnime } from '../lib/shikimori'
 import { ReleaseCard, ShikiCard, CardSkeletons, Empty } from '../components/ui'
-import { FranchiseRow } from '../components/FranchiseRow'
 import { shikiTitle } from '../lib/shikimori'
+import { useFolded } from '../lib/franchise'
+import { useStore } from '../lib/store'
 
 export default function Search() {
   const [sp, setSp] = useSearchParams()
@@ -14,6 +15,10 @@ export default function Search() {
   const [loading, setLoading] = useState(false)
   const [others, setOthers] = useState<ShikiAnime[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
+  const titles = useStore((s) => s.titles)
+  // every season of one anime is one card
+  const libria = useFolded(items ?? [], (r) => r.mal?.id, (r) => `r${r.id}`, (r) => r.name.main, (r) => titles[r.id]?.lastWatchedAt ?? 0)
+  const rest = useFolded(others, (a) => a.id, (a) => `s${a.id}`, shikiTitle)
 
   useEffect(() => {
     if (!q) inputRef.current?.focus()
@@ -63,7 +68,6 @@ export default function Search() {
           </button>
         )}
       </div>
-      {others[0] && <FranchiseRow key={others[0].id} malId={others[0].id} title={`${shikiTitle(others[0]).split(/[:—]/)[0].trim()} — все части`} />}
       {items !== null && items.length > 0 && <h2 className="text-xl font-extrabold">В озвучке AniLibria</h2>}
       {items === null && !loading ? (
         <Empty icon={<SearchIcon />} title="Что посмотрим?" text="Начните вводить название — результаты появятся сразу." />
@@ -71,20 +75,21 @@ export default function Search() {
         <Empty icon={<SearchX />} title="Ничего не нашлось" text="Попробуйте другое написание или английское название." />
       ) : (
         <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-          {loading ? <CardSkeletons n={12} /> : items!.map((r) => <ReleaseCard key={r.id} r={r} />)}
+          {loading ? <CardSkeletons n={12} /> : libria.map((g) => <ReleaseCard key={g.key} r={g.lead} title={g.name} parts={g.parts.length} />)}
         </div>
       )}
       {(() => {
-        const mine = new Set((items ?? []).map((r) => r.mal?.id))
-        const rest = others.filter((a) => !mine.has(a.id))
-        return rest.length ? (
+        // an anime AniLibria has already shows above, with all its seasons
+        const mine = new Set(libria.flatMap((g) => [g.franchise, ...g.parts.map((r) => r.mal?.id)]))
+        const shown = rest.filter((g) => !mine.has(g.franchise) && !g.parts.some((a) => mine.has(a.id)))
+        return shown.length ? (
           <section className="flex flex-col gap-4">
             <h2 className="text-xl font-extrabold">
               Другие аниме <span className="text-sm font-semibold text-muted">· все озвучки, Studio Band и другие</span>
             </h2>
             <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-              {rest.map((a) => (
-                <ShikiCard key={a.id} a={a} />
+              {shown.map((g) => (
+                <ShikiCard key={g.key} a={g.lead} title={g.name} parts={g.parts.length} />
               ))}
             </div>
           </section>

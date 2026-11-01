@@ -22,7 +22,8 @@ import {
   BookOpen,
 } from 'lucide-react'
 import { api, posterUrl, type Release } from '../lib/api'
-import { shiki, shImg, shikiTitle, KINDS } from '../lib/shikimori'
+import { shiki, shImg, shikiTitle, shikiMeta, KINDS } from '../lib/shikimori'
+import { groupByFranchise, franchiseName, partsWord } from '../lib/franchise'
 import { useLibriaIndex } from '../lib/libriaIndex'
 import { useSync } from '../lib/sync'
 import { isElectron } from '../lib/platform'
@@ -86,7 +87,7 @@ function SyncBadge() {
   )
 }
 
-type QuickItem = { key: string; title: string; sub: string; poster: string; meta: string; rating: number | null; href: string; libria: boolean }
+type QuickItem = { key: string; title: string; sub: string; poster: string; meta: string; rating: number | null; href: string; libria: boolean; mal?: number | null }
 
 const fromRelease = (r: Release): QuickItem => ({
   key: `l${r.id}`,
@@ -97,6 +98,7 @@ const fromRelease = (r: Release): QuickItem => ({
   rating: r.mal?.rating ?? null,
   href: `/title/${r.alias}`,
   libria: true,
+  mal: r.mal?.id,
 })
 
 function SearchBox() {
@@ -145,12 +147,21 @@ function SearchBox() {
               rating: Number(a.score) || null,
               href: l ? `/title/${l.alias}` : `/anime/${a.id}`,
               libria: !!l,
+              mal: a.id,
             }
           })
           const seen = new Set(sh.map((a) => a.id))
           for (const r of lib) if (!r.mal?.id || !seen.has(r.mal.id)) out.push(fromRelease(r))
-          setItems(out.slice(0, 8))
-          setSel(0)
+          // every season of one anime is one line, under the anime's own name
+          return shikiMeta(out.map((r) => r.mal ?? 0)).then((meta) => {
+            const folded = groupByFranchise(out, (r) => r.mal, (r) => r.key, meta).map((parts) =>
+              parts.length < 2
+                ? parts[0]
+                : { ...(parts.find((p) => p.libria) ?? parts[0]), title: franchiseName(parts.map((p) => p.title)), meta: [parts[0].meta, partsWord(parts.length)].filter(Boolean).join(' · ') },
+            )
+            setItems(folded.slice(0, 8))
+            setSel(0)
+          })
         })
         .finally(() => setLoading(false))
     }, 250)

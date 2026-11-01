@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { shiki, SHIKI_ORDERS, KINDS, type ShikiAnime } from '../lib/shikimori'
 import { ShikiCard, CardSkeletons } from '../components/ui'
+import { useFolded } from '../lib/franchise'
+import { shikiTitle } from '../lib/shikimori'
 
 const YEARS = Array.from({ length: new Date().getFullYear() - 1979 }, (_, i) => String(new Date().getFullYear() - i))
 
@@ -24,6 +26,7 @@ export default function ShikiCatalog({ Select }: { Select: (p: SelectProps) => R
   }
 
   const [items, setItems] = useState<ShikiAnime[]>([])
+  const groups = useFolded(items, (a) => a.id, (a) => `s${a.id}`, shikiTitle)
   const [page, setPage] = useState(1)
   const [done, setDone] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -83,8 +86,8 @@ export default function ShikiCatalog({ Select }: { Select: (p: SelectProps) => R
         <Select value={year} onChange={(v) => set('year', v)} options={YEARS.map((y) => ({ value: y, label: y }))} placeholder="Любой год" />
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-        {items.map((a) => (
-          <ShikiCard key={a.id} a={a} />
+        {groups.map((g) => (
+          <ShikiCard key={g.key} a={g.lead} title={g.name} parts={g.parts.length} />
         ))}
         {loading && <CardSkeletons n={items.length ? 6 : 18} />}
       </div>
