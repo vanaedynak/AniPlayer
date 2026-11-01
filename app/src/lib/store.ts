@@ -125,6 +125,8 @@ export const syncHooks: {
   title?: (t: TitleEntry) => void
   prefs?: (p: SyncedPrefs) => void
   stats?: () => void
+  /** an episode reached "watched" by playing (not by a manual mark): counts for the leaderboards */
+  finished?: (key: string) => void
 } = {}
 
 function entryFromRelease(r: Release, prev?: TitleEntry): TitleEntry {
@@ -168,6 +170,7 @@ export const useStore = create<State>()(
         const next: Progress = { ...p, watched, updatedAt: Date.now() }
         set((s) => ({ progress: { ...s.progress, [key]: next } }))
         syncHooks.progress?.(next, force)
+        if (watched && !prev?.watched) syncHooks.finished?.(key)
         // a title joins history and "continue watching" only once an episode really plays
         const t = get().titles[p.releaseId]
         if (t && (next.time >= STARTED_SECONDS || watched)) {
@@ -251,7 +254,8 @@ export const useStore = create<State>()(
         for (const p of items) {
           const key = progressKey(p.releaseId, p.ordinal)
           const mine = cur[key]
-          if (!mine || p.updatedAt > mine.updatedAt) (changed ??= { ...cur })[key] = p
+          // the cloud keeps no preview frames: this device's stays
+          if (!mine || p.updatedAt > mine.updatedAt) (changed ??= { ...cur })[key] = { preview: mine?.preview, ...p }
         }
         if (changed) set({ progress: changed })
       },

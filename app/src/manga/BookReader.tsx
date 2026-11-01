@@ -10,6 +10,7 @@ import { DEFAULT_MODEL } from './translate'
 import { cn } from '../lib/format'
 import { Narrator } from './Narrator'
 import { isElectron } from '../lib/platform'
+import { useReadingClock } from '../lib/activity'
 
 type Doc = Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void }
 type El = HTMLElement & { webkitRequestFullscreen?: () => void }
@@ -22,6 +23,7 @@ export const FONTS = {
 
 export default function BookReader() {
   const { id = '' } = useParams()
+  useReadingClock()
   const nav = useNavigate()
   const book = useBooks((s) => s.books[id])
   const position = useBooks((s) => s.position)

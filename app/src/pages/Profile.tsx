@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Pencil, Camera, Lock, Clock, CheckCircle2, Eye, MessageCircle, Star, Loader2, ShieldCheck, UserX, Heart } from 'lucide-react'
+import { Pencil, Camera, Lock, Clock, CheckCircle2, Eye, MessageCircle, Star, Loader2, ShieldCheck, UserX, BookOpen, BookText, Flame, Trophy } from 'lucide-react'
 import { Panel, Empty, Skeleton, ShikiCard } from '../components/ui'
 import { Avatar } from '../components/Social'
-import { getProfile, profileStats, updateProfile, uploadPicture, userComments, useMyProfile, displayName, type Profile, type ProfileStats, type Comment } from '../lib/social'
+import { getProfile, profileStats, updateProfile, uploadPicture, userComments, useMyProfile, displayName, levelOf, type Profile, type ProfileStats, type Comment } from '../lib/social'
 import { shiki, type ShikiAnime } from '../lib/shikimori'
 import { useStore } from '../lib/store'
 import { useSync } from '../lib/sync'
@@ -76,6 +76,7 @@ export default function ProfilePage() {
             <div className="text-sm font-semibold text-muted">
               @{p.username} · с нами с {new Date(p.created_at).toLocaleDateString('ru', { month: 'long', year: 'numeric' })}
             </div>
+            {stats && <LevelBar xp={stats.xp} accent={accent} />}
           </div>
           {own && (
             <button onClick={() => setEditing((v) => !v)} className="flex h-11 items-center gap-2 self-start rounded-full bg-white/10 px-5 font-bold hover:bg-white/15 sm:self-end">
@@ -89,12 +90,14 @@ export default function ProfilePage() {
       {editing && own && <EditProfile p={p} onSaved={(np) => setP(np)} />}
 
       {stats && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
             { icon: <Clock size={18} />, v: `${hours} ч`, l: 'просмотра' },
             { icon: <Eye size={18} />, v: stats.episodes, l: 'серий' },
-            { icon: <CheckCircle2 size={18} />, v: stats.completed, l: 'просмотрено' },
-            { icon: <Heart size={18} />, v: stats.watching, l: 'смотрит' },
+            { icon: <CheckCircle2 size={18} />, v: stats.completed, l: 'аниме просмотрено' },
+            { icon: <Flame size={18} />, v: stats.streak, l: `дней подряд · рекорд ${stats.best_streak}` },
+            { icon: <BookOpen size={18} />, v: stats.chapters, l: 'глав манги' },
+            { icon: <BookText size={18} />, v: stats.ln_chapters, l: 'глав ранобэ' },
             { icon: <Star size={18} />, v: stats.ratings, l: 'оценок' },
             { icon: <MessageCircle size={18} />, v: stats.comments, l: 'комментариев' },
           ].map((s) => (
@@ -185,8 +188,8 @@ function EditProfile({ p, onSaved }: { p: Profile; onSaved: (p: Profile) => void
     <Panel>
       <div className="flex flex-col gap-5">
         <div className="flex flex-wrap gap-2">
-          <input ref={avatarIn} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={(e) => void upload(e.target.files?.[0], 'avatar')} />
-          <input ref={bannerIn} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={(e) => void upload(e.target.files?.[0], 'banner')} />
+          <input ref={avatarIn} type="file" accept="image/*" hidden onChange={(e) => void upload(e.target.files?.[0], 'avatar')} />
+          <input ref={bannerIn} type="file" accept="image/*" hidden onChange={(e) => void upload(e.target.files?.[0], 'banner')} />
           <button onClick={() => avatarIn.current?.click()} className="flex h-11 items-center gap-2 rounded-full bg-white/10 px-5 font-bold hover:bg-white/15">
             {busy === 'avatar' ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />} Аватар
           </button>
@@ -255,4 +258,18 @@ export function useMyProfileLink() {
   const user = useSync((s) => s.user)
   const me = useMyProfile()
   return user && me ? `/u/${me.username}` : null
+}
+
+function LevelBar({ xp, accent }: { xp: number; accent: string }) {
+  const { level, progress, toNext } = levelOf(xp)
+  return (
+    <Link to="/top" title={`${xp} опыта · до следующего уровня ${toNext}`} className="mt-2 flex max-w-xs items-center gap-2.5">
+      <span className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-extrabold text-black" style={{ background: accent }}>
+        <Trophy size={12} /> {level} ур.
+      </span>
+      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+        <span className="block h-full rounded-full" style={{ width: `${Math.round(progress * 100)}%`, background: accent }} />
+      </span>
+    </Link>
+  )
 }

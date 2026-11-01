@@ -12,6 +12,7 @@ import { PAPER } from './ui'
 import { useAsync } from '../lib/useAsync'
 import { cn } from '../lib/format'
 import { isElectron, isIOS } from '../lib/platform'
+import { useReadingClock } from '../lib/activity'
 
 type Doc = Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void }
 type El = HTMLElement & { webkitRequestFullscreen?: () => void }
@@ -19,6 +20,7 @@ type El = HTMLElement & { webkitRequestFullscreen?: () => void }
 export default function MangaReader() {
   const { id = '', chapterId = '' } = useParams()
   const nav = useNavigate()
+  useReadingClock()
   const m = useAsync(() => manga(id), [id])
   const entryLang = useManga((s) => s.entries[id]?.lang)
   const preferred = useManga((s) => s.prefs.lang)

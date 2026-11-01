@@ -4,6 +4,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { pushDoc, registerDocs } from '../lib/sync'
 import { setAdult, type Manga } from './md'
+import { countFinished } from '../lib/activity'
 
 export type ReadStatus = 'reading' | 'planned' | 'completed' | 'postponed' | 'dropped'
 export const READ_LABELS: Record<ReadStatus, string> = {
@@ -112,6 +113,7 @@ export const useManga = create<MangaState>()(
         const cur = get().entries[mangaId]
         if (!cur) return
         const read = p.done && !cur.read.includes(p.key) ? [...cur.read, p.key] : cur.read
+        if (read !== cur.read) countFinished(mangaId.startsWith('ln-') ? 'l' : 'c', `${mangaId}:${p.key}`)
         const e: MangaEntry = {
           ...cur,
           lastChapterId: p.chapterId,

@@ -24,6 +24,7 @@ import About from './pages/About'
 import Status from './pages/Status'
 import ProfilePage from './pages/Profile'
 import Moderation from './pages/Moderation'
+import Top from './pages/Top'
 
 // HashRouter: works from file:// in Electron and capacitor:// on iPad
 export default function App() {
@@ -41,6 +42,7 @@ export default function App() {
           <Route path="/history" element={<History />} />
           <Route path="/collection" element={<Collection />} />
           <Route path="/stats" element={<Stats />} />
+          <Route path="/top" element={<Top />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/downloads" element={<Downloads />} />
           <Route path="/manga" element={<MangaHome />} />

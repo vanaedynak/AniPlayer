@@ -7,6 +7,7 @@ import {
   History,
   Library,
   BarChart3,
+  Trophy,
   Settings,
   Search,
   X,
@@ -41,6 +42,7 @@ const NAV = [
   { to: '/collection', label: 'Моя коллекция', icon: Library },
   { to: '/manga', label: 'Манга и ранобэ', icon: BookOpen },
   { to: '/stats', label: 'Статистика', icon: BarChart3 },
+  { to: '/top', label: 'Топы', icon: Trophy },
   { to: '/downloads', label: 'Загрузки', icon: HardDriveDownload },
 ]
 

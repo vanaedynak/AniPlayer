@@ -10,6 +10,7 @@ import { isRussian, savedChapter, translateChapter } from '../manga/bookTranslat
 import { DEFAULT_MODEL } from '../manga/translate'
 import { cn } from '../lib/format'
 import { isElectron } from '../lib/platform'
+import { useReadingClock } from '../lib/activity'
 import { sourceById } from './registry'
 import { loadChapter, loadNovel } from './cache'
 import { chapterPath, entryId, fileKey, novelPath, rememberNovel } from './shelf'
@@ -22,6 +23,7 @@ export default function NovelReader() {
   const { src = '', id = '', ch = '' } = useParams()
   const novelId = decodeURIComponent(id)
   const chapterId = decodeURIComponent(ch)
+  useReadingClock()
   const nav = useNavigate()
   const source = sourceById(src)
   const prefs = useManga((s) => s.book)

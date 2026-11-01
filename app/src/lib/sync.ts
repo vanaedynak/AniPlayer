@@ -1,5 +1,5 @@
 // Cloud sync through Supabase: accounts, and the user's own rows in user_docs
-// (kind progress | title | manga | prefs) plus watch_stats. Row level security keeps every row to its owner.
+// (kind episodes | title | manga | prefs) plus watch_stats. Row level security keeps every row to its owner.
 // Conflicts resolve last-write-wins on updatedAt. Writes that fail without network wait in an outbox
 // on the device and go out when it is back.
 import { createClient, type SupabaseClient, type User, type RealtimeChannel } from '@supabase/supabase-js'
@@ -7,6 +7,7 @@ import { create } from 'zustand'
 import { SUPABASE_URL, SUPABASE_KEY } from '../supabase-config'
 import { useStore, syncHooks, progressKey, type Progress, type TitleEntry, type SyncedPrefs } from './store'
 import { vaultLogin, vaultRemember, vaultForget } from './vault'
+import { takeActivity, restoreActivity, countFinished, type Activity } from './activity'
 
 export type SyncStatus = 'disabled' | 'signed-out' | 'connecting' | 'synced' | 'offline' | 'error'
 
@@ -17,7 +18,14 @@ export const useSync = create<{ status: SyncStatus; user: User | null; error: st
   moving: false,
 }))
 
-export type DocKind = 'progress' | 'title' | 'manga' | 'prefs'
+export type DocKind = 'progress' | 'episodes' | 'title' | 'manga' | 'prefs'
+
+// episode positions travel as one row per title: {ordinal: [time, duration, watched, updatedAt]}
+// ('progress' rows, one per episode, are what 1.0.34 and older write; they are still read and moved over)
+type Packed = Record<string, [number, number, number, number]>
+const pack = (p: Progress): Packed[string] => [Math.round(p.time), Math.round(p.duration), p.watched ? 1 : 0, Math.round(p.updatedAt)]
+const unpack = (releaseKey: string, data: Packed): Progress[] =>
+  Object.entries(data).map(([o, [time, duration, watched, updatedAt]]) => ({ releaseId: Number(releaseKey), ordinal: Number(o), time, duration, watched: watched === 1, updatedAt }))
 interface Doc {
   key: string
   updatedAt: number
@@ -169,9 +177,14 @@ type Row = { kind: DocKind; key: string; data: Record<string, unknown>; updated_
 
 function apply(rows: Row[]) {
   const by: Partial<Record<DocKind, Record<string, unknown>[]>> = {}
-  for (const r of rows) (by[r.kind] ??= []).push(r.data)
+  const progress: Progress[] = []
+  for (const r of rows) {
+    if (r.kind === 'episodes') progress.push(...unpack(r.key, r.data as unknown as Packed))
+    else if (r.kind === 'progress') progress.push(r.data as unknown as Progress)
+    else (by[r.kind] ??= []).push(r.data)
+  }
   const store = useStore.getState()
-  if (by.progress) store.mergeRemoteProgress(by.progress as unknown as Progress[])
+  if (progress.length) store.mergeRemoteProgress(progress)
   if (by.title) store.mergeRemoteTitles(by.title as unknown as TitleEntry[])
   if (by.prefs?.[0]) store.mergeRemotePrefs(by.prefs[0] as unknown as SyncedPrefs)
   if (by.manga) kinds.manga?.merge(by.manga as never)
@@ -194,8 +207,9 @@ async function start(userId: string) {
     if (uid !== userId) return
     apply(rows)
     await uploadNewer(rows)
-    const { data: stats } = await sb.from('watch_stats').select('day,seconds')
-    useStore.getState().setRemoteStats(Object.fromEntries((stats ?? []).map((s) => [s.day, s.seconds])))
+    await moveOldProgress(rows)
+    const { data: stats } = await sb.from('watch_stats').select('day,seconds,legacy_seconds')
+    useStore.getState().setRemoteStats(Object.fromEntries((stats ?? []).map((s) => [s.day, s.seconds + s.legacy_seconds])))
     // the other devices' changes, live
     channel = sb
       .channel(`docs-${userId}`)
@@ -222,7 +236,6 @@ function onError(e: unknown) {
 const localDocs = (): { kind: DocKind; key: string; data: object; updatedAt: number }[] => {
   const s = useStore.getState()
   const out: { kind: DocKind; key: string; data: object; updatedAt: number }[] = [
-    ...Object.values(s.progress).map((p) => ({ kind: 'progress' as const, key: progressKey(p.releaseId, p.ordinal), data: p, updatedAt: p.updatedAt })),
     ...Object.values(s.titles).map((t) => ({ kind: 'title' as const, key: String(t.releaseId), data: t, updatedAt: t.updatedAt })),
   ]
   if (s.prefs.updatedAt) out.push({ kind: 'prefs', key: 'prefs', data: s.prefs, updatedAt: s.prefs.updatedAt })
@@ -238,6 +251,24 @@ async function uploadNewer(remote: Row[]) {
   const have = new Map(remote.map((r) => [`${r.kind}:${r.key}`, r.updated_at]))
   const send = localDocs().filter((d) => (have.get(`${d.kind}:${d.key}`) ?? -1) < d.updatedAt)
   await upsert(send)
+  // episodes compare one by one
+  const seen = new Map<string, number>()
+  for (const r of remote) {
+    if (r.kind === 'episodes') for (const [o, v] of Object.entries(r.data as unknown as Packed)) seen.set(progressKey(Number(r.key), Number(o)), v[3])
+    else if (r.kind === 'progress') seen.set(r.key, r.updated_at)
+  }
+  await sendEpisodes(Object.values(useStore.getState().progress).filter((p) => (seen.get(progressKey(p.releaseId, p.ordinal)) ?? -1) < Math.round(p.updatedAt)))
+}
+
+/** rows an old version wrote one per episode go into the per-title rows, then away */
+async function moveOldProgress(remote: Row[]) {
+  const old = remote.filter((r) => r.kind === 'progress')
+  if (!sb || !old.length) return
+  const progress = useStore.getState().progress
+  if (!(await sendEpisodes(old.map((r) => progress[r.key] ?? (r.data as unknown as Progress))))) return
+  for (let i = 0; i < old.length; i += 200) {
+    await sb.from('user_docs').delete().eq('kind', 'progress').in('key', old.slice(i, i + 200).map((r) => r.key))
+  }
 }
 
 // ---- writing -----------------------------------------------------------------------------------
@@ -262,6 +293,55 @@ const saveOutbox = () => {
 }
 
 const inflight = new Set<Promise<unknown>>()
+
+const EP_OUTBOX_KEY = 'aniplayer-outbox-episodes'
+const epOutbox = new Map<string, Progress>(
+  (() => {
+    try {
+      return (JSON.parse(localStorage.getItem(EP_OUTBOX_KEY) ?? '[]') as Progress[]).map((p) => [progressKey(p.releaseId, p.ordinal), p] as [string, Progress])
+    } catch {
+      return []
+    }
+  })(),
+)
+// older versions queued episodes as documents
+for (const [k, d] of outbox) {
+  if (d.kind !== 'progress') continue
+  epOutbox.set(d.key, d.data as Progress)
+  outbox.delete(k)
+}
+const saveEpOutbox = () => {
+  try {
+    localStorage.setItem(EP_OUTBOX_KEY, JSON.stringify([...epOutbox.values()]))
+  } catch {
+    /* ignore */
+  }
+}
+
+/** episode positions, merged on the server episode by episode; false when they stay queued */
+async function sendEpisodes(list: Progress[]) {
+  if (!sb || !uid || !list.length) return true
+  const p: Record<string, Packed> = {}
+  for (const e of list) (p[e.releaseId] ??= {})[String(e.ordinal)] = pack(e)
+  const req = Promise.resolve(sb.rpc('put_episodes', { p })).then(({ error }) => {
+    if (error) throw error
+    for (const e of list) {
+      const k = progressKey(e.releaseId, e.ordinal)
+      if (epOutbox.get(k)?.updatedAt === e.updatedAt) epOutbox.delete(k)
+    }
+    saveEpOutbox()
+  })
+  inflight.add(req)
+  try {
+    await req
+    return true
+  } catch (e) {
+    onError(e)
+    return false
+  } finally {
+    inflight.delete(req)
+  }
+}
 
 async function upsert(list: Pending[]) {
   if (!sb || !uid || !list.length) return
@@ -294,6 +374,7 @@ async function upsert(list: Pending[]) {
 
 async function drainOutbox() {
   if (outbox.size) await upsert([...outbox.values()])
+  if (epOutbox.size) await sendEpisodes([...epOutbox.values()])
 }
 
 /** a changed entry of any kind goes out (and into the outbox until the server has it) */
@@ -306,12 +387,15 @@ export function pushDoc(kind: DocKind, key: string, data: object, updatedAt: num
 
 const lastPush = new Map<string, number>()
 const timers = new Map<string, ReturnType<typeof setTimeout>>()
-const PROGRESS_INTERVAL = 10_000
+// the exact spot also goes out on pause, tab hide and close (flushAll)
+const PROGRESS_INTERVAL = 30_000
 
 function writeProgress(p: Progress) {
   const key = progressKey(p.releaseId, p.ordinal)
   lastPush.set(key, Date.now())
-  pushDoc('progress', key, p, p.updatedAt)
+  epOutbox.set(key, p)
+  saveEpOutbox()
+  if (uid) void sendEpisodes([p])
 }
 
 function pushProgress(p: Progress, force = false) {
@@ -339,14 +423,29 @@ function flushStats() {
   if (statsTimer) clearTimeout(statsTimer)
   statsTimer = null
   if (!sb || !uid) return
-  const pending = useStore.getState().takePendingStats()
-  const data = Object.fromEntries(Object.entries(pending).filter(([, s]) => s > 0).map(([d, s]) => [d, Math.round(s)]))
+  const watch = useStore.getState().takePendingStats()
+  const act = takeActivity()
+  const data: Record<string, Activity & { w?: number }> = {}
+  for (const d of new Set([...Object.keys(watch), ...Object.keys(act)])) {
+    const day: Activity & { w?: number } = { ...act[d] }
+    if ((watch[d] ?? 0) >= 1) day.w = Math.round(watch[d])
+    if (Object.keys(day).length) data[d] = day
+  }
   if (!Object.keys(data).length) return
-  const p = Promise.resolve(sb.rpc('add_watch_time', { p: data })).then(({ error }) => {
+  const p = Promise.resolve(sb.rpc('add_activity', { p: data })).then(({ error }) => {
     if (error) throw error
   })
   inflight.add(p)
-  p.catch(onError).finally(() => inflight.delete(p))
+  p.catch((e) => {
+    // not lost: back in line for the next report
+    useStore.setState((s) => {
+      const merged = { ...s.pendingStats }
+      for (const [d, sec] of Object.entries(watch)) merged[d] = (merged[d] ?? 0) + sec
+      return { pendingStats: merged }
+    })
+    restoreActivity(act)
+    onError(e)
+  }).finally(() => inflight.delete(p))
 }
 
 /** send everything right now: called on pause, tab hide and app close */
@@ -369,16 +468,17 @@ async function importLegacy(old: import('./legacy').LegacyData) {
   store.mergeRemoteTitles(old.titles)
   if (old.prefs) store.mergeRemotePrefs(old.prefs)
   if (old.manga.length) kinds.manga?.merge(old.manga as never)
+  await sendEpisodes(old.progress)
   await upsert([
-    ...old.progress.map((p) => ({ kind: 'progress' as const, key: progressKey(p.releaseId, p.ordinal), data: p, updatedAt: p.updatedAt })),
     ...old.titles.map((t) => ({ kind: 'title' as const, key: String(t.releaseId), data: t, updatedAt: t.updatedAt })),
     ...old.manga.map((m) => ({ kind: 'manga' as const, key: m.id, data: m, updatedAt: m.updatedAt })),
     ...(old.prefs ? [{ kind: 'prefs' as const, key: 'prefs', data: old.prefs, updatedAt: old.prefs.updatedAt ?? Date.now() }] : []),
   ])
-  if (sb && Object.keys(old.stats).length) await sb.rpc('add_watch_time', { p: old.stats })
+  if (sb && Object.keys(old.stats).length) await sb.rpc('import_watch_history', { p: old.stats })
 }
 
 syncHooks.progress = pushProgress
 syncHooks.title = pushTitle
 syncHooks.prefs = pushPrefs
 syncHooks.stats = scheduleStats
+syncHooks.finished = (key) => countFinished('e', key)

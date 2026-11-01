@@ -72,15 +72,54 @@ create trigger protect_profile before update on public.profiles for each row exe
 
 create table if not exists public.user_docs (
   user_id uuid not null references auth.users on delete cascade default auth.uid(),
-  kind text not null check (kind in ('progress', 'title', 'manga', 'prefs')),
+  kind text not null,
   key text not null check (char_length(key) <= 200),
   data jsonb not null check (pg_column_size(data) <= 65536),
   updated_at bigint not null,
   primary key (user_id, kind, key)
 );
+-- 'episodes' is one row per title holding every episode's position ({ordinal: [time, duration, watched, updatedAt]}):
+-- a row costs ~100 bytes before its data, so a row per episode ('progress', what 1.0.34 and older write) is 4x bigger
+alter table public.user_docs drop constraint if exists user_docs_kind_check;
+alter table public.user_docs add constraint user_docs_kind_check check (kind in ('progress', 'episodes', 'title', 'manga', 'prefs'));
+-- room on each page for the frequent position updates to happen in place
+alter table public.user_docs set (fillfactor = 90);
 alter table public.user_docs enable row level security;
 drop policy if exists "own docs" on public.user_docs;
 create policy "own docs" on public.user_docs for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- merges episode positions into the title's row, each episode keeping whichever side changed it last
+create or replace function public.put_episodes(p jsonb) returns void
+language plpgsql security invoker set search_path = public as $$
+declare k text; v jsonb;
+begin
+  if auth.uid() is null or jsonb_typeof(p) <> 'object' then return; end if;
+  for k, v in select key, value from jsonb_each(p) loop
+    continue when jsonb_typeof(v) <> 'object' or v = '{}';
+    insert into user_docs as u (user_id, kind, key, data, updated_at)
+    values (auth.uid(), 'episodes', k, v, (select coalesce(max((e.value ->> 3)::bigint), 0) from jsonb_each(v) e))
+    on conflict (user_id, kind, key) do update set
+      data = u.data || (select coalesce(jsonb_object_agg(n.key, n.value), '{}') from jsonb_each(excluded.data) n
+                        where not (u.data ? n.key) or (n.value ->> 3)::bigint >= (u.data -> n.key ->> 3)::bigint),
+      updated_at = greatest(u.updated_at, excluded.updated_at);
+  end loop;
+end $$;
+
+-- one-time move of the per-episode rows into per-title rows (the client also moves any an old version writes later)
+do $$
+begin
+  if exists (select 1 from public.user_docs where kind = 'progress') then
+    insert into public.user_docs as u (user_id, kind, key, data, updated_at)
+    select user_id, 'episodes', data ->> 'releaseId',
+      jsonb_object_agg(data ->> 'ordinal', jsonb_build_array(round((data ->> 'time')::numeric), round((data ->> 'duration')::numeric),
+        case when (data ->> 'watched')::boolean then 1 else 0 end, updated_at)),
+      max(updated_at)
+    from public.user_docs where kind = 'progress' and data ? 'releaseId' and data ? 'ordinal'
+    group by user_id, data ->> 'releaseId'
+    on conflict (user_id, kind, key) do update set data = excluded.data || u.data, updated_at = greatest(u.updated_at, excluded.updated_at);
+    delete from public.user_docs where kind = 'progress';
+  end if;
+end $$;
 
 create table if not exists public.watch_stats (
   user_id uuid not null references auth.users on delete cascade default auth.uid(),
@@ -92,17 +131,131 @@ alter table public.watch_stats enable row level security;
 drop policy if exists "own stats" on public.watch_stats;
 create policy "own stats" on public.watch_stats for select using (user_id = auth.uid());
 
--- adds watched seconds per day; at most a day's worth per call so nobody inflates their stats
+-- what leaderboards count, per day: reading time, finished episodes, manga and ranobe chapters;
+-- legacy_seconds is history brought over from the old Firebase account (shown in stats, not ranked)
+alter table public.watch_stats add column if not exists read_seconds integer not null default 0 check (read_seconds >= 0);
+alter table public.watch_stats add column if not exists episodes integer not null default 0 check (episodes >= 0);
+alter table public.watch_stats add column if not exists chapters integer not null default 0 check (chapters >= 0);
+alter table public.watch_stats add column if not exists ln_chapters integer not null default 0 check (ln_chapters >= 0);
+alter table public.watch_stats add column if not exists legacy_seconds integer not null default 0 check (legacy_seconds >= 0);
+create index if not exists watch_stats_day on public.watch_stats (day);
+
+-- running totals for the all-time boards, and the clock that keeps reports honest
+create table if not exists public.user_totals (
+  user_id uuid primary key references auth.users on delete cascade,
+  watch_seconds bigint not null default 0,
+  read_seconds bigint not null default 0,
+  episodes integer not null default 0,
+  chapters integer not null default 0,
+  ln_chapters integer not null default 0,
+  streak integer not null default 0,
+  best_streak integer not null default 0,
+  last_day date,
+  credit numeric not null default 3600,
+  reported_at timestamptz not null default now(),
+  imported boolean not null default false
+);
+alter table public.user_totals enable row level security;
+drop policy if exists "own totals" on public.user_totals;
+create policy "own totals" on public.user_totals for select using (user_id = auth.uid());
+
+-- what the accounts had before the counters existed
+insert into public.user_totals (user_id, watch_seconds, episodes)
+select s.user_id, sum(s.seconds),
+  least((select count(*) from public.user_docs d, jsonb_each(d.data) e where d.user_id = s.user_id and d.kind = 'episodes' and (e.value ->> 2) = '1'),
+        sum(s.seconds) / 480)
+from public.watch_stats s group by s.user_id
+on conflict (user_id) do nothing;
+update public.user_totals set credit = least(credit, 21600);
+-- streaks from the days already recorded (once, for accounts that have none yet)
+with days as (select user_id, day::date as d from public.watch_stats where seconds + legacy_seconds >= 600),
+runs as (
+  select user_id, count(*)::int as n, max(d) as last
+  from (select user_id, d, d - (row_number() over (partition by user_id order by d))::int as g from days) x
+  group by user_id, g
+)
+update public.user_totals t set
+  best_streak = (select max(n) from runs where runs.user_id = t.user_id),
+  streak = (select n from runs where runs.user_id = t.user_id order by last desc limit 1),
+  last_day = (select max(last) from runs where runs.user_id = t.user_id)
+where t.last_day is null and exists (select 1 from runs where runs.user_id = t.user_id);
+
+-- Adds a report {day: {w, r, e, c, l}}: seconds watched and read, episodes, manga and ranobe chapters finished.
+-- Honest by construction, whatever a modified client sends:
+--  * time can't run faster than the clock: every second reported is paid from a credit that refills
+--    one second per real second (at most 6 hours banked, for offline viewing);
+--  * only the last two days and tomorrow (time zones) can be reported, at most 16 hours a day;
+--  * a finished episode needs 8 minutes of watching that day, a manga chapter 15 s and a ranobe chapter 45 s of reading.
+create or replace function public.add_activity(p jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  me uuid := auth.uid();
+  t user_totals;
+  s watch_stats;
+  k text; v jsonb; d date;
+  w int; r int; e int; c int; l int; used int;
+begin
+  if me is null or jsonb_typeof(p) <> 'object' then return; end if;
+  insert into user_totals (user_id) values (me) on conflict do nothing;
+  select * into t from user_totals where user_id = me for update;
+  t.credit := least(t.credit + extract(epoch from now() - t.reported_at), 21600);
+  for k, v in select key, value from jsonb_each(p) order by key loop
+    continue when k !~ '^\d{4}-\d{2}-\d{2}$' or jsonb_typeof(v) <> 'object';
+    begin d := k::date; exception when others then continue; end;
+    continue when d < current_date - 2 or d > current_date + 1;
+    insert into watch_stats (user_id, day) values (me, k) on conflict do nothing;
+    select * into s from watch_stats where user_id = me and day = k for update;
+    used := s.seconds + s.read_seconds;
+    w := least(greatest(coalesce((v ->> 'w')::numeric, 0), 0), t.credit, greatest(57600 - used, 0))::int;
+    r := least(greatest(coalesce((v ->> 'r')::numeric, 0), 0), t.credit - w, greatest(57600 - used - w, 0))::int;
+    t.credit := t.credit - w - r;
+    e := least(greatest(coalesce((v ->> 'e')::int, 0), 0),
+               greatest(case when s.seconds + w >= 60 then (s.seconds + w) / 480 + 1 else 0 end - s.episodes, 0));
+    c := least(greatest(coalesce((v ->> 'c')::int, 0), 0),
+               greatest((s.read_seconds + r + 30 - s.ln_chapters * 45) / 15 - s.chapters, 0));
+    l := least(greatest(coalesce((v ->> 'l')::int, 0), 0),
+               greatest((s.read_seconds + r + 30 - (s.chapters + c) * 15) / 45 - s.ln_chapters, 0));
+    continue when w + r + e + c + l = 0;
+    update watch_stats set seconds = seconds + w, read_seconds = read_seconds + r,
+      episodes = episodes + e, chapters = chapters + c, ln_chapters = ln_chapters + l
+    where user_id = me and day = k;
+    t.watch_seconds := t.watch_seconds + w;
+    t.read_seconds := t.read_seconds + r;
+    t.episodes := t.episodes + e;
+    t.chapters := t.chapters + c;
+    t.ln_chapters := t.ln_chapters + l;
+    -- a streak day is one with at least 10 minutes of watching or reading
+    if used + w + r >= 600 and (t.last_day is null or d > t.last_day) then
+      t.streak := case when t.last_day = d - 1 then t.streak + 1 else 1 end;
+      t.best_streak := greatest(t.best_streak, t.streak);
+      t.last_day := d;
+    end if;
+  end loop;
+  update user_totals set watch_seconds = t.watch_seconds, read_seconds = t.read_seconds, episodes = t.episodes,
+    chapters = t.chapters, ln_chapters = t.ln_chapters, streak = t.streak, best_streak = t.best_streak,
+    last_day = t.last_day, credit = t.credit, reported_at = now()
+  where user_id = me;
+end $$;
+
+-- what 1.0.34 and older call: watch time only
 create or replace function public.add_watch_time(p jsonb) returns void
+language sql security definer set search_path = public as $$
+  select public.add_activity((select jsonb_object_agg(key, jsonb_build_object('w', value)) from jsonb_each(p)))
+$$;
+
+-- the watch history of an account moved from Firebase: once, into legacy_seconds, never ranked
+create or replace function public.import_watch_history(p jsonb) returns void
 language plpgsql security definer set search_path = public as $$
 declare k text; v numeric;
 begin
-  if auth.uid() is null then return; end if;
+  if auth.uid() is null or jsonb_typeof(p) <> 'object' then return; end if;
+  insert into user_totals (user_id) values (auth.uid()) on conflict do nothing;
+  update user_totals set imported = true where user_id = auth.uid() and not imported;
+  if not found then return; end if;
   for k, v in select key, value::numeric from jsonb_each_text(p) loop
-    if k ~ '^\d{4}-\d{2}-\d{2}$' and v > 0 then
-      insert into watch_stats (user_id, day, seconds) values (auth.uid(), k, least(v, 86400)::int)
-      on conflict (user_id, day) do update set seconds = least(watch_stats.seconds + excluded.seconds, 86400);
-    end if;
+    continue when k !~ '^\d{4}-\d{2}-\d{2}$' or v <= 0;
+    insert into watch_stats (user_id, day, legacy_seconds) values (auth.uid(), k, least(v, 57600)::int)
+    on conflict (user_id, day) do update set legacy_seconds = least(watch_stats.legacy_seconds + excluded.legacy_seconds, 57600);
   end loop;
 end $$;
 
@@ -364,9 +517,11 @@ grant execute on function public.register(text, text) to anon, authenticated;
 -- ---------------------------------------------------------------------------------------------
 -- avatars and banners: public pictures, each account writes only into its own folder (<uid>/...)
 
+-- the app shrinks pictures to WebP before upload (avatar ~20 KB, banner ~80 KB) and keeps one of each per account,
+-- so 1 GB of free file storage holds about 10 000 profiles; the limit stops anything bigger getting in
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('avatars', 'avatars', true, 2097152, '{image/png,image/jpeg,image/webp,image/gif}')
-on conflict (id) do update set public = true, file_size_limit = 2097152, allowed_mime_types = '{image/png,image/jpeg,image/webp,image/gif}';
+values ('avatars', 'avatars', true, 307200, '{image/webp,image/jpeg}')
+on conflict (id) do update set public = true, file_size_limit = 307200, allowed_mime_types = '{image/webp,image/jpeg}';
 
 drop policy if exists "avatars read" on storage.objects;
 create policy "avatars read" on storage.objects for select using (bucket_id = 'avatars');
@@ -381,11 +536,80 @@ create policy "avatars delete own" on storage.objects for delete using (bucket_i
 create or replace function public.profile_stats(target uuid) returns jsonb
 language sql stable security definer set search_path = public as $$
   select case when not exists (select 1 from profiles where id = target and (public or id = auth.uid())) then null else jsonb_build_object(
-    'seconds', coalesce((select sum(seconds) from watch_stats where user_id = target), 0),
-    'episodes', (select count(*) from user_docs where user_id = target and kind = 'progress' and (data ->> 'watched')::boolean),
+    'seconds', coalesce((select sum(seconds + legacy_seconds) from watch_stats where user_id = target), 0),
+    'episodes', (select count(*) from user_docs d, jsonb_each(d.data) e where d.user_id = target and d.kind = 'episodes' and (e.value ->> 2) = '1'),
+    'read_seconds', coalesce((select read_seconds from user_totals where user_id = target), 0),
+    'chapters', coalesce((select chapters from user_totals where user_id = target), 0),
+    'ln_chapters', coalesce((select ln_chapters from user_totals where user_id = target), 0),
+    'streak', coalesce((select case when last_day >= current_date - 1 then streak else 0 end from user_totals where user_id = target), 0),
+    'best_streak', coalesce((select best_streak from user_totals where user_id = target), 0),
+    'xp', coalesce((select watch_seconds / 60 + read_seconds / 60 + episodes * 5 + chapters * 2 + ln_chapters * 4 from user_totals where user_id = target), 0),
     'completed', (select count(*) from user_docs where user_id = target and kind = 'title' and data ->> 'status' = 'completed'),
     'watching', (select count(*) from user_docs where user_id = target and kind = 'title' and data ->> 'status' = 'watching'),
     'comments', (select count(*) from comments where user_id = target and not hidden),
     'ratings', (select count(*) from ratings where user_id = target)
   ) end
 $$;
+
+-- ---------------------------------------------------------------------------------------------
+-- leaderboards: board = xp | watch | episodes | read | chapters | ln | streak | best_streak | likes | critic,
+-- period = week | month | all. Only public, unbanned profiles are ranked; the caller always gets their own row too.
+
+create or replace function public.leaderboard(board text, period text default 'all', lim integer default 50)
+returns table (place integer, user_id uuid, username text, display_name text, avatar_url text, accent text, role text, value bigint, me boolean)
+language plpgsql stable security definer set search_path = public as $$
+declare
+  since date := case period when 'week' then current_date - 6 when 'month' then current_date - 29 end;
+  daily boolean := since is not null and board in ('xp', 'watch', 'episodes', 'read', 'chapters', 'ln');
+begin
+  return query
+  with v as (
+    select ws.user_id as uid, (case board
+      when 'xp' then sum(ws.seconds / 60 + ws.read_seconds / 60 + ws.episodes * 5 + ws.chapters * 2 + ws.ln_chapters * 4)
+      when 'watch' then sum(ws.seconds) when 'episodes' then sum(ws.episodes) when 'read' then sum(ws.read_seconds)
+      when 'chapters' then sum(ws.chapters) when 'ln' then sum(ws.ln_chapters) end)::bigint as val
+    from watch_stats ws where daily and ws.day >= since::text group by ws.user_id
+    union all
+    select t.user_id, (case board
+      when 'xp' then t.watch_seconds / 60 + t.read_seconds / 60 + t.episodes * 5 + t.chapters * 2 + t.ln_chapters * 4
+      when 'watch' then t.watch_seconds when 'episodes' then t.episodes when 'read' then t.read_seconds
+      when 'chapters' then t.chapters when 'ln' then t.ln_chapters
+      when 'streak' then case when t.last_day >= current_date - 1 then t.streak else 0 end
+      when 'best_streak' then t.best_streak end)::bigint
+    from user_totals t where not daily and board in ('xp', 'watch', 'episodes', 'read', 'chapters', 'ln', 'streak', 'best_streak')
+    union all
+    select c.user_id, sum(c.likes)::bigint from comments c
+    where board = 'likes' and not c.hidden and (since is null or c.created_at >= since) group by c.user_id
+    union all
+    select r.user_id, count(*)::bigint from ratings r
+    where board = 'critic' and (since is null or r.updated_at >= since) group by r.user_id
+  ), ranked as (
+    select v.uid, v.val, (rank() over (order by v.val desc))::int as pos
+    from v join profiles p on p.id = v.uid
+    where v.val > 0 and ((p.public and (p.banned_until is null or p.banned_until < now())) or v.uid = auth.uid())
+  )
+  select r.pos, p.id, p.username, p.display_name, p.avatar_url, p.accent, p.role, r.val, p.id = auth.uid()
+  from ranked r join profiles p on p.id = r.uid
+  where r.pos <= least(greatest(lim, 1), 100) or r.uid = auth.uid()
+  order by r.pos, p.username;
+end $$;
+
+-- ---------------------------------------------------------------------------------------------
+-- housekeeping, so old rows don't eat the free 500 MB: rooms idle for 3 days go (with their events),
+-- a room keeps its last 200 chat messages and reactions
+
+create or replace function public.room_cleanup() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if tg_table_name = 'rooms' then
+    delete from rooms where updated_at < now() - interval '3 days';
+  else
+    delete from room_events where code = new.code
+      and id <= (select id from room_events where code = new.code order by id desc offset 200 limit 1);
+  end if;
+  return null;
+end $$;
+drop trigger if exists room_cleanup on public.rooms;
+create trigger room_cleanup after insert on public.rooms for each statement execute function public.room_cleanup();
+drop trigger if exists room_cleanup on public.room_events;
+create trigger room_cleanup after insert on public.room_events for each row execute function public.room_cleanup();

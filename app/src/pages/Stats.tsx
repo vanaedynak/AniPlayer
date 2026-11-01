@@ -137,6 +137,9 @@ export default function Stats() {
           <Link to="/collection" className="mt-4 flex items-center justify-between rounded-2xl bg-white/[0.04] px-5 py-4 font-bold ring-1 ring-white/5 hover:bg-white/[0.08]">
             Смотреть коллекции <ArrowRight size={18} />
           </Link>
+          <Link to="/top" className="mt-2 flex items-center justify-between rounded-2xl bg-accent/15 px-5 py-4 font-bold text-accent-2 ring-1 ring-accent/30 hover:bg-accent/25">
+            Топы: часы, серии, манга, ранобэ <ArrowRight size={18} />
+          </Link>
         </Panel>
 
         <Panel>

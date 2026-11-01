@@ -69,13 +69,48 @@ export async function updateProfile(patch: ProfileEdit) {
 }
 
 /** uploads a picture into the account's own folder; returns its public address */
+// pictures are cut and shrunk on the device: an avatar ends up ~20 KB, a banner ~80 KB,
+// so the free 1 GB of file storage fits about ten thousand profiles
+const PICTURE = { avatar: { w: 256, h: 256, q: 0.82 }, banner: { w: 1200, h: 400, q: 0.78 } }
+
+async function shrink(file: File, kind: 'avatar' | 'banner') {
+  const { w, h, q } = PICTURE[kind]
+  const img = await createImageBitmap(file).catch(() => {
+    throw new Error('Не получилось открыть картинку')
+  })
+  // cover: the middle of the picture, cropped to the target shape
+  const scale = Math.max(w / img.width, h / img.height)
+  const sw = w / scale
+  const sh = h / scale
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')!
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, 0, 0, w, h)
+  img.close()
+  const blob = (type: string, quality: number) => new Promise<Blob | null>((r) => canvas.toBlob(r, type, quality))
+  // Safari before 17 has no WebP encoder: it hands back PNG, so JPEG instead
+  let out = await blob('image/webp', q)
+  if (!out || out.type !== 'image/webp') out = await blob('image/jpeg', q)
+  for (let quality = q - 0.15; out && out.size > 280_000 && quality > 0.3; quality -= 0.15) out = await blob(out.type, quality)
+  if (!out) throw new Error('Не получилось сжать картинку')
+  return out
+}
+
 export async function uploadPicture(file: File, kind: 'avatar' | 'banner') {
   const { sb, uid } = me()
-  if (file.size > 2 * 1024 * 1024) throw new Error('Картинка больше 2 МБ')
-  if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) throw new Error('Подойдут PNG, JPG, WebP или GIF')
-  const path = `${uid}/${kind}-${Date.now()}.${file.type.split('/')[1]}`
-  check(await sb.storage.from('avatars').upload(path, file, { contentType: file.type, upsert: true }))
-  return sb.storage.from('avatars').getPublicUrl(path).data.publicUrl
+  if (!file.type.startsWith('image/')) throw new Error('Нужна картинка')
+  if (file.size > 20 * 1024 * 1024) throw new Error('Картинка больше 20 МБ')
+  const blob = await shrink(file, kind)
+  const path = `${uid}/${kind}.${blob.type === 'image/webp' ? 'webp' : 'jpg'}`
+  check(await sb.storage.from('avatars').upload(path, blob, { contentType: blob.type, upsert: true, cacheControl: '31536000' }))
+  // older copies (other names from earlier versions) stop taking space
+  const { data: files } = await sb.storage.from('avatars').list(uid)
+  const stale = (files ?? []).map((f) => `${uid}/${f.name}`).filter((n) => n !== path && n.split('/')[1].startsWith(kind))
+  if (stale.length) await sb.storage.from('avatars').remove(stale)
+  // the name stays the same, so the address changes with each upload to get past caches
+  return `${sb.storage.from('avatars').getPublicUrl(path).data.publicUrl}?v=${Date.now()}`
 }
 
 export interface ProfileStats {
@@ -85,6 +120,40 @@ export interface ProfileStats {
   watching: number
   comments: number
   ratings: number
+  read_seconds: number
+  chapters: number
+  ln_chapters: number
+  streak: number
+  best_streak: number
+  xp: number
+}
+
+export type Board = 'xp' | 'watch' | 'episodes' | 'read' | 'chapters' | 'ln' | 'streak' | 'best_streak' | 'likes' | 'critic'
+export type Period = 'week' | 'month' | 'all'
+export interface Place {
+  place: number
+  user_id: string
+  username: string
+  display_name: string | null
+  avatar_url: string | null
+  accent: string | null
+  role: Profile['role']
+  value: number
+  me: boolean
+}
+/** the top of a board (public profiles only) plus the caller's own place wherever it is */
+export async function leaderboard(board: Board, period: Period, limit = 50): Promise<Place[]> {
+  const rows = check(await client().rpc('leaderboard', { board, period, lim: limit })) as (Place & { value: string | number })[]
+  return rows.map((r) => ({ ...r, value: Number(r.value) }))
+}
+
+/** experience: a minute watched or read is 1, an episode 5, a manga chapter 2, a ranobe chapter 4;
+ *  level n starts at 50·(n−1)² — about 5 hours for level 3, 300 hours for level 20 */
+export function levelOf(xp: number) {
+  const level = Math.floor(Math.sqrt(Math.max(xp, 0) / 50)) + 1
+  const from = 50 * (level - 1) ** 2
+  const to = 50 * level ** 2
+  return { level, progress: (xp - from) / (to - from), toNext: to - xp }
 }
 export async function profileStats(id: string): Promise<ProfileStats | null> {
   return check(await client().rpc('profile_stats', { target: id })) as ProfileStats | null
