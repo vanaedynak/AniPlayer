@@ -1,7 +1,7 @@
 // MangaDex: the open manga catalog with an official public API (https://api.mangadex.org/docs).
 // Russian titles and descriptions come from Shikimori, whose manga ids match MangaDex's "mal" link.
 import { CapacitorHttp } from '@capacitor/core'
-import { isIOS, isNative } from '../lib/platform'
+import { isNative } from '../lib/platform'
 import { skFind, skManga, skNorm, skPages, skSearchManga } from './sk'
 
 const API = 'https://api.mangadex.org'
@@ -121,10 +121,14 @@ function query(params: Params) {
   return qs.toString()
 }
 
+// MangaDex asks API clients to name themselves and sends anything with a browser User-Agent to a bot check,
+// so the app introduces itself honestly (the desktop app sets the same header in electron/main.cjs)
+const CLIENT = `Anyflow/${__APP_VERSION__} (+https://github.com/vanaedynak/AniPlayer)`
+
 async function fetchJson<T>(url: string): Promise<T> {
-  // iPad: capacitor:// is not an allowed CORS origin, so the request goes through the native layer
-  if (isNative && isIOS) {
-    const res = await CapacitorHttp.get({ url, headers: { Accept: 'application/json' } })
+  // iPad and Android: through the native layer, where the header can be set (and capacitor:// is no CORS origin)
+  if (isNative) {
+    const res = await CapacitorHttp.get({ url, headers: { Accept: 'application/json', 'User-Agent': CLIENT } })
     if (res.status >= 400) throw new Error(`HTTP ${res.status}`)
     return (typeof res.data === 'string' ? JSON.parse(res.data) : res.data) as T
   }

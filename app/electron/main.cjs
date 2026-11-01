@@ -197,6 +197,11 @@ app.whenReady().then(() => {
     headers['Access-Control-Allow-Origin'] = ['app://aniplayer']
     cb({ responseHeaders: headers })
   })
+  // MangaDex asks API clients to name themselves; a browser User-Agent gets sent to its bot check (HTTP 403)
+  session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['https://api.mangadex.org/*'] }, (d, cb) => {
+    d.requestHeaders['User-Agent'] = `Anyflow/${app.getVersion()} (+https://github.com/vanaedynak/AniPlayer)`
+    cb({ requestHeaders: d.requestHeaders })
+  })
   createWindow()
   initUpdater()
 })
