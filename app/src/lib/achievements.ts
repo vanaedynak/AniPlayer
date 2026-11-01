@@ -42,6 +42,8 @@ export interface Achievement {
   reward?: { theme: string }
 }
 export type Stats = ProfileStats & { created_at: string }
+/** per anime (MAL id): [episodes watched, furthest episode watched] */
+export type MalEpisodes = Record<string, [number, number]>
 
 const ladder = (
   category: Category,
