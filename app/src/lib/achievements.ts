@@ -1,17 +1,19 @@
 // Achievements: earned from the numbers the server counts (profile_stats). General ones grow with time
 // watched, episodes, reading, streaks and community; series ones need a title finished (by its MAL id).
-// Some carry a reward: a unique theme opens with them.
+// Themed ones (lib/themed) follow one anime episode by episode. Some carry a reward: a unique theme opens with them.
 import type { ProfileStats } from './social'
 import { levelOf } from './social'
+import { THEMED } from './themed'
 
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary'
-export type Category = 'watch' | 'read' | 'streak' | 'community' | 'series' | 'special'
+export type Category = 'watch' | 'read' | 'streak' | 'community' | 'theme' | 'series' | 'special'
 
 export const CATEGORIES: { id: Category; label: string }[] = [
   { id: 'watch', label: 'Просмотр' },
   { id: 'read', label: 'Чтение' },
   { id: 'streak', label: 'Серии дней' },
   { id: 'community', label: 'Сообщество' },
+  { id: 'theme', label: 'Тематические' },
   { id: 'series', label: 'Аниме' },
   { id: 'special', label: 'Особые' },
 ]
@@ -32,6 +34,10 @@ export interface Achievement {
   rarity: Rarity
   goal: number
   value: (s: Stats) => number
+  /** the longer story, shown when the achievement is opened */
+  about?: string
+  /** the anime it belongs to */
+  anime?: string
   /** what it opens */
   reward?: { theme: string }
 }
@@ -57,6 +63,8 @@ const series = (id: string, icon: string, label: string, title: string, ids: num
   icon,
   label,
   hint: all ? `Досмотреть все сезоны «${title}»` : `Досмотреть «${title}»`,
+  about: all ? `Все сезоны «${title}» в списке просмотренных. Историю целиком проходят немногие.` : `«${title}» в списке просмотренных. Одно из тех аниме, которые стоит увидеть хотя бы раз.`,
+  anime: title,
   rarity,
   goal: all ? ids.length : 1,
   value: (s) => has(s, ids),
@@ -169,6 +177,8 @@ export const ACHIEVEMENTS: Achievement[] = [
   series('drstone', '🧫', 'Десять миллиардов процентов', 'Доктор Стоун', [38691]),
   series('haikyuu', '🏐', 'Через сетку', 'Волейбол!!', [20583]),
   series('mushoku', '🧭', 'На этот раз всерьёз', 'Реинкарнация безработного', [39535]),
+
+  ...THEMED,
 
   // special
   ...ladder('special', 'lvl', (s) => levelOf(s.xp).level, [

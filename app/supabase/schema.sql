@@ -561,6 +561,15 @@ language sql stable security definer set search_path = public as $$
     -- MAL ids of the finished titles, for the per-series achievements
     'completed_ids', (select coalesce(jsonb_agg(distinct (data ->> 'malId')::int), '[]') from user_docs
                       where user_id = target and kind = 'title' and data ->> 'status' = 'completed' and data ->> 'malId' ~ '^\d{1,9}$'),
+    -- per anime (MAL id): [episodes watched, furthest episode watched], for the themed achievements
+    'mal_eps', (select coalesce(jsonb_object_agg(m.mal, m.v), '{}') from (
+                  select (t.data ->> 'malId')::int as mal, jsonb_build_array(sum(x.n), coalesce(max(x.top), 0)) as v
+                  from user_docs t cross join lateral (
+                    select count(*) as n, max(floor(e.key::numeric)) filter (where e.key ~ '^\d{1,5}(\.\d+)?$') as top
+                    from user_docs d, jsonb_each(d.data) e
+                    where d.user_id = target and d.kind = 'episodes' and d.key = t.key and (e.value ->> 2) = '1') x
+                  where t.user_id = target and t.kind = 'title' and t.data ->> 'malId' ~ '^\d{1,9}$'
+                  group by 1 having sum(x.n) > 0) m),
     'comments', (select count(*) from comments where user_id = target and not hidden),
     'ratings', (select count(*) from ratings where user_id = target)
   ) end

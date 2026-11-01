@@ -784,6 +784,7 @@ function Page({
         src={src}
         alt=""
         draggable={false}
+        referrerPolicy="no-referrer"
         loading={eager ? 'eager' : 'lazy'}
         decoding="async"
         ref={img}

@@ -9,6 +9,7 @@ import { useStore } from '../lib/store'
 import { useSync } from '../lib/sync'
 import { cn, relTime } from '../lib/format'
 import { RARITY, evaluate } from '../lib/achievements'
+import { useLocalMalEps, withLocal } from '../lib/myAchievements'
 import { FRAMES, NAME_STYLES, BANNERS, LINKS, LinkChips, bannerCss, nameStyle, cleanLink, type Frame, type NameStyle, type BannerStyle } from '../components/ProfileLook'
 
 const ACCENTS = ['#14b8a6', '#38bdf8', '#8b5cf6', '#ec4899', '#f97316', '#eab308', '#22c55e', '#f43f5e']
@@ -387,7 +388,8 @@ function LevelBar({ xp, accent }: { xp: number; accent: string }) {
 }
 
 function Achievements({ p, stats, own, accent }: { p: Profile; stats: ProfileStats; own: boolean; accent: string }) {
-  const all = evaluate({ ...stats, created_at: p.created_at })
+  const local = useLocalMalEps()
+  const all = evaluate(own ? withLocal({ ...stats, created_at: p.created_at }, local) : { ...stats, created_at: p.created_at })
   const earned = all.filter((x) => x.done)
   // the rarest first: what the profile shows off
   const order = ['legendary', 'epic', 'rare', 'common']
@@ -404,7 +406,7 @@ function Achievements({ p, stats, own, accent }: { p: Profile; stats: ProfileSta
       {top.length ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {top.map(({ a }) => (
-            <div key={a.id} title={a.hint} className="flex items-center gap-3 rounded-2xl bg-white/[0.04] p-3 ring-1" style={{ boxShadow: `inset 0 0 0 1px ${RARITY[a.rarity].color}44` }}>
+            <Link key={a.id} to={`${own ? '/achievements' : `/achievements/${p.username}`}?a=${a.id}`} title={a.hint} className="flex items-center gap-3 rounded-2xl bg-white/[0.04] p-3 ring-1 transition hover:bg-white/[0.08]" style={{ boxShadow: `inset 0 0 0 1px ${RARITY[a.rarity].color}44` }}>
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-2xl" style={{ background: `${RARITY[a.rarity].color}22` }}>
                 {a.icon}
               </span>
@@ -414,7 +416,7 @@ function Achievements({ p, stats, own, accent }: { p: Profile; stats: ProfileSta
                   {RARITY[a.rarity].label}
                 </span>
               </span>
-            </div>
+            </Link>
           ))}
         </div>
       ) : (

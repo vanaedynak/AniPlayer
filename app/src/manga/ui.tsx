@@ -5,13 +5,16 @@ import { coverUrl, mangaName, KIND, STATUS, type Manga } from './md'
 import { useManga, type MangaEntry } from './store'
 import { cn } from '../lib/format'
 
-/** cover with a soft fallback: some MangaDex titles have no cover art */
+/**
+ * cover with a soft fallback: some MangaDex titles have no cover art. No Referer: MangaDex swaps covers
+ * linked from other sites for a «read it on mangadex.org» picture, and the iPad app's capacitor:// counts as one.
+ */
 export function Cover({ src, className, children }: { src: string; className?: string; children?: ReactNode }) {
   const [bad, setBad] = useState(false)
   return (
     <div className={cn('relative overflow-hidden bg-card', className)}>
       {src && !bad ? (
-        <img src={src} alt="" loading="lazy" onError={() => setBad(true)} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+        <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBad(true)} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-accent/30 to-pink/20 text-white/50">
           <BookOpen size={36} />

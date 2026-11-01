@@ -35,6 +35,7 @@ import { CrashGuard, Welcome } from './Crash'
 import { Avatar } from './Social'
 import { useMyProfile } from '../lib/social'
 import { SUPPORT_URL } from '../lib/links'
+import { AchievementToasts } from './AchievementToasts'
 
 const NAV = [
   { to: '/', label: 'Главная', icon: Home },
@@ -401,6 +402,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       <MiniPlayer />
       <RoomBridge />
       <Welcome />
+      <AchievementToasts />
     </div>
   )
 }

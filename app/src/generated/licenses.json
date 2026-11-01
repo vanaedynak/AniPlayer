@@ -396,6 +396,48 @@
   "url": "https://github.com/protobufjs/protobuf.js"
  },
  {
+  "name": "@supabase/auth-js",
+  "version": "2.118.0",
+  "license": "MIT",
+  "url": "https://github.com/supabase/supabase-js/tree/master/packages/core/auth-js"
+ },
+ {
+  "name": "@supabase/functions-js",
+  "version": "2.118.0",
+  "license": "MIT",
+  "url": "https://github.com/supabase/supabase-js/tree/master/packages/core/functions-js"
+ },
+ {
+  "name": "@supabase/phoenix",
+  "version": "0.4.5",
+  "license": "MIT",
+  "url": "https://github.com/supabase/phoenix"
+ },
+ {
+  "name": "@supabase/postgrest-js",
+  "version": "2.118.0",
+  "license": "MIT",
+  "url": "https://github.com/supabase/supabase-js/tree/master/packages/core/postgrest-js"
+ },
+ {
+  "name": "@supabase/realtime-js",
+  "version": "2.118.0",
+  "license": "MIT",
+  "url": "https://github.com/supabase/supabase-js/tree/master/packages/core/realtime-js"
+ },
+ {
+  "name": "@supabase/storage-js",
+  "version": "2.118.0",
+  "license": "MIT",
+  "url": "https://github.com/supabase/supabase-js/tree/master/packages/core/storage-js"
+ },
+ {
+  "name": "@supabase/supabase-js",
+  "version": "2.118.0",
+  "license": "MIT",
+  "url": "https://github.com/supabase/supabase-js/tree/master/packages/core/supabase-js"
+ },
+ {
   "name": "@types/node",
   "version": "24.19.2",
   "license": "MIT",
@@ -538,6 +580,12 @@
   "version": "0.5.10",
   "license": "MIT",
   "url": "https://github.com/creationix/http-parser-js"
+ },
+ {
+  "name": "iceberg-js",
+  "version": "0.8.1",
+  "license": "MIT",
+  "url": "https://github.com/supabase/iceberg-js#readme"
  },
  {
   "name": "idb",

@@ -134,6 +134,8 @@ export interface ProfileStats {
   best_streak: number
   xp: number
   completed_ids: number[]
+  /** per anime (MAL id): [episodes watched, furthest episode]; older servers leave it out */
+  mal_eps?: Record<string, [number, number]>
 }
 
 export type Board = 'xp' | 'watch' | 'episodes' | 'read' | 'chapters' | 'ln' | 'streak' | 'best_streak' | 'likes' | 'critic'
