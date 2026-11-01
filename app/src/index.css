@@ -48,7 +48,14 @@ html, body, #root { height: 100%; }
 
 body {
   margin: 0;
-  background: var(--color-bg);
+  /* each theme's glow: its accent from the top right, its second color from the bottom left */
+  background:
+    var(--theme-pattern, none),
+    radial-gradient(1100px 620px at 88% -12%, var(--color-aura, transparent), transparent 65%),
+    radial-gradient(900px 560px at -8% 112%, var(--color-aura-2, transparent), transparent 65%),
+    var(--color-bg);
+  background-size: var(--theme-pattern-size, auto), auto, auto, auto;
+  background-attachment: fixed;
   color: #f4f4f7;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -92,6 +99,7 @@ img { -webkit-user-drag: none; }
 .animate-fade-up { animation: fade-up .45s var(--ease-out-soft) both; }
 
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes frame-shift { from { background-position: 0% 50%; } to { background-position: 300% 50%; } }
 .animate-fade-in { animation: fade-in .25s ease both; }
 
 @keyframes pop { from { opacity: 0; transform: scale(.96) translateY(6px); } to { opacity: 1; transform: none; } }

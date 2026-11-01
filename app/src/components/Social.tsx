@@ -22,8 +22,30 @@ import {
   type Profile,
 } from '../lib/social'
 import { cn, relTime } from '../lib/format'
+import { frameStyle } from './ProfileLook'
 
-export function Avatar({ p, size = 40, className }: { p?: Pick<Profile, 'username' | 'display_name' | 'avatar_url'> | null; size?: number; className?: string }) {
+export function Avatar({
+  p,
+  size = 40,
+  className,
+}: {
+  p?: (Pick<Profile, 'username' | 'display_name' | 'avatar_url'> & Partial<Pick<Profile, 'frame' | 'accent'>>) | null
+  size?: number
+  className?: string
+}) {
+  const ring = frameStyle(p?.frame, p?.accent ?? 'var(--color-accent)', size)
+  if (ring)
+    return (
+      <span className={cn('inline-flex shrink-0', className)} style={ring}>
+        <span className="block rounded-full" style={{ background: 'var(--color-card)', padding: 1 }}>
+          <Picture p={p} size={size - 2 * (ring.padding as number) - 2} />
+        </span>
+      </span>
+    )
+  return <Picture p={p} size={size} className={className} />
+}
+
+function Picture({ p, size, className }: { p?: Pick<Profile, 'username' | 'display_name' | 'avatar_url'> | null; size: number; className?: string }) {
   const name = displayName(p)
   const [bad, setBad] = useState(false)
   return p?.avatar_url && !bad ? (

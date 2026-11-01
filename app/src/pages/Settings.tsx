@@ -1,10 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Cloud, LogOut, Link2, PlayCircle, Database, Check, ExternalLink, Loader2, ZoomIn, Info, Activity, LifeBuoy, UserRound, ShieldCheck } from 'lucide-react'
+import { Lock, Cloud, LogOut, Link2, PlayCircle, Database, Check, ExternalLink, Loader2, ZoomIn, Info, Activity, LifeBuoy, UserRound, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { useMyProfile, isStaff } from '../lib/social'
+import { useMyProfile, isStaff, profileStats, type ProfileStats } from '../lib/social'
 import { useSync, signIn, logOut, accountName, deleteAccount } from '../lib/sync'
 import { anilistViewer, anilistAuthUrl } from '../lib/anilist'
-import { useStore, THEMES } from '../lib/store'
+import { useStore } from '../lib/store'
+import { PALETTES, unlocked } from '../lib/palettes'
 import { Panel, PanelTitle } from '../components/ui'
 import { UpdateSettings } from '../components/Updates'
 import { cn } from '../lib/format'
@@ -261,25 +262,61 @@ function InterfaceSettings() {
   const scale = useStore((s) => s.local.scale)
   const theme = useStore((s) => s.local.theme ?? 'anyflow')
   const setLocal = useStore((s) => s.setLocal)
+  // unique themes open with achievements: the account's own counters decide
+  const me = useMyProfile()
+  const [stats, setStats] = useState<ProfileStats | null>(null)
+  useEffect(() => {
+    if (me) void profileStats(me.id).then(setStats).catch(() => {})
+  }, [me])
   return (
     <Panel>
       <PanelTitle icon={<ZoomIn className="text-pink" />} title="Интерфейс" sub="Тема и масштаб для этого устройства" />
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
-        <span className="font-bold">Тема</span>
-        <div className="flex flex-wrap gap-2">
-          {THEMES.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setLocal({ theme: t.id })}
-              className={cn('flex items-center gap-2.5 rounded-full py-1.5 pr-4 pl-1.5 text-sm font-bold ring-1 transition', theme === t.id ? 'bg-white/10 ring-white/40' : 'ring-white/10 hover:bg-white/5')}
-            >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full ring-1 ring-white/10" style={{ background: t.colors[0] }}>
-                <span className="h-3.5 w-3.5 rounded-full" style={{ background: `linear-gradient(135deg, ${t.colors[1]}, ${t.colors[2]})` }} />
-              </span>
-              {t.label}
-            </button>
-          ))}
-        </div>
+      <div className="mb-5 flex flex-col gap-4 px-1">
+        <span className="font-bold">Тема · {PALETTES.length}</span>
+        {[...new Set(PALETTES.map((t) => t.group))].map((group) => (
+          <div key={group} className="flex flex-col gap-2">
+            <span className="text-xs font-bold tracking-wide text-dim uppercase">{group}</span>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              {PALETTES.filter((t) => t.group === group).map((t) => {
+                const open = unlocked(t, stats, isStaff(me))
+                return (
+                <button
+                  key={t.id}
+                  onClick={() => open && setLocal({ theme: t.id })}
+                  disabled={!open}
+                  title={t.unlock ? `Открывается за достижение: ${t.unlock.hint}` : undefined}
+                  className={cn('relative overflow-hidden rounded-2xl text-left ring-2 transition', theme === t.id ? 'ring-white/70' : 'ring-white/5 hover:ring-white/20', !open && 'cursor-not-allowed')}
+                  style={{ background: t.bg }}
+                >
+                  {t.pattern && <span className="absolute inset-0" style={{ backgroundImage: t.pattern, backgroundSize: t.patternSize }} />}
+                  {/* a tiny picture of the app in this theme: glow, a card, a button and a line of text */}
+                  <span className="relative block h-16" style={{ background: `radial-gradient(120px 70px at 85% 0%, ${t.accent}55, transparent 70%), radial-gradient(100px 60px at 0% 100%, ${t.pink}33, transparent 70%)` }}>
+                    <span className="absolute top-3 left-3 h-9 w-14 rounded-lg" style={{ background: t.card }}>
+                      <span className="absolute top-2 left-2 h-1.5 w-8 rounded-full" style={{ background: t.light }} />
+                      <span className="absolute top-5 left-2 h-1.5 w-5 rounded-full" style={{ background: t.muted, opacity: 0.6 }} />
+                    </span>
+                    <span className="absolute right-3 bottom-3 h-5 w-10 rounded-full" style={{ background: `linear-gradient(90deg, ${t.accent}, ${t.pink})` }} />
+                  </span>
+                  <span className="relative flex items-center justify-between gap-2 px-3 py-2 text-sm font-bold" style={{ background: t.card }}>
+                    <span className="min-w-0">
+                      <span className="block truncate">{t.label}</span>
+                      {t.unlock && <span className="block truncate text-[11px] font-semibold text-white/50">{open ? 'Открыта' : t.unlock.hint}</span>}
+                    </span>
+                    {theme === t.id && <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: t.light }} />}
+                  </span>
+                  {!open && (
+                    <span className="absolute inset-0 flex items-start justify-end bg-black/45 p-2.5">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 ring-1 ring-white/15">
+                        <Lock size={14} />
+                      </span>
+                    </span>
+                  )}
+                </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 px-1">
         <span className="font-bold">Масштаб</span>

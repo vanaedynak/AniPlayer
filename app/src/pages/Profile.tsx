@@ -8,6 +8,7 @@ import { shiki, type ShikiAnime } from '../lib/shikimori'
 import { useStore } from '../lib/store'
 import { useSync } from '../lib/sync'
 import { cn, relTime } from '../lib/format'
+import { FRAMES, NAME_STYLES, BANNERS, LINKS, LinkChips, achievements, bannerCss, nameStyle, cleanLink, type Frame, type NameStyle, type BannerStyle } from '../components/ProfileLook'
 
 const ACCENTS = ['#14b8a6', '#38bdf8', '#8b5cf6', '#ec4899', '#f97316', '#eab308', '#22c55e', '#f43f5e']
 
@@ -53,14 +54,16 @@ export default function ProfilePage() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
       <div className="relative overflow-hidden rounded-[32px] bg-card ring-1 ring-white/5">
-        <div className="h-40 sm:h-56" style={{ background: p.banner_url ? `center / cover url("${p.banner_url}")` : `linear-gradient(120deg, ${accent}, var(--color-pink))` }} />
+        <div className="h-40 sm:h-56" style={{ background: p.banner_url ? `center / cover url("${p.banner_url}")` : bannerCss(p.banner_style, accent) }} />
         <div className="flex flex-col gap-4 px-6 pb-6 sm:flex-row sm:items-end sm:px-8">
           <div className="-mt-14 rounded-full p-1.5" style={{ background: 'var(--color-card)' }}>
             <Avatar p={p} size={112} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-3xl font-extrabold tracking-tight">{displayName(p)}</h1>
+              <h1 className="text-3xl font-extrabold tracking-tight" style={nameStyle(p.name_style, accent)}>
+                {displayName(p)}
+              </h1>
               {p.role !== 'user' && (
                 <span className="flex items-center gap-1 rounded-full bg-accent/20 px-2.5 py-0.5 text-xs font-bold text-accent-2">
                   <ShieldCheck size={13} /> {p.role === 'admin' ? 'Администратор' : 'Модератор'}
@@ -76,6 +79,7 @@ export default function ProfilePage() {
             <div className="text-sm font-semibold text-muted">
               @{p.username} · с нами с {new Date(p.created_at).toLocaleDateString('ru', { month: 'long', year: 'numeric' })}
             </div>
+            {p.status && <div className="mt-1 text-[15px] font-semibold text-white/85">{p.status}</div>}
             {stats && <LevelBar xp={stats.xp} accent={accent} />}
           </div>
           {own && (
@@ -84,7 +88,12 @@ export default function ProfilePage() {
             </button>
           )}
         </div>
-        {p.bio && !editing && <p className="px-6 pb-6 text-[15px] leading-relaxed whitespace-pre-line text-white/80 sm:px-8">{p.bio}</p>}
+        {p.bio && !editing && <p className="px-6 pb-4 text-[15px] leading-relaxed whitespace-pre-line text-white/80 sm:px-8">{p.bio}</p>}
+        {!editing && Object.keys(p.links ?? {}).length > 0 && (
+          <div className="px-6 pb-6 sm:px-8">
+            <LinkChips links={p.links} />
+          </div>
+        )}
       </div>
 
       {editing && own && <EditProfile p={p} onSaved={(np) => setP(np)} />}
@@ -111,6 +120,8 @@ export default function ProfilePage() {
           ))}
         </div>
       )}
+
+      {stats && <Achievements p={p} stats={stats} own={own} accent={accent} />}
 
       {favs.length > 0 && (
         <Panel>
@@ -142,7 +153,19 @@ export default function ProfilePage() {
 
 function EditProfile({ p, onSaved }: { p: Profile; onSaved: (p: Profile) => void }) {
   const titles = useStore((s) => s.titles)
-  const [form, setForm] = useState({ display_name: p.display_name ?? '', bio: p.bio ?? '', accent: p.accent ?? '', public: p.public, favorites: p.favorites })
+  const [form, setForm] = useState({
+    display_name: p.display_name ?? '',
+    bio: p.bio ?? '',
+    accent: p.accent ?? '',
+    public: p.public,
+    favorites: p.favorites,
+    status: p.status ?? '',
+    frame: p.frame ?? 'none',
+    name_style: p.name_style ?? 'plain',
+    banner_style: p.banner_style ?? 'accent',
+    links: p.links ?? {},
+  })
+  const accentNow = form.accent || 'var(--color-accent)'
   const [busy, setBusy] = useState<'' | 'save' | 'avatar' | 'banner'>('')
   const [msg, setMsg] = useState('')
   const avatarIn = useRef<HTMLInputElement>(null)
@@ -157,7 +180,19 @@ function EditProfile({ p, onSaved }: { p: Profile; onSaved: (p: Profile) => void
     setBusy('save')
     setMsg('')
     try {
-      const patch = { display_name: form.display_name.trim() || null, bio: form.bio.trim() || null, accent: form.accent || null, public: form.public, favorites: form.favorites }
+      const links = Object.fromEntries(Object.entries(form.links).map(([k, v]) => [k, cleanLink(v)]).filter(([, v]) => v))
+      const patch = {
+        display_name: form.display_name.trim() || null,
+        bio: form.bio.trim() || null,
+        accent: form.accent || null,
+        public: form.public,
+        favorites: form.favorites,
+        status: form.status.trim() || null,
+        frame: form.frame as Frame,
+        name_style: form.name_style as NameStyle,
+        banner_style: form.banner_style as BannerStyle,
+        links,
+      }
       await updateProfile(patch)
       onSaved({ ...p, ...patch })
       setMsg('Сохранено')
@@ -196,11 +231,15 @@ function EditProfile({ p, onSaved }: { p: Profile; onSaved: (p: Profile) => void
           <button onClick={() => bannerIn.current?.click()} className="flex h-11 items-center gap-2 rounded-full bg-white/10 px-5 font-bold hover:bg-white/15">
             {busy === 'banner' ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />} Обложка
           </button>
-          <span className="self-center text-xs text-dim">PNG, JPG, WebP или GIF до 2 МБ</span>
+          <span className="self-center text-xs text-dim">Любая картинка: приложение само уменьшит её</span>
         </div>
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-bold">Имя на сайте</span>
           <input className={input} maxLength={40} value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} placeholder={p.username} />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-bold">Статус</span>
+          <input className={input} maxLength={80} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} placeholder="Пересматриваю Евангелион 🤖" />
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-bold">О себе</span>
@@ -211,6 +250,78 @@ function EditProfile({ p, onSaved }: { p: Profile; onSaved: (p: Profile) => void
           <div className="flex flex-wrap gap-2">
             {ACCENTS.map((c) => (
               <button key={c} onClick={() => setForm({ ...form, accent: c })} className={cn('h-9 w-9 rounded-full ring-2', form.accent === c ? 'ring-white' : 'ring-transparent')} style={{ background: c }} />
+            ))}
+            {/* any other color */}
+            <label
+              className={cn('relative flex h-9 w-9 cursor-pointer items-center justify-center overflow-hidden rounded-full ring-2', form.accent && !ACCENTS.includes(form.accent) ? 'ring-white' : 'ring-white/15')}
+              style={{ background: 'conic-gradient(#f43f5e, #f97316, #facc15, #22c55e, #06b6d4, #6366f1, #d946ef, #f43f5e)' }}
+              title="Свой цвет"
+            >
+              <input type="color" value={form.accent || '#14b8a6'} onChange={(e) => setForm({ ...form, accent: e.target.value })} className="absolute inset-0 cursor-pointer opacity-0" />
+            </label>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-bold">Рамка аватара</span>
+          <div className="flex flex-wrap gap-3">
+            {FRAMES.map((f) => (
+              <button key={f.id} onClick={() => setForm({ ...form, frame: f.id })} className={cn('flex w-20 flex-col items-center gap-1.5 rounded-2xl p-2 ring-1 transition', form.frame === f.id ? 'bg-white/10 ring-white/40' : 'ring-white/5 hover:bg-white/5')}>
+                <Avatar p={{ ...p, frame: f.id, accent: form.accent || null }} size={48} />
+                <span className="text-center text-[11px] font-bold leading-tight">{f.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-bold">Стиль имени</span>
+          <div className="flex flex-wrap gap-2">
+            {NAME_STYLES.map((n) => (
+              <button key={n.id} onClick={() => setForm({ ...form, name_style: n.id })} className={cn('rounded-2xl px-4 py-2 ring-1 transition', form.name_style === n.id ? 'bg-white/10 ring-white/40' : 'ring-white/5 hover:bg-white/5')}>
+                <span className="text-lg font-extrabold" style={nameStyle(n.id, accentNow)}>
+                  {form.display_name || p.username}
+                </span>
+                <span className="block text-[11px] font-bold text-muted">{n.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-bold">Фон шапки {p.banner_url && <span className="font-semibold text-dim">· виден, когда нет своей обложки</span>}</span>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+            {BANNERS.map((b) => (
+              <button key={b.id} onClick={() => setForm({ ...form, banner_style: b.id })} className={cn('overflow-hidden rounded-2xl ring-2 transition', form.banner_style === b.id ? 'ring-white/70' : 'ring-white/5 hover:ring-white/20')}>
+                <span className="block h-12" style={{ background: b.css(accentNow) }} />
+                <span className="block bg-card-2 py-1 text-[11px] font-bold">{b.label}</span>
+              </button>
+            ))}
+          </div>
+          {p.banner_url && (
+            <button
+              onClick={() => {
+                void updateProfile({ banner_url: null }).then(() => onSaved({ ...p, banner_url: null }))
+              }}
+              className="self-start text-xs font-bold text-muted underline hover:text-white"
+            >
+              Убрать свою обложку
+            </button>
+          )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-bold">Ссылки · только ник, адрес подставится сам</span>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {LINKS.map((l) => (
+              <label key={l.id} className="flex items-center gap-2 rounded-2xl bg-card-2 px-3 ring-1 ring-white/5 focus-within:ring-accent/60">
+                <span className="flex w-28 shrink-0 items-center gap-1.5 text-sm font-bold text-muted">
+                  {l.icon} {l.label}
+                </span>
+                <input
+                  className="h-11 min-w-0 flex-1 bg-transparent font-semibold outline-none"
+                  maxLength={40}
+                  value={form.links[l.id] ?? ''}
+                  onChange={(e) => setForm({ ...form, links: { ...form.links, [l.id]: e.target.value } })}
+                  placeholder={l.id === 'discord' ? 'ник' : 'username'}
+                />
+              </label>
             ))}
           </div>
         </div>
@@ -271,5 +382,45 @@ function LevelBar({ xp, accent }: { xp: number; accent: string }) {
         <span className="block h-full rounded-full" style={{ width: `${Math.round(progress * 100)}%`, background: accent }} />
       </span>
     </Link>
+  )
+}
+
+function Achievements({ p, stats, own, accent }: { p: Profile; stats: ProfileStats; own: boolean; accent: string }) {
+  const all = achievements(stats, p.created_at)
+  const earned = all.filter((a) => a.value >= a.goal)
+  // others see what was earned; the owner also sees what is next and how far it is
+  const list = own ? all : earned
+  if (!list.length) return null
+  return (
+    <Panel>
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <span className="text-xl font-extrabold">Достижения</span>
+        <span className="text-sm font-bold text-muted">
+          {earned.length} из {all.length}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        {list.map((a) => {
+          const done = a.value >= a.goal
+          return (
+            <div key={a.id} title={a.hint} className={cn('flex items-center gap-3 rounded-2xl p-3 ring-1', done ? 'bg-white/[0.06] ring-white/10' : 'ring-white/5')}>
+              <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-2xl', !done && 'opacity-35 grayscale')} style={done ? { background: `${accent}26` } : undefined}>
+                {a.icon}
+              </span>
+              <span className="min-w-0">
+                <span className={cn('block truncate text-sm font-extrabold', !done && 'text-white/50')}>{a.label}</span>
+                {done ? (
+                  <span className="block truncate text-xs text-muted">{a.hint}</span>
+                ) : (
+                  <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-white/10">
+                    <span className="block h-full rounded-full" style={{ width: `${Math.min(100, (a.value / a.goal) * 100)}%`, background: accent }} />
+                  </span>
+                )}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </Panel>
   )
 }

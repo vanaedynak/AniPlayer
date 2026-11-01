@@ -16,6 +16,11 @@ export interface Profile {
   role: 'user' | 'moderator' | 'admin'
   banned_until: string | null
   created_at: string
+  status: string | null
+  frame: 'none' | 'accent' | 'gradient' | 'glow' | 'gold' | 'neon' | 'rainbow' | 'sakura' | 'ice' | 'fire'
+  name_style: 'plain' | 'gradient' | 'glow' | 'rainbow'
+  banner_style: 'accent' | 'sunset' | 'ocean' | 'aurora' | 'sakura' | 'night' | 'fire' | 'mint' | 'cyber' | 'gold'
+  links: Record<string, string>
 }
 
 export interface Comment {
@@ -29,11 +34,11 @@ export interface Comment {
   hidden: boolean
   created_at: string
   edited_at: string | null
-  author?: Pick<Profile, 'username' | 'display_name' | 'avatar_url' | 'role'>
+  author?: Pick<Profile, 'username' | 'display_name' | 'avatar_url' | 'role' | 'frame' | 'accent'>
   liked?: boolean
 }
 
-const PROFILE_FIELDS = 'id,username,display_name,avatar_url,banner_url,bio,accent,favorites,public,role,banned_until,created_at'
+const PROFILE_FIELDS = 'id,username,display_name,avatar_url,banner_url,bio,accent,favorites,public,role,banned_until,created_at,status,frame,name_style,banner_style,links'
 
 function client() {
   const sb = supabase()
@@ -60,7 +65,9 @@ export async function getProfileById(id: string): Promise<Profile | null> {
   return check(await client().from('profiles').select(PROFILE_FIELDS).eq('id', id).maybeSingle()) as Profile | null
 }
 
-export type ProfileEdit = Partial<Pick<Profile, 'display_name' | 'bio' | 'accent' | 'favorites' | 'public' | 'avatar_url' | 'banner_url'>>
+export type ProfileEdit = Partial<
+  Pick<Profile, 'display_name' | 'bio' | 'accent' | 'favorites' | 'public' | 'avatar_url' | 'banner_url' | 'status' | 'frame' | 'name_style' | 'banner_style' | 'links'>
+>
 export async function updateProfile(patch: ProfileEdit) {
   const { sb, uid } = me()
   check(await sb.from('profiles').update(patch).eq('id', uid))
@@ -137,6 +144,7 @@ export interface Place {
   display_name: string | null
   avatar_url: string | null
   accent: string | null
+  frame: Profile['frame']
   role: Profile['role']
   value: number
   me: boolean
@@ -223,7 +231,7 @@ async function attach(list: Comment[]) {
   if (!list.length) return
   const sb = client()
   const ids = [...new Set(list.map((c) => c.user_id))]
-  const people = check(await sb.from('profiles').select('id,username,display_name,avatar_url,role').in('id', ids)) as (Profile & { id: string })[]
+  const people = check(await sb.from('profiles').select('id,username,display_name,avatar_url,role,frame,accent').in('id', ids)) as (Profile & { id: string })[]
   const byId = new Map(people.map((p) => [p.id, p]))
   const c = cloud()
   const liked = c ? new Set((check(await c.sb.from('comment_likes').select('comment_id').in('comment_id', list.map((x) => x.id))) as { comment_id: number }[]).map((l) => l.comment_id)) : new Set<number>()

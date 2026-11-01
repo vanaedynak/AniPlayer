@@ -20,6 +20,18 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now()
 );
 
+-- looks: a status line, an avatar frame, how the name is drawn, a banner gradient when there is no picture,
+-- and links to the user's other pages (their own profile, so links are allowed here, unlike in comments)
+alter table public.profiles add column if not exists status text check (char_length(status) <= 80);
+alter table public.profiles add column if not exists frame text not null default 'none'
+  check (frame in ('none', 'accent', 'gradient', 'glow', 'gold', 'neon', 'rainbow', 'sakura', 'ice', 'fire'));
+alter table public.profiles add column if not exists name_style text not null default 'plain'
+  check (name_style in ('plain', 'gradient', 'glow', 'rainbow'));
+alter table public.profiles add column if not exists banner_style text not null default 'accent'
+  check (banner_style in ('accent', 'sunset', 'ocean', 'aurora', 'sakura', 'night', 'fire', 'mint', 'cyber', 'gold'));
+alter table public.profiles add column if not exists links jsonb not null default '{}'
+  check (jsonb_typeof(links) = 'object' and pg_column_size(links) <= 1024);
+
 create or replace function public.is_staff() returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (select 1 from profiles where id = auth.uid() and role in ('moderator', 'admin'))
@@ -555,8 +567,9 @@ $$;
 -- leaderboards: board = xp | watch | episodes | read | chapters | ln | streak | best_streak | likes | critic,
 -- period = week | month | all. Only public, unbanned profiles are ranked; the caller always gets their own row too.
 
-create or replace function public.leaderboard(board text, period text default 'all', lim integer default 50)
-returns table (place integer, user_id uuid, username text, display_name text, avatar_url text, accent text, role text, value bigint, me boolean)
+drop function if exists public.leaderboard(text, text, integer);
+create function public.leaderboard(board text, period text default 'all', lim integer default 50)
+returns table (place integer, user_id uuid, username text, display_name text, avatar_url text, accent text, frame text, role text, value bigint, me boolean)
 language plpgsql stable security definer set search_path = public as $$
 declare
   since date := case period when 'week' then current_date - 6 when 'month' then current_date - 29 end;
@@ -588,7 +601,7 @@ begin
     from v join profiles p on p.id = v.uid
     where v.val > 0 and ((p.public and (p.banned_until is null or p.banned_until < now())) or v.uid = auth.uid())
   )
-  select r.pos, p.id, p.username, p.display_name, p.avatar_url, p.accent, p.role, r.val, p.id = auth.uid()
+  select r.pos, p.id, p.username, p.display_name, p.avatar_url, p.accent, p.frame, p.role, r.val, p.id = auth.uid()
   from ranked r join profiles p on p.id = r.uid
   where r.pos <= least(greatest(lim, 1), 100) or r.uid = auth.uid()
   order by r.pos, p.username;

@@ -1,6 +1,7 @@
 // Runtime detection + app lifecycle hooks for Electron (Windows) and Capacitor (iPad)
 import { StatusBar, Style } from '@capacitor/status-bar'
 import { flushAll } from './sync'
+import { paletteById, paletteVars } from './palettes'
 
 export type UpdateState =
   | { status: 'idle' | 'checking' | 'latest' }
@@ -107,7 +108,12 @@ export function applyScale(scale: number) {
 
 /** the color theme lives on <html>; the CSS swaps the color tokens */
 export function applyTheme(theme: string | undefined) {
-  document.documentElement.dataset.theme = theme ?? 'anyflow'
+  const p = paletteById(theme)
+  const root = document.documentElement
+  root.dataset.theme = p.id
+  for (const [k, v] of Object.entries(paletteVars(p))) root.style.setProperty(k, v)
+  // the phone's status bar and the browser's address bar follow the background
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', p.bg)
 }
 
 export function initScale(get: () => number, set: (s: number) => void) {
