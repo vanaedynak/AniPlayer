@@ -8,6 +8,7 @@ import {
   Library,
   BarChart3,
   Trophy,
+  Award,
   Settings,
   Search,
   X,
@@ -43,6 +44,7 @@ const NAV = [
   { to: '/manga', label: 'Манга и ранобэ', icon: BookOpen },
   { to: '/stats', label: 'Статистика', icon: BarChart3 },
   { to: '/top', label: 'Топы', icon: Trophy },
+  { to: '/achievements', label: 'Достижения', icon: Award },
   { to: '/downloads', label: 'Загрузки', icon: HardDriveDownload },
 ]
 
@@ -304,6 +306,7 @@ function Sidebar() {
           key={to}
           to={to}
           end={to === '/'}
+          data-nav=""
           className={({ isActive }) =>
             cn(
               'flex items-center gap-4 rounded-2xl border px-5 py-3.5 text-[15px] font-bold transition',
@@ -373,7 +376,9 @@ export default function Layout({ children }: { children: ReactNode }) {
     window.scrollTo({ top: 0 })
   }, [loc.pathname])
   return (
-    <div className="min-h-full" style={{ paddingLeft: 'var(--safe-left)', paddingRight: 'var(--safe-right)' }}>
+    <div className="relative min-h-full" style={{ paddingLeft: 'var(--safe-left)', paddingRight: 'var(--safe-right)' }}>
+      {/* a unique theme's illustration, behind everything */}
+      <div className="theme-art" aria-hidden />
       <Header />
       <div className="flex gap-8">
         <Sidebar />

@@ -6,6 +6,7 @@ import { useSync, signIn, logOut, accountName, deleteAccount } from '../lib/sync
 import { anilistViewer, anilistAuthUrl } from '../lib/anilist'
 import { useStore } from '../lib/store'
 import { PALETTES, unlocked } from '../lib/palettes'
+import { achievementById } from '../lib/achievements'
 import { Panel, PanelTitle } from '../components/ui'
 import { UpdateSettings } from '../components/Updates'
 import { cn } from '../lib/format'
@@ -278,19 +279,27 @@ function InterfaceSettings() {
             <span className="text-xs font-bold tracking-wide text-dim uppercase">{group}</span>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
               {PALETTES.filter((t) => t.group === group).map((t) => {
-                const open = unlocked(t, stats, isStaff(me))
+                const open = unlocked(t, stats && me ? { ...stats, created_at: me.created_at } : null, isStaff(me))
+                const need = t.unlock ? achievementById(t.unlock) : undefined
                 return (
                 <button
                   key={t.id}
                   onClick={() => open && setLocal({ theme: t.id })}
                   disabled={!open}
-                  title={t.unlock ? `Открывается за достижение: ${t.unlock.hint}` : undefined}
+                  title={need ? `Открывается за достижение «${need.label}»: ${need.hint}` : undefined}
                   className={cn('relative overflow-hidden rounded-2xl text-left ring-2 transition', theme === t.id ? 'ring-white/70' : 'ring-white/5 hover:ring-white/20', !open && 'cursor-not-allowed')}
                   style={{ background: t.bg }}
                 >
                   {t.pattern && <span className="absolute inset-0" style={{ backgroundImage: t.pattern, backgroundSize: t.patternSize }} />}
                   {/* a tiny picture of the app in this theme: glow, a card, a button and a line of text */}
-                  <span className="relative block h-16" style={{ background: `radial-gradient(120px 70px at 85% 0%, ${t.accent}55, transparent 70%), radial-gradient(100px 60px at 0% 100%, ${t.pink}33, transparent 70%)` }}>
+                  <span
+                    className={cn('relative block', t.art ? 'h-24' : 'h-16')}
+                    style={{
+                      background: t.art
+                        ? `linear-gradient(90deg, ${t.bg} 10%, transparent 70%), url("${t.art}") right center / cover`
+                        : `radial-gradient(120px 70px at 85% 0%, ${t.accent}55, transparent 70%), radial-gradient(100px 60px at 0% 100%, ${t.pink}33, transparent 70%)`,
+                    }}
+                  >
                     <span className="absolute top-3 left-3 h-9 w-14 rounded-lg" style={{ background: t.card }}>
                       <span className="absolute top-2 left-2 h-1.5 w-8 rounded-full" style={{ background: t.light }} />
                       <span className="absolute top-5 left-2 h-1.5 w-5 rounded-full" style={{ background: t.muted, opacity: 0.6 }} />
@@ -300,7 +309,7 @@ function InterfaceSettings() {
                   <span className="relative flex items-center justify-between gap-2 px-3 py-2 text-sm font-bold" style={{ background: t.card }}>
                     <span className="min-w-0">
                       <span className="block truncate">{t.label}</span>
-                      {t.unlock && <span className="block truncate text-[11px] font-semibold text-white/50">{open ? 'Открыта' : t.unlock.hint}</span>}
+                      {need && <span className="block truncate text-[11px] font-semibold text-white/50">{open ? 'Открыта' : `${need.icon} ${need.hint}`}</span>}
                     </span>
                     {theme === t.id && <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: t.light }} />}
                   </span>

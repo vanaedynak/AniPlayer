@@ -294,7 +294,7 @@ export function Empty({ icon, title, text, action }: { icon: ReactNode; title: s
 }
 
 export function Panel({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('rounded-[28px] border border-white/[0.06] bg-card/80 p-5 sm:p-7', className)}>{children}</div>
+  return <div className={cn('theme-panel rounded-[28px] border border-white/[0.06] bg-card/80 p-5 sm:p-7', className)}>{children}</div>
 }
 
 export function PanelTitle({ icon, title, sub }: { icon: ReactNode; title: string; sub?: string }) {

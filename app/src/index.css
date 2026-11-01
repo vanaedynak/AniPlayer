@@ -167,3 +167,59 @@ input[type="range"].slider::-webkit-slider-thumb { -webkit-appearance: none; wid
 }
 .book table { margin: 1em auto; border-collapse: collapse; }
 .book td, .book th { padding: 0.3em 0.6em; border: 1px solid var(--sub); }
+
+/* ---------------------------------------------------------------------------------------------
+   Unique themes: an illustration behind the page, and each one restyles the menu, panels and titles. */
+
+.theme-art {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--theme-art, none) right top / cover no-repeat;
+  opacity: 0.6;
+  /* the art fades out towards the content column on the left */
+  -webkit-mask-image: linear-gradient(90deg, transparent 8%, rgba(0, 0, 0, 0.55) 45%, #000 85%);
+  mask-image: linear-gradient(90deg, transparent 8%, rgba(0, 0, 0, 0.55) 45%, #000 85%);
+}
+@media (max-width: 1023px) {
+  .theme-art { opacity: 0.38; background-position: 72% top; -webkit-mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.5) 55%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.5) 55%, transparent 100%); }
+}
+.theme-panel { position: relative; }
+
+/* Разведкорпус: leather and stitching, stern titles */
+:root[data-theme="scouts"] .theme-panel { border-radius: 18px; border-color: #d6c7a126; box-shadow: inset 0 0 0 4px #0b0d0a, inset 0 0 0 5px #d6c7a11f; }
+:root[data-theme="scouts"] [data-nav][aria-current="page"] { background: linear-gradient(100deg, #3f6212, #4d7c0f 60%, #65a30d); color: #f5efe0; border-color: #d6c7a155; box-shadow: inset 4px 0 0 #d6c7a1; }
+:root[data-theme="scouts"] h1, :root[data-theme="scouts"] .theme-panel h2 { text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* Деревня Листа: warm orange, a swirl in the panel corner */
+:root[data-theme="leaf"] .theme-panel { overflow: hidden; }
+:root[data-theme="leaf"] .theme-panel::after { content: ""; position: absolute; top: -40px; right: -40px; width: 140px; height: 140px; border-radius: 50%; pointer-events: none; background: repeating-radial-gradient(circle, #ea580c22 0 3px, transparent 3px 14px); }
+:root[data-theme="leaf"] [data-nav][aria-current="page"] { background: linear-gradient(100deg, #c2410c, #ea580c 55%, #f97316); color: #fff; border-color: #fdba7466; box-shadow: 0 8px 24px -10px #ea580c; }
+
+/* Шинигами: sharp corners, a red slash, wide uppercase titles */
+:root[data-theme="shinigami"] .theme-panel { border-radius: 8px; border-color: #ffffff1a; }
+:root[data-theme="shinigami"] .theme-panel::before { content: ""; position: absolute; top: 0; right: 28px; width: 3px; height: 46px; background: #dc2626; transform: skewX(-24deg); box-shadow: 8px 0 0 #f5f5f540; }
+:root[data-theme="shinigami"] [data-nav] { border-radius: 6px; }
+:root[data-theme="shinigami"] [data-nav][aria-current="page"] { background: #f5f5f5; color: #050505; box-shadow: inset 5px 0 0 #dc2626; }
+:root[data-theme="shinigami"] h1 { text-transform: uppercase; letter-spacing: 0.08em; }
+
+/* Охотник на демонов: a checkered strip along the top of every panel */
+:root[data-theme="slayer"] .theme-panel { overflow: hidden; }
+:root[data-theme="slayer"] .theme-panel::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 7px; pointer-events: none; background: conic-gradient(#15803d 25%, #050a07 0 50%, #15803d 0 75%, #050a07 0) 0 0 / 14px 14px; opacity: 0.85; }
+:root[data-theme="slayer"] [data-nav][aria-current="page"] { background: conic-gradient(#166534 25%, #0c1a10 0 50%, #166534 0 75%, #0c1a10 0) 0 0 / 22px 22px; color: #fff; border-color: #86efac55; text-shadow: 0 1px 2px #000; }
+
+/* Проклятая энергия: panels glow from inside, titles give off violet light */
+:root[data-theme="cursed"] .theme-panel { border-color: #6366f144; box-shadow: inset 0 0 40px -18px #6366f1, 0 0 30px -22px #a855f7; }
+:root[data-theme="cursed"] [data-nav][aria-current="page"] { background: linear-gradient(100deg, #312e81, #4338ca 60%, #7c3aed); color: #fff; border-color: #a5b4fc55; box-shadow: 0 0 22px -6px #6366f1; }
+:root[data-theme="cursed"] h1 { text-shadow: 0 0 22px #6366f1aa; }
+
+/* Перерождение: a gilded double frame and storybook titles */
+:root[data-theme="isekai"] .theme-panel { border-color: #fcd34d33; box-shadow: inset 0 0 0 5px #09060f, inset 0 0 0 6px #fcd34d26; }
+:root[data-theme="isekai"] [data-nav][aria-current="page"] { background: linear-gradient(100deg, #5b21b6, #7c3aed); color: #fff7d6; border-color: #fcd34d88; box-shadow: inset 0 0 0 1px #fcd34d55, 0 6px 22px -10px #fcd34d; }
+:root[data-theme="isekai"] h1, :root[data-theme="isekai"] .theme-panel h2 { font-family: Georgia, "Times New Roman", serif; letter-spacing: 0.01em; }
+
+/* Великий путь: a rope along the panel top, straw-yellow highlights */
+:root[data-theme="grandline"] .theme-panel { overflow: hidden; }
+:root[data-theme="grandline"] .theme-panel::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 5px; pointer-events: none; background: repeating-linear-gradient(60deg, #a16207 0 5px, #fde047 5px 8px, #78350f 8px 11px); opacity: 0.8; }
+:root[data-theme="grandline"] [data-nav][aria-current="page"] { background: linear-gradient(100deg, #991b1b, #b91c1c 60%, #dc2626); color: #fff; border-color: #fde04766; box-shadow: inset 0 -3px 0 #fde047; }

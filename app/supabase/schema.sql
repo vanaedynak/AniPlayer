@@ -558,6 +558,9 @@ language sql stable security definer set search_path = public as $$
     'xp', coalesce((select watch_seconds / 60 + read_seconds / 60 + episodes * 5 + chapters * 2 + ln_chapters * 4 from user_totals where user_id = target), 0),
     'completed', (select count(*) from user_docs where user_id = target and kind = 'title' and data ->> 'status' = 'completed'),
     'watching', (select count(*) from user_docs where user_id = target and kind = 'title' and data ->> 'status' = 'watching'),
+    -- MAL ids of the finished titles, for the per-series achievements
+    'completed_ids', (select coalesce(jsonb_agg(distinct (data ->> 'malId')::int), '[]') from user_docs
+                      where user_id = target and kind = 'title' and data ->> 'status' = 'completed' and data ->> 'malId' ~ '^\d{1,9}$'),
     'comments', (select count(*) from comments where user_id = target and not hidden),
     'ratings', (select count(*) from ratings where user_id = target)
   ) end

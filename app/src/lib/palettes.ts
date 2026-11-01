@@ -1,6 +1,15 @@
 // Color themes of the app. Every theme is dark (the interface draws white text everywhere), and differs in
 // the tint of the background, the main accent, the second accent and the glow behind the page.
 // Applied as CSS variables on <html>, which every Tailwind color in the app reads.
+import { achievementById, type Stats } from './achievements'
+// original illustrations for the unique themes (generated for Anyflow; no characters or logos from the series)
+import scoutsArt from '../assets/theme-art/scouts.webp'
+import leafArt from '../assets/theme-art/leaf.webp'
+import shinigamiArt from '../assets/theme-art/shinigami.webp'
+import slayerArt from '../assets/theme-art/slayer.webp'
+import cursedArt from '../assets/theme-art/cursed.webp'
+import isekaiArt from '../assets/theme-art/isekai.webp'
+import grandlineArt from '../assets/theme-art/grandline.webp'
 
 export interface Palette {
   id: string
@@ -15,15 +24,13 @@ export interface Palette {
   light: string
   /** the second color of gradients and badges */
   pink: string
+  /** unique themes: an illustration behind the page (bundled image) */
+  art?: string
   /** a faint ornament over the page (unique themes), with its tile size */
   pattern?: string
   patternSize?: string
-  /** unique themes open with an achievement; the numbers come from the server's counters */
-  unlock?: {
-    stat: 'seconds' | 'episodes' | 'completed' | 'chapters' | 'ln_chapters' | 'best_streak'
-    goal: number
-    hint: string
-  }
+  /** unique themes open with an achievement (its id in lib/achievements) */
+  unlock?: string
 }
 
 export const PALETTES: Palette[] = [
@@ -276,6 +283,7 @@ export const PALETTES: Palette[] = [
   // inspired by well-known series: their colors and a motif, no logos or artwork
   {
     id: 'scouts',
+    art: scoutsArt,
     label: 'Разведкорпус',
     group: 'Уникальные',
     bg: '#0b0d0a',
@@ -285,10 +293,11 @@ export const PALETTES: Palette[] = [
     light: '#d6c7a1',
     pink: '#60a5fa',
     pattern: 'repeating-linear-gradient(135deg, #d6c7a10a 0 2px, transparent 2px 26px), repeating-linear-gradient(45deg, #d6c7a106 0 1px, transparent 1px 52px)',
-    unlock: { stat: 'seconds', goal: 50 * 3600, hint: '50 часов просмотра' },
+    unlock: 'min3000',
   },
   {
     id: 'leaf',
+    art: leafArt,
     label: 'Деревня Листа',
     group: 'Уникальные',
     bg: '#0e0905',
@@ -298,10 +307,11 @@ export const PALETTES: Palette[] = [
     light: '#fdba74',
     pink: '#3b82f6',
     pattern: 'repeating-radial-gradient(circle at 100% 0%, #ea580c12 0 2px, transparent 2px 46px)',
-    unlock: { stat: 'best_streak', goal: 7, hint: '7 дней подряд' },
+    unlock: 'st7',
   },
   {
     id: 'shinigami',
+    art: shinigamiArt,
     label: 'Шинигами',
     group: 'Уникальные',
     bg: '#050505',
@@ -311,10 +321,11 @@ export const PALETTES: Palette[] = [
     light: '#f5f5f5',
     pink: '#f97316',
     pattern: 'linear-gradient(115deg, transparent 46%, #dc26260f 49%, #f5f5f50a 50%, #dc26260f 51%, transparent 54%)',
-    unlock: { stat: 'episodes', goal: 100, hint: '100 серий' },
+    unlock: 'ep100',
   },
   {
     id: 'slayer',
+    art: slayerArt,
     label: 'Охотник на демонов',
     group: 'Уникальные',
     bg: '#050a07',
@@ -325,10 +336,11 @@ export const PALETTES: Palette[] = [
     pink: '#f472b6',
     pattern: 'conic-gradient(#15803d14 25%, transparent 0 50%, #15803d14 0 75%, transparent 0)',
     patternSize: '56px 56px',
-    unlock: { stat: 'completed', goal: 10, hint: '10 аниме просмотрено' },
+    unlock: 'done10',
   },
   {
     id: 'cursed',
+    art: cursedArt,
     label: 'Проклятая энергия',
     group: 'Уникальные',
     bg: '#06050d',
@@ -338,10 +350,11 @@ export const PALETTES: Palette[] = [
     light: '#a5b4fc',
     pink: '#e879f9',
     pattern: 'repeating-conic-gradient(from 0deg at 85% 10%, #6366f10d 0 5deg, transparent 5deg 15deg)',
-    unlock: { stat: 'chapters', goal: 100, hint: '100 глав манги' },
+    unlock: 'ch100',
   },
   {
     id: 'isekai',
+    art: isekaiArt,
     label: 'Перерождение',
     group: 'Уникальные',
     bg: '#09060f',
@@ -351,10 +364,11 @@ export const PALETTES: Palette[] = [
     light: '#fcd34d',
     pink: '#f0abfc',
     pattern: 'repeating-radial-gradient(circle at 50% 38%, #fcd34d0a 0 1px, transparent 1px 36px)',
-    unlock: { stat: 'ln_chapters', goal: 50, hint: '50 глав ранобэ' },
+    unlock: 'ln50',
   },
   {
     id: 'grandline',
+    art: grandlineArt,
     label: 'Великий путь',
     group: 'Уникальные',
     bg: '#040a10',
@@ -364,14 +378,15 @@ export const PALETTES: Palette[] = [
     light: '#fde047',
     pink: '#0ea5e9',
     pattern: 'repeating-radial-gradient(ellipse at 50% 130%, #0ea5e910 0 2px, transparent 2px 28px)',
-    unlock: { stat: 'episodes', goal: 1000, hint: '1000 серий' },
+    unlock: 'ep1000',
   },
 ]
 
 /** whether a unique theme is open for these stats (staff see all of them, to check how they look) */
-export function unlocked(p: Palette, stats: Partial<Record<NonNullable<Palette['unlock']>['stat'], number>> | null, staff = false) {
+export function unlocked(p: Palette, stats: Stats | null, staff = false) {
   if (!p.unlock || staff) return true
-  return (stats?.[p.unlock.stat] ?? 0) >= p.unlock.goal
+  const a = achievementById(p.unlock)
+  return !!a && !!stats && a.value(stats) >= a.goal
 }
 
 const hex = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))
@@ -408,6 +423,7 @@ export function paletteVars(p: Palette): Record<string, string> {
     '--color-aura': p.accent + '1f',
     '--color-aura-2': p.pink + '14',
     '--theme-pattern': p.pattern ?? 'none',
+    '--theme-art': p.art ? `url("${p.art}")` : 'none',
     '--theme-pattern-size': p.patternSize ?? 'auto',
   }
 }

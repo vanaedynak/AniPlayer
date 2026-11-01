@@ -133,6 +133,7 @@ export interface ProfileStats {
   streak: number
   best_streak: number
   xp: number
+  completed_ids: number[]
 }
 
 export type Board = 'xp' | 'watch' | 'episodes' | 'read' | 'chapters' | 'ln' | 'streak' | 'best_streak' | 'likes' | 'critic'

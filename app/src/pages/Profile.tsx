@@ -8,7 +8,8 @@ import { shiki, type ShikiAnime } from '../lib/shikimori'
 import { useStore } from '../lib/store'
 import { useSync } from '../lib/sync'
 import { cn, relTime } from '../lib/format'
-import { FRAMES, NAME_STYLES, BANNERS, LINKS, LinkChips, achievements, bannerCss, nameStyle, cleanLink, type Frame, type NameStyle, type BannerStyle } from '../components/ProfileLook'
+import { RARITY, evaluate } from '../lib/achievements'
+import { FRAMES, NAME_STYLES, BANNERS, LINKS, LinkChips, bannerCss, nameStyle, cleanLink, type Frame, type NameStyle, type BannerStyle } from '../components/ProfileLook'
 
 const ACCENTS = ['#14b8a6', '#38bdf8', '#8b5cf6', '#ec4899', '#f97316', '#eab308', '#22c55e', '#f43f5e']
 
@@ -386,41 +387,41 @@ function LevelBar({ xp, accent }: { xp: number; accent: string }) {
 }
 
 function Achievements({ p, stats, own, accent }: { p: Profile; stats: ProfileStats; own: boolean; accent: string }) {
-  const all = achievements(stats, p.created_at)
-  const earned = all.filter((a) => a.value >= a.goal)
-  // others see what was earned; the owner also sees what is next and how far it is
-  const list = own ? all : earned
-  if (!list.length) return null
+  const all = evaluate({ ...stats, created_at: p.created_at })
+  const earned = all.filter((x) => x.done)
+  // the rarest first: what the profile shows off
+  const order = ['legendary', 'epic', 'rare', 'common']
+  const top = [...earned].sort((a, b) => order.indexOf(a.a.rarity) - order.indexOf(b.a.rarity)).slice(0, 8)
+  if (!earned.length && !own) return null
   return (
     <Panel>
       <div className="mb-4 flex items-baseline justify-between gap-3">
         <span className="text-xl font-extrabold">Достижения</span>
-        <span className="text-sm font-bold text-muted">
-          {earned.length} из {all.length}
-        </span>
+        <Link to={own ? '/achievements' : `/achievements/${p.username}`} className="text-sm font-bold text-accent-2 hover:underline">
+          {earned.length} из {all.length} · все →
+        </Link>
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-        {list.map((a) => {
-          const done = a.value >= a.goal
-          return (
-            <div key={a.id} title={a.hint} className={cn('flex items-center gap-3 rounded-2xl p-3 ring-1', done ? 'bg-white/[0.06] ring-white/10' : 'ring-white/5')}>
-              <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-2xl', !done && 'opacity-35 grayscale')} style={done ? { background: `${accent}26` } : undefined}>
+      {top.length ? (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {top.map(({ a }) => (
+            <div key={a.id} title={a.hint} className="flex items-center gap-3 rounded-2xl bg-white/[0.04] p-3 ring-1" style={{ boxShadow: `inset 0 0 0 1px ${RARITY[a.rarity].color}44` }}>
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-2xl" style={{ background: `${RARITY[a.rarity].color}22` }}>
                 {a.icon}
               </span>
               <span className="min-w-0">
-                <span className={cn('block truncate text-sm font-extrabold', !done && 'text-white/50')}>{a.label}</span>
-                {done ? (
-                  <span className="block truncate text-xs text-muted">{a.hint}</span>
-                ) : (
-                  <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-white/10">
-                    <span className="block h-full rounded-full" style={{ width: `${Math.min(100, (a.value / a.goal) * 100)}%`, background: accent }} />
-                  </span>
-                )}
+                <span className="block truncate text-sm font-extrabold">{a.label}</span>
+                <span className="block truncate text-xs font-bold" style={{ color: RARITY[a.rarity].color }}>
+                  {RARITY[a.rarity].label}
+                </span>
               </span>
             </div>
-          )
-        })}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <Link to="/achievements" className="block rounded-2xl bg-white/[0.04] px-4 py-3 text-sm font-semibold text-muted ring-1 ring-white/5 hover:text-white" style={{ borderColor: accent }}>
+          Первые достижения откроются после первой серии или главы — посмотрите, что можно получить
+        </Link>
+      )}
     </Panel>
   )
 }
