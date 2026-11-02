@@ -21,7 +21,7 @@ import {
   Loader2,
   Sparkles,
 } from 'lucide-react'
-import { episodePreview, aniskip, type Episode, type Release } from '../lib/api'
+import { episodePreview, aniskip, sortedEpisodes, type Episode, type Release } from '../lib/api'
 import { useStore, getProgress, progressKey, WATCHED_RATIO } from '../lib/store'
 import { waitForFirstSync } from '../lib/sync'
 import { anilistReportEpisode } from '../lib/anilist'
@@ -87,7 +87,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
   const [error, setError] = useState('')
 
   // per-episode session bookkeeping (refs: no re-render needed)
-  const session = useRef({ played: 0, lastMedia: -1, pendingWatch: 0, reported: false, skippedOp: false, skippedEd: false, lastSave: 0 })
+  const session = useRef({ played: 0, lastMedia: -1, pendingWatch: 0, reported: false, skippedOp: false, skippedEd: false, lastSave: 0, ended: false })
   const resumeAt = useRef<number | null>(null)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
@@ -98,9 +98,26 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
   useEffect(() => {
     setExtSkip({})
     const mal = release.mal?.id
-    if (!mal || (ownOp && ownEd)) return
+    if (ownOp && ownEd) return
     let alive = true
-    aniskip(mal, Math.floor(episode.ordinal), episode.duration ?? 0).then((r) => alive && setExtSkip(r))
+    const len = episode.duration ?? 0
+    void (async () => {
+      const r = mal ? await aniskip(mal, Math.floor(episode.ordinal), len) : {}
+      if (!alive) return
+      setExtSkip(r)
+      if (ownEd || r.ed || !len) return
+      // nobody marked this episode's ending: a neighbour of the same length has the same ending in the same place
+      const eps = sortedEpisodes(release)
+      const i = eps.findIndex((e) => e.id === episode.id)
+      for (const j of [i - 1, i + 1, i - 2, i + 2]) {
+        const n = eps[j]
+        if (!n?.duration || Math.abs(n.duration - len) > 3) continue
+        const own = n.ending?.start != null && n.ending?.stop ? { start: n.ending.start, stop: n.ending.stop } : null
+        const ed = own ?? (mal ? (await aniskip(mal, Math.floor(n.ordinal), n.duration)).ed : undefined)
+        if (!alive) return
+        if (ed && ed.stop <= len) return setExtSkip((s) => ({ ...s, ed }))
+      }
+    })()
     return () => {
       alive = false
     }
@@ -256,7 +273,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
 
   // new episode → reset session, save the old one on the way out
   useEffect(() => {
-    session.current = { played: 0, lastMedia: -1, pendingWatch: 0, reported: false, skippedOp: false, skippedEd: false, lastSave: 0 }
+    session.current = { played: 0, lastMedia: -1, pendingWatch: 0, reported: false, skippedOp: false, skippedEd: false, lastSave: 0, ended: false }
     setCountdown(null)
     setAutoSkip(null)
     setTime(0)
@@ -473,10 +490,13 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
     if (ed && t < ed.start! - 1) s.skippedEd = false
     setAutoSkip((a) => (a && ((a.kind === 'op' && !inOpNow) || (a.kind === 'ed' && !inEdNow)) ? null : a))
     const d = v.duration
+    if (d && t < d - 3) s.ended = false
     if (d && (t / d >= WATCHED_RATIO || (ed && t >= ed.start!))) markWatched()
   }
 
   const onEnded = () => {
+    if (session.current.ended) return
+    session.current.ended = true
     save(true)
     markWatched()
     if (next && useStore.getState().prefs.autoNext) setCountdown(5)
@@ -662,7 +682,12 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
           save(true)
           report()
         }}
-        onWaiting={() => setWaiting(true)}
+        onWaiting={(e) => {
+          setWaiting(true)
+          // the stream can stop a moment short of its stated length and never say "ended"
+          const v = e.currentTarget
+          if (v.duration && v.currentTime >= v.duration - 1.5) onEnded()
+        }}
         onCanPlay={() => setWaiting(false)}
         onPlaying={() => setWaiting(false)}
         onLoadedMetadata={(e) => {

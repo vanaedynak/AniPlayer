@@ -395,7 +395,8 @@ export default function Layout({ children }: { children: ReactNode }) {
       <div className="flex gap-8">
         <Sidebar />
         <main ref={mainRef} className="min-w-0 flex-1 px-4 pt-4 pb-28 sm:px-6 lg:pr-10 lg:pb-12 lg:pl-0">
-          <CrashGuard key={loc.pathname}>{children}</CrashGuard>
+          {/* the next episode stays on the same page: a remount would drop fullscreen on every auto-next */}
+          <CrashGuard key={loc.pathname.replace(/^(\/watch\/[^/]+)\/.*/, '$1')}>{children}</CrashGuard>
         </main>
       </div>
       <TabBar />
