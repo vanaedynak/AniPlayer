@@ -27,7 +27,8 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: app/package-lock.json
-      - run: npm ci
+      # the torrent engine's native modules are desktop only; their install scripts (prebuilt downloads) are not needed here
+      - run: npm ci --ignore-scripts
       - run: npm version 1.0.${{ github.run_number }} --no-git-tag-version
       - run: npm run build
 
@@ -93,7 +94,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm version 1.0.${{ github.run_number }} --no-git-tag-version
       - run: npm run build
 
