@@ -30,6 +30,12 @@ contextBridge.exposeInMainWorld('aniplayer', {
     open(id) {
       return ipcRenderer.invoke('torrent-open', id)
     },
+    openMagnet(uri) {
+      return ipcRenderer.invoke('torrent-open-magnet', uri)
+    },
+    openFile(bytes) {
+      return ipcRenderer.invoke('torrent-open-file', bytes)
+    },
     stats(hash, index) {
       return ipcRenderer.invoke('torrent-stats', hash, index)
     },

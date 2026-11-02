@@ -21,9 +21,30 @@ import {
   Loader2,
   Sparkles,
   Magnet,
+  X,
 } from 'lucide-react'
 import { api, episodePreview, aniskip, sortedEpisodes, type Episode, type Release, type Torrent } from '../lib/api'
-import { torrentSupported, torrentsFor, torrentTitle, torrentHint, episodeFile, type TorrentFile } from '../lib/torrent'
+import {
+  torrentSupported,
+  torrentsFor,
+  torrentTitle,
+  torrentHint,
+  episodeFile,
+  episodeOf,
+  anilibriaSource,
+  userSource,
+  subsFor,
+  decodeText,
+  parseSubs,
+  embeddedCues,
+  trackLabel,
+  type TorSource,
+  type TorrentInfo,
+  type TorrentVideo,
+  type EmbeddedSubs,
+  type Cue,
+} from '../lib/torrent'
+import { TorrentOpenForm } from './TorrentOpen'
 import { useStore, getProgress, progressKey, WATCHED_RATIO } from '../lib/store'
 import { waitForFirstSync } from '../lib/sync'
 import { anilistReportEpisode } from '../lib/anilist'
@@ -35,7 +56,7 @@ import { useRoom } from '../lib/room'
 import { startUpscale, upscaleSupported, UPSCALE_MODES, type UpscaleMode, type Upscaler } from '../lib/upscale'
 
 type Quality = '480' | '720' | '1080'
-type Menu = 'main' | 'quality' | 'speed' | 'upscale'
+type Menu = 'main' | 'quality' | 'speed' | 'upscale' | 'audio' | 'subs'
 const QUALITIES: Quality[] = ['1080', '720', '480']
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 const AUTO_SKIP_MS = 5000
@@ -46,7 +67,19 @@ interface Props {
   next?: Episode
   prev?: Episode
   onSelect: (e: Episode) => void
+  /** a torrent to play instead of AniLibria's stream (the standalone torrent player) */
+  source?: TorSource
+  /** nothing is saved: no progress, history or watched marks (a torrent with no title behind it) */
+  ephemeral?: boolean
 }
+
+/** the torrent file of an episode: the standalone player names it in the episode id, a title by its number */
+function fileFor(info: TorrentInfo, ep: Episode): TorrentVideo | null {
+  if (ep.id.startsWith('tf:')) return info.files.find((f) => `tf:${f.index}` === ep.id) ?? null
+  return episodeFile(info.files, ep.ordinal)
+}
+
+type SubPick = { kind: 'emb'; track: number } | { kind: 'ext'; suffix: string } | null
 
 function sourceFor(ep: Episode, q: Quality): { url: string; q: Quality } | null {
   const order = [q, ...QUALITIES.filter((x) => x !== q)]
@@ -64,9 +97,12 @@ function torSpan(bps: number, t: number): [number, number] {
   return [at, at + Math.max(24 * MB, 30 * bps)]
 }
 
+const samePick = (a: SubPick, b: SubPick) =>
+  a === b || (!!a && !!b && a.kind === b.kind && (a.kind === 'emb' ? a.track === (b as { track: number }).track : a.suffix === (b as { suffix: string }).suffix))
+
 const nativeHls = () => isIOS && !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl')
 
-export default function Player({ release, episode, next, prev, onSelect }: Props) {
+export default function Player({ release, episode, next, prev, onSelect, source, ephemeral }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const hlsRef = useRef<Hls | null>(null)
@@ -139,20 +175,23 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
 
   // ---------- torrent (desktop): AniLibria's own release at full bitrate, downloaded in playback order ----------
   const [torrents, setTorrents] = useState<Torrent[]>([])
-  const [tor, setTor] = useState<Torrent | null>(null)
+  const [tor, setTor] = useState<TorSource | null>(source ?? null)
   const [torStats, setTorStats] = useState<{ peers: number; down: number } | null>(null)
   // live: the picture comes from the torrent now; warm: share of the bytes around the playhead already there
   const [torLive, setTorLive] = useState(false)
   const [torWarm, setTorWarm] = useState<number | null>(null)
   const torFile = useRef<{ hash: string; index: number } | null>(null)
-  const torInfo = useRef<{ id: number; info: Promise<{ infoHash: string; files: TorrentFile[] }> } | null>(null)
+  const torInfo = useRef<{ key: string; info: Promise<TorrentInfo> } | null>(null)
+  // the torrent file on screen (or about to be): its dubs and subtitles are offered in the menu
+  const [torCur, setTorCur] = useState<{ info: TorrentInfo; file: TorrentVideo } | null>(null)
+  const [ownOpen, setOwnOpen] = useState(false)
   // AniLibria's stream plays while the torrent fetches the bytes around the playhead; then the source swaps
   const pending = useRef<{ url: string; hash: string; index: number; bps: number; warmedTo: number } | null>(null)
   const nextWarm = useRef('')
   const nextRef = useRef(next)
   nextRef.current = next
   useEffect(() => {
-    if (!torrentSupported()) return
+    if (!torrentSupported() || source) return
     let alive = true
     api
       .torrents(release.id)
@@ -171,6 +210,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
       torFile.current = null
       torInfo.current = null
       pending.current = null
+      setTorCur(null)
       if (f) void window.aniplayer?.torrent?.drop(f.hash)
       return
     }
@@ -200,11 +240,11 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
       // the next episode's opening bytes, fetched well before the end: auto-next starts in the torrent at once
       const n = nextRef.current
       const d = v.duration
-      const key = n ? `${tor.id}:${n.ordinal}` : ''
+      const key = n ? `${tor.key}:${n.id}` : ''
       if (!n || !d || v.currentTime < d * 0.5 || nextWarm.current === key || !torInfo.current) return
       nextWarm.current = key
       const info = await torInfo.current.info.catch(() => null)
-      const nf = info && episodeFile(info.files, n.ordinal)
+      const nf = info && fileFor(info, n)
       if (nf) {
         const [a, b] = torSpan(nf.length / (n.duration || d), 0)
         void bridge.warm(info.infoHash, nf.index, a, b)
@@ -217,12 +257,12 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
   // the torrent picked last comes back on its own, for any title that has the same kind
   useEffect(() => {
     const want = local.torrent
-    if (tor || !want) return
+    if (tor || !want || source) return
     const t = episodeTorrents.find((x) => torrentTitle(x) === want)
     if (!t) return
     const v = videoRef.current
     if (v && v.currentTime > 0) resumeAt.current = v.currentTime
-    setTor(t)
+    setTor(anilibriaSource(t))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [episodeTorrents])
   useEffect(
@@ -288,7 +328,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
   const save = useCallback(
     (force = false) => {
       const v = videoRef.current
-      if (!v || session.current.played < 3 || !v.duration) return
+      if (ephemeral || !v || session.current.played < 3 || !v.duration) return
       useStore.getState().saveProgress(
         {
           releaseId: release.id,
@@ -320,7 +360,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
     const off = downloaded(release.id, episode.ordinal)
     const src = off ? { url: offlineUrl(off.key), q: off.quality } : sourceFor(episode, quality)
     // a torrent without this episode (another season's part) hands it back to AniLibria's stream
-    if (tor && !off && !episodeTorrents.some((t) => t.id === tor.id)) {
+    if (tor?.anilibria && !off && !episodeTorrents.some((t) => t.id === tor.anilibria!.id)) {
       setTor(null)
       return
     }
@@ -358,12 +398,13 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
       if (useTor) {
         const bridge = window.aniplayer!.torrent!
         try {
-          if (torInfo.current?.id !== useTor.id) torInfo.current = { id: useTor.id, info: bridge.open(useTor.id) }
+          if (torInfo.current?.key !== useTor.key) torInfo.current = { key: useTor.key, info: useTor.open() }
           const info = await torInfo.current.info
           if (cancelled) return
-          const f = episodeFile(info.files, episode.ordinal)
-          if (!f) throw new Error('в раздаче нет файла этой серии')
+          const f = fileFor(info, episode)
+          if (!f) throw new Error(`в раздаче не нашлось ${fmtOrdinal(episode.ordinal)} серии`)
           torFile.current = { hash: info.infoHash, index: f.index }
+          setTorCur({ info, file: f })
           const bps = f.length / (episode.duration || v.duration || 1440)
           const [a, b] = torSpan(bps, startAt)
           // already fetched (the next episode, warmed up during this one): straight from the torrent
@@ -380,7 +421,10 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
         } catch (e) {
           if (cancelled) return
           torInfo.current = null
-          setToast({ text: `Торрент не открылся: ${e instanceof Error ? e.message : e}` })
+          const msg = e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e)
+          // the standalone player has nothing to fall back on
+          if (source) return setError(`Торрент не открылся: ${msg}`)
+          setToast({ text: `Торрент не открылся: ${msg}` })
           resumeAt.current = startAt
           setTor(null)
           return
@@ -583,10 +627,92 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
 
   const pickTorrent = (t: Torrent) => {
     resumeAt.current = videoRef.current?.currentTime ?? 0
-    setTor(t)
+    setTor(anilibriaSource(t))
     setLocal({ torrent: torrentTitle(t) })
     setMenu(null)
   }
+
+  // a magnet link or .torrent file of the user's own: its episodes are found by number
+  const openOwn = (info: TorrentInfo) => {
+    setOwnOpen(false)
+    if (!fileFor(info, episode)) {
+      setToast({ text: `В раздаче не нашлось ${fmtOrdinal(episode.ordinal)} серии` })
+      return
+    }
+    resumeAt.current = videoRef.current?.currentTime ?? 0
+    setTor(userSource(info))
+  }
+
+  // ---------- dubs inside the file (Electron turns on video.audioTracks) ----------
+  type ATrack = { enabled: boolean; label: string; language: string }
+  const [audio, setAudio] = useState<{ list: { label: string }[]; cur: number }>({ list: [], cur: 0 })
+  const audioPick = useRef<string | null>(null)
+  const readAudio = useCallback(() => {
+    const tracks = (videoRef.current as (HTMLVideoElement & { audioTracks?: ArrayLike<ATrack> }) | null)?.audioTracks
+    if (!tracks) return setAudio({ list: [], cur: 0 })
+    const list = Array.from(tracks).map((t, i) => ({ label: trackLabel(t.label, t.language, `Дорожка ${i + 1}`) }))
+    // the dub picked in an earlier episode stays picked
+    const want = audioPick.current ? list.findIndex((t) => t.label === audioPick.current) : -1
+    if (want >= 0 && !tracks[want].enabled) Array.from(tracks).forEach((t, i) => (t.enabled = i === want))
+    setAudio({ list, cur: Math.max(0, Array.from(tracks).findIndex((t) => t.enabled)) })
+  }, [])
+  const selectAudio = (i: number) => {
+    const tracks = (videoRef.current as (HTMLVideoElement & { audioTracks?: ArrayLike<ATrack> }) | null)?.audioTracks
+    if (!tracks) return
+    Array.from(tracks).forEach((t, j) => (t.enabled = j === i))
+    audioPick.current = audio.list[i]?.label ?? null
+    setAudio((a) => ({ ...a, cur: i }))
+    setMenu(null)
+  }
+
+  // ---------- subtitles: inside the mkv (read out of the stream) or files next to it ----------
+  const [embedded, setEmbedded] = useState<EmbeddedSubs | null>(null)
+  const [subPick, setSubPick] = useState<SubPick>(null)
+  const [extCues, setExtCues] = useState<Cue[]>([])
+  const extSubs = useMemo(() => (torCur ? subsFor(torCur.info, torCur.file, episode.id.startsWith('tf:') ? episodeOf(torCur.file.name) : episode.ordinal) : []), [torCur, episode])
+  // the same kind of subtitle file in every episode ("Show - 01.rus.ass", "Show - 02.rus.ass"): numbers aside, one name
+  const extKey = (name: string) => name.replace(/\d+/g, '#')
+  useEffect(() => {
+    setEmbedded(null)
+    if (!torCur || !torLive || !/\.mkv$/i.test(torCur.file.name)) return
+    let alive = true
+    const url = torCur.file.subs
+    const load = () =>
+      fetch(url)
+        .then((r) => r.json())
+        .then((e: EmbeddedSubs) => alive && setEmbedded(e))
+        .catch(() => {})
+    void load()
+    const id = setInterval(load, 3000)
+    return () => {
+      alive = false
+      clearInterval(id)
+    }
+  }, [torCur, torLive])
+  useEffect(() => {
+    setExtCues([])
+    if (subPick?.kind !== 'ext' || !torCur) return
+    const f = extSubs.find((x) => extKey(x.name) === subPick.suffix) ?? (extSubs.length === 1 ? extSubs[0] : undefined)
+    if (!f) return
+    let alive = true
+    fetch(f.url)
+      .then((r) => r.arrayBuffer())
+      .then((b) => alive && setExtCues(parseSubs(f.name, decodeText(b))))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subPick, extSubs])
+  const cues = useMemo(() => (subPick?.kind === 'emb' ? (embedded ? embeddedCues(embedded, subPick.track) : []) : subPick?.kind === 'ext' ? extCues : []), [subPick, embedded, extCues])
+  const subTracks = useMemo(
+    () => [
+      ...(embedded?.tracks ?? []).map((t) => ({ pick: { kind: 'emb', track: t.number } as SubPick, label: trackLabel(t.name, t.language, `Дорожка ${t.number}`) })),
+      ...extSubs.map((f) => ({ pick: { kind: 'ext', suffix: extKey(f.name) } as SubPick, label: f.name })),
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [embedded, extSubs],
+  )
 
   // the bytes around the playhead are on disk: the same second continues from the torrent
   function swapToTorrent(p: NonNullable<typeof pending.current>) {
@@ -608,6 +734,8 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
     setTorWarm(null)
   }
 
+  const subLine = cues.filter((c) => time >= c.start && time < c.end).map((c) => c.text)
+
   const goNext = useCallback(() => {
     if (next) {
       save(true)
@@ -618,7 +746,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
   // ---------- media events ----------
   const markWatched = useCallback(() => {
     const s = session.current
-    if (s.reported) return
+    if (s.reported || ephemeral) return
     s.reported = true
     const v = videoRef.current
     useStore.getState().setWatched(release.id, episode.ordinal, true, v?.duration)
@@ -869,6 +997,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
         onLoadedMetadata={(e) => {
           setDuration(e.currentTarget.duration)
           trackSize(e.currentTarget)
+          readAudio()
         }}
         onResize={(e) => trackSize(e.currentTarget)}
         onDurationChange={(e) => setDuration(e.currentTarget.duration)}
@@ -917,9 +1046,9 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
       )}
 
       {error && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 text-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 px-6 text-center">
           <p className="text-lg font-semibold">{error}</p>
-          <button
+          {!source && <button
             className="rounded-full bg-white px-5 py-2 text-sm font-bold text-black"
             onClick={() => {
               resumeAt.current = videoRef.current?.currentTime ?? 0
@@ -928,7 +1057,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
             }}
           >
             {tor ? 'Смотреть с AniLibria' : 'Попробовать другое качество'}
-          </button>
+          </button>}
         </div>
       )}
 
@@ -956,12 +1085,44 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
         </div>
         {tor && (
           <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-white/70">
-            <Magnet size={13} className="text-accent-2" /> Торрент · {torrentTitle(tor)}
+            <Magnet size={13} className="text-accent-2" /> Торрент · <span className="max-w-[40ch] truncate">{tor.title}</span>
             {!torLive && torWarm != null && ` · готовим, ${Math.round(torWarm * 100)}%`}
             {torStats && ` · ${torStats.peers} пир. · ${(torStats.down / 1024 ** 2).toFixed(1)} МБ/с`}
           </div>
         )}
       </div>
+
+      {/* subtitles */}
+      {subLine.length > 0 && (
+        <div
+          className="pointer-events-none absolute inset-x-0 flex justify-center px-[6%] text-center transition-[bottom] duration-300"
+          style={{ bottom: controls || menu ? 150 : '6%' }}
+        >
+          <div className="text-[clamp(15px,4.6cqh,46px)] leading-tight font-bold whitespace-pre-line text-white [text-shadow:0_0_3px_#000,0_0_3px_#000,0_2px_6px_#000]">
+            {subLine.join('\n')}
+          </div>
+        </div>
+      )}
+
+      {/* own torrent: a magnet link or a .torrent file */}
+      {ownOpen && (
+        <div className="animate-fade-in absolute inset-0 z-10 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" onPointerUp={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-lg rounded-3xl bg-card p-5 ring-1 ring-white/10">
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-lg font-extrabold">
+                <Magnet size={18} className="text-accent-2" /> Свой торрент
+              </div>
+              <button onClick={() => setOwnOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10" aria-label="Закрыть">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="mb-4 text-sm text-white/60">
+              Вставьте magnet-ссылку или выберите .torrent файл. Серии найдутся по номерам в именах файлов, озвучка и субтитры из MKV — в настройках плеера.
+            </p>
+            <TorrentOpenForm onOpen={openOwn} />
+          </div>
+        </div>
+      )}
 
       {/* toast */}
       {toast && (
@@ -1112,6 +1273,23 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
                 torrents={episodeTorrents}
                 tor={tor}
                 pickTorrent={pickTorrent}
+                hasStream={!source}
+                onOwn={
+                  torrentSupported() && !source
+                    ? () => {
+                        setMenu(null)
+                        setOwnOpen(true)
+                      }
+                    : undefined
+                }
+                audio={audio}
+                selectAudio={selectAudio}
+                subTracks={subTracks}
+                subPick={subPick}
+                setSubPick={(p) => {
+                  setSubPick(p)
+                  setMenu(null)
+                }}
                 rate={local.rate}
                 setRate={setRate}
                 upscale={upscaleMode}
@@ -1126,7 +1304,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
                 <Settings size={19} className={cn('transition-transform duration-300', menu && 'rotate-45')} />
               </CtrlBtn>
               <span className="hidden items-center gap-1 px-1.5 text-xs font-bold text-white/70 sm:flex">
-                {offline ? 'Скачано' : `${quality}p`}
+                {offline ? 'Скачано' : torLive ? 'Торрент' : `${quality}p`}
                 {upscaled && (
                   <span
                     className="flex items-center gap-0.5 rounded-md bg-gradient-to-r from-accent to-pink px-1.5 py-0.5 text-[10px] font-extrabold text-white"
@@ -1231,6 +1409,13 @@ function SettingsMenu({
   torrents,
   tor,
   pickTorrent,
+  hasStream,
+  onOwn,
+  audio,
+  selectAudio,
+  subTracks,
+  subPick,
+  setSubPick,
   rate,
   setRate,
   upscale,
@@ -1242,8 +1427,15 @@ function SettingsMenu({
   quality: Quality
   changeQuality: (q: Quality) => void
   torrents: Torrent[]
-  tor: Torrent | null
+  tor: TorSource | null
   pickTorrent: (t: Torrent) => void
+  hasStream: boolean
+  onOwn?: () => void
+  audio: { list: { label: string }[]; cur: number }
+  selectAudio: (i: number) => void
+  subTracks: { pick: SubPick; label: string }[]
+  subPick: SubPick
+  setSubPick: (p: SubPick) => void
   rate: number
   setRate: (r: number) => void
   upscale: UpscaleMode
@@ -1279,7 +1471,11 @@ function SettingsMenu({
     >
       {menu === 'main' && (
         <>
-          <Row label="Качество" value={tor ? `Торрент ${tor.quality?.value ?? ''}` : `${quality}p`} onClick={() => setMenu('quality')} />
+          {hasStream && <Row label="Качество" value={tor ? 'Торрент' : `${quality}p`} onClick={() => setMenu('quality')} />}
+          {audio.list.length > 1 && <Row label="Озвучка" value={audio.list[audio.cur]?.label ?? ''} onClick={() => setMenu('audio')} />}
+          {subTracks.length > 0 && (
+            <Row label="Субтитры" value={subPick ? (subTracks.find((t) => samePick(t.pick, subPick))?.label ?? 'Вкл') : 'Выкл'} onClick={() => setMenu('subs')} />
+          )}
           <Row label="Скорость" value={rate === 1 ? 'Обычная' : `${rate}×`} onClick={() => setMenu('speed')} />
           {upscaleSupported() ? (
             <Row label="Апскейл Anime4K" value={UPSCALE_MODES.find((m) => m.id === upscale)!.label} onClick={() => setMenu('upscale')} />
@@ -1317,10 +1513,21 @@ function SettingsMenu({
                     <span className="block font-semibold">{torrentTitle(t)}</span>
                     <span className="block text-xs text-white/50">{torrentHint(t)}</span>
                   </span>
-                  {tor?.id === t.id && <Check size={18} className="shrink-0 text-accent-2" />}
+                  {tor?.anilibria?.id === t.id && <Check size={18} className="shrink-0 text-accent-2" />}
                 </button>
               ))}
             </>
+          )}
+          {onOwn && (
+            <button className="mt-1 flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-white/10" onClick={onOwn}>
+              <span>
+                <span className="flex items-center gap-1.5 font-semibold">
+                  <Magnet size={14} /> Свой торрент
+                </span>
+                <span className="block text-xs text-white/50">{tor && !tor.anilibria ? tor.title : 'Magnet-ссылка или файл .torrent'}</span>
+              </span>
+              {tor && !tor.anilibria ? <Check size={18} className="shrink-0 text-accent-2" /> : <ChevronRight size={16} className="text-white/60" />}
+            </button>
           )}
         </>
       )}
@@ -1338,6 +1545,28 @@ function SettingsMenu({
                 <span className="block text-xs text-white/50">{m.hint}</span>
               </span>
               {m.id === upscale && <Check size={18} className="shrink-0 text-accent-2" />}
+            </button>
+          ))}
+        </>
+      )}
+      {menu === 'audio' && (
+        <>
+          <Back title="Озвучка" />
+          {audio.list.map((t, i) => (
+            <button key={i} className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left hover:bg-white/10" onClick={() => selectAudio(i)}>
+              <span className="font-semibold">{t.label}</span>
+              {i === audio.cur && <Check size={18} className="shrink-0 text-accent-2" />}
+            </button>
+          ))}
+        </>
+      )}
+      {menu === 'subs' && (
+        <>
+          <Back title="Субтитры" />
+          {[{ pick: null as SubPick, label: 'Выкл' }, ...subTracks].map((t, i) => (
+            <button key={i} className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left hover:bg-white/10" onClick={() => setSubPick(t.pick)}>
+              <span className="min-w-0 truncate font-semibold">{t.label}</span>
+              {samePick(t.pick, subPick) && <Check size={18} className="shrink-0 text-accent-2" />}
             </button>
           ))}
         </>

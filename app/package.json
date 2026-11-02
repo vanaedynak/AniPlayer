@@ -27,6 +27,7 @@
     "firebase": "^13.1.0",
     "hls.js": "^1.7.4",
     "lucide-react": "^1.64.0",
+    "matroska-subtitles": "^3.3.2",
     "onnxruntime-web": "^1.18.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   Home,
+  Magnet,
   LayoutGrid,
   CalendarDays,
   History,
@@ -48,6 +49,8 @@ const NAV = [
   { to: '/top', label: 'Топы', icon: Trophy },
   { to: '/achievements', label: 'Достижения', icon: Award },
   { to: '/downloads', label: 'Загрузки', icon: HardDriveDownload },
+  // own torrents stream only in the desktop app
+  ...(window.aniplayer?.torrent ? [{ to: '/torrent', label: 'Торрент-плеер', icon: Magnet }] : []),
 ]
 
 const TABS = [

@@ -64,6 +64,8 @@ function createWindow() {
       sandbox: false,
       autoplayPolicy: 'no-user-gesture-required',
       backgroundThrottling: false,
+      // video.audioTracks: a BDRip mkv carries several dubs, the player lets you pick one
+      enableBlinkFeatures: 'AudioVideoTracks',
     },
   })
   if (state.maximized) win.maximize()
@@ -150,11 +152,10 @@ ipcMain.on('close-ok', () => win && !win.isDestroyed() && win.destroy())
 // Torrent streaming (AniLibria's own torrents): loaded on first use, pieces live in a temp folder until the app quits
 let torrent = null
 const tor = () => (torrent ??= require('./torrent.cjs'))
-ipcMain.handle('torrent-open', async (_e, id) => {
-  const t = tor()
-  const info = await t.open(id)
-  return { ...info, files: info.files.map((f) => ({ ...f, url: t.streamUrl(info.infoHash, f.index) })) }
-})
+ipcMain.handle('torrent-open', async (_e, id) => tor().withUrls(await tor().open(id)))
+// any torrent the user brings: a pasted magnet link or a picked .torrent file
+ipcMain.handle('torrent-open-magnet', async (_e, uri) => tor().withUrls(await tor().openMagnet(uri)))
+ipcMain.handle('torrent-open-file', async (_e, bytes) => tor().withUrls(await tor().openFile(bytes)))
 ipcMain.handle('torrent-stats', (_e, hash, index) => tor().stats(hash, index))
 ipcMain.handle('torrent-drop', (_e, hash) => tor().drop(hash))
 ipcMain.handle('torrent-warm', (_e, hash, index, from, to) => tor().warm(hash, index, from, to))

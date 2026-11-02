@@ -12,6 +12,7 @@ import Collection from './pages/Collection'
 import Stats from './pages/Stats'
 import Settings from './pages/Settings'
 import Downloads from './pages/Downloads'
+import TorrentPlayer from './pages/TorrentPlayer'
 import MangaHome from './manga/MangaHome'
 import MangaTitle from './manga/MangaTitle'
 import MangaReader from './manga/Reader'
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="/achievements/:username" element={<Achievements />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/downloads" element={<Downloads />} />
+          <Route path="/torrent" element={<TorrentPlayer />} />
           <Route path="/manga" element={<MangaHome />} />
           <Route path="/manga/:id" element={<MangaTitle />} />
           <Route path="/manga/read/:id/:chapterId" element={<MangaReader />} />

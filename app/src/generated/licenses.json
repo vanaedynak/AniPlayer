@@ -780,6 +780,12 @@
   "url": "https://github.com/lovell/detect-libc"
  },
  {
+  "name": "ebml-stream",
+  "version": "1.0.3",
+  "license": "MIT",
+  "url": "https://github.com/austinleroy/node-ebml#readme"
+ },
+ {
   "name": "electron-updater",
   "version": "6.8.11",
   "license": "MIT",
@@ -1188,6 +1194,12 @@
   "url": "https://github.com/webtorrent/magnet-uri"
  },
  {
+  "name": "matroska-subtitles",
+  "version": "3.3.2",
+  "license": "MIT",
+  "url": "https://github.com/mathiasvr/matroska-subtitles#readme"
+ },
+ {
   "name": "memory-chunk-store",
   "version": "1.3.5",
   "license": "MIT",
@@ -1312,6 +1324,12 @@
   "version": "1.18.0",
   "license": "MIT",
   "url": "https://github.com/Microsoft/onnxruntime"
+ },
+ {
+  "name": "pako",
+  "version": "2.2.0",
+  "license": "(MIT AND Zlib)",
+  "url": "nodeca/pako"
  },
  {
   "name": "parse-torrent",

@@ -2,6 +2,7 @@
 import { StatusBar, Style } from '@capacitor/status-bar'
 import { flushAll } from './sync'
 import { paletteById, paletteVars } from './palettes'
+import type { TorrentInfo } from './torrent'
 
 export type UpdateState =
   | { status: 'idle' | 'checking' | 'latest' }
@@ -19,7 +20,9 @@ interface ElectronBridge {
   version?: () => Promise<string>
   /** desktop only: streams AniLibria torrents through a local server */
   torrent?: {
-    open: (id: number) => Promise<{ infoHash: string; files: { index: number; name: string; length: number; url: string }[] }>
+    open: (id: number) => Promise<TorrentInfo>
+    openMagnet: (uri: string) => Promise<TorrentInfo>
+    openFile: (bytes: Uint8Array) => Promise<TorrentInfo>
     stats: (hash: string, index: number) => Promise<{ peers: number; down: number; progress: number } | null>
     drop: (hash: string) => Promise<void>
     /** downloads bytes [from, to] of a file ahead of playback */
