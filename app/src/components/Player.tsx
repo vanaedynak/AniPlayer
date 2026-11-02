@@ -20,8 +20,10 @@ import {
   FastForward,
   Loader2,
   Sparkles,
+  Magnet,
 } from 'lucide-react'
-import { episodePreview, aniskip, sortedEpisodes, type Episode, type Release } from '../lib/api'
+import { api, episodePreview, aniskip, sortedEpisodes, type Episode, type Release, type Torrent } from '../lib/api'
+import { torrentSupported, torrentsFor, torrentTitle, torrentHint, episodeFile, type TorrentFile } from '../lib/torrent'
 import { useStore, getProgress, progressKey, WATCHED_RATIO } from '../lib/store'
 import { waitForFirstSync } from '../lib/sync'
 import { anilistReportEpisode } from '../lib/anilist'
@@ -53,6 +55,13 @@ function sourceFor(ep: Episode, q: Quality): { url: string; q: Quality } | null 
     if (url) return { url, q: x }
   }
   return null
+}
+
+const MB = 1024 * 1024
+/** bytes to fetch before playing a torrent from second `t`: half a minute ahead, at least 24 MB (three 8 MB pieces) */
+function torSpan(bps: number, t: number): [number, number] {
+  const at = Math.max(0, t * bps - MB)
+  return [at, at + Math.max(24 * MB, 30 * bps)]
 }
 
 const nativeHls = () => isIOS && !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl')
@@ -128,6 +137,102 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
 
   const offline = useDownloads((s) => s.items[dlKey(release.id, episode.ordinal)]?.status === 'done')
 
+  // ---------- torrent (desktop): AniLibria's own release at full bitrate, downloaded in playback order ----------
+  const [torrents, setTorrents] = useState<Torrent[]>([])
+  const [tor, setTor] = useState<Torrent | null>(null)
+  const [torStats, setTorStats] = useState<{ peers: number; down: number } | null>(null)
+  // live: the picture comes from the torrent now; warm: share of the bytes around the playhead already there
+  const [torLive, setTorLive] = useState(false)
+  const [torWarm, setTorWarm] = useState<number | null>(null)
+  const torFile = useRef<{ hash: string; index: number } | null>(null)
+  const torInfo = useRef<{ id: number; info: Promise<{ infoHash: string; files: TorrentFile[] }> } | null>(null)
+  // AniLibria's stream plays while the torrent fetches the bytes around the playhead; then the source swaps
+  const pending = useRef<{ url: string; hash: string; index: number; bps: number; warmedTo: number } | null>(null)
+  const nextWarm = useRef('')
+  const nextRef = useRef(next)
+  nextRef.current = next
+  useEffect(() => {
+    if (!torrentSupported()) return
+    let alive = true
+    api
+      .torrents(release.id)
+      .then((l) => alive && setTorrents(l))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [release.id])
+  const episodeTorrents = useMemo(() => torrentsFor(torrents, episode.ordinal), [torrents, episode.ordinal])
+  useEffect(() => {
+    if (!tor) {
+      setTorStats(null)
+      // back on AniLibria's stream: the torrent and its pieces go
+      const f = torFile.current
+      torFile.current = null
+      torInfo.current = null
+      pending.current = null
+      if (f) void window.aniplayer?.torrent?.drop(f.hash)
+      return
+    }
+    const bridge = window.aniplayer!.torrent!
+    const id = setInterval(async () => {
+      const f = torFile.current
+      const v = videoRef.current
+      const st = f ? await bridge.stats(f.hash, f.index).catch(() => null) : null
+      setTorStats(st ? { peers: st.peers, down: st.down } : null)
+      if (!v) return
+      const p = pending.current
+      if (p) {
+        const at = v.currentTime * p.bps
+        const need: [number, number] = [at - MB, at + Math.max(10 * MB, 12 * p.bps)]
+        // playback outran the warm-up (or jumped): fetch from where it is now
+        if (need[1] > p.warmedTo || need[0] < p.warmedTo - 200 * MB) {
+          const [a, b] = torSpan(p.bps, v.currentTime)
+          p.warmedTo = b
+          void bridge.warm(p.hash, p.index, a, b)
+        }
+        const have = await bridge.ready(p.hash, p.index, need[0], need[1]).catch(() => 0)
+        if (pending.current !== p) return
+        setTorWarm(have)
+        if (have >= 1) swapToTorrent(p)
+        return
+      }
+      // the next episode's opening bytes, fetched well before the end: auto-next starts in the torrent at once
+      const n = nextRef.current
+      const d = v.duration
+      const key = n ? `${tor.id}:${n.ordinal}` : ''
+      if (!n || !d || v.currentTime < d * 0.5 || nextWarm.current === key || !torInfo.current) return
+      nextWarm.current = key
+      const info = await torInfo.current.info.catch(() => null)
+      const nf = info && episodeFile(info.files, n.ordinal)
+      if (nf) {
+        const [a, b] = torSpan(nf.length / (n.duration || d), 0)
+        void bridge.warm(info.infoHash, nf.index, a, b)
+      }
+    }, 1000)
+    return () => clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tor])
+
+  // the torrent picked last comes back on its own, for any title that has the same kind
+  useEffect(() => {
+    const want = local.torrent
+    if (tor || !want) return
+    const t = episodeTorrents.find((x) => torrentTitle(x) === want)
+    if (!t) return
+    const v = videoRef.current
+    if (v && v.currentTime > 0) resumeAt.current = v.currentTime
+    setTor(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [episodeTorrents])
+  useEffect(
+    () => () => {
+      const f = torFile.current
+      if (f) void window.aniplayer?.torrent?.drop(f.hash)
+    },
+    [],
+  )
+
   // ---------- Anime4K ----------
   // the canvas sits exactly over the letterboxed picture; the video keeps playing underneath
   const [upscaled, setUpscaled] = useState<{ from: number; to: number } | null>(null)
@@ -177,7 +282,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
       alive = false
       up?.stop()
     }
-  }, [upscaleMode, videoSize, episode.id, quality, hasFit])
+  }, [upscaleMode, videoSize, episode.id, quality, hasFit, tor])
 
   // ---------- saving ----------
   const save = useCallback(
@@ -214,8 +319,14 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
     // a downloaded episode always plays from the device: works offline and saves traffic
     const off = downloaded(release.id, episode.ordinal)
     const src = off ? { url: offlineUrl(off.key), q: off.quality } : sourceFor(episode, quality)
+    // a torrent without this episode (another season's part) hands it back to AniLibria's stream
+    if (tor && !off && !episodeTorrents.some((t) => t.id === tor.id)) {
+      setTor(null)
+      return
+    }
+    const useTor = off ? null : tor
     setError('')
-    if (!src) {
+    if (!src && !useTor) {
       setError('У этой серии нет видео')
       return
     }
@@ -240,10 +351,46 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
       }
       resumeAt.current = null
 
+      let direct = !off && (nativeHls() || !Hls.isSupported()) ? src?.url : undefined
+      pending.current = null
+      setTorWarm(null)
+      let live = false
+      if (useTor) {
+        const bridge = window.aniplayer!.torrent!
+        try {
+          if (torInfo.current?.id !== useTor.id) torInfo.current = { id: useTor.id, info: bridge.open(useTor.id) }
+          const info = await torInfo.current.info
+          if (cancelled) return
+          const f = episodeFile(info.files, episode.ordinal)
+          if (!f) throw new Error('в раздаче нет файла этой серии')
+          torFile.current = { hash: info.infoHash, index: f.index }
+          const bps = f.length / (episode.duration || v.duration || 1440)
+          const [a, b] = torSpan(bps, startAt)
+          // already fetched (the next episode, warmed up during this one): straight from the torrent
+          const have = await bridge.ready(info.infoHash, f.index, a, Math.min(b, a + Math.max(10 * MB, 12 * bps)))
+          if (cancelled) return
+          if (have >= 1 || !src) {
+            direct = f.url
+            live = true
+          } else {
+            void bridge.warm(info.infoHash, f.index, a, b)
+            pending.current = { url: f.url, hash: info.infoHash, index: f.index, bps, warmedTo: b }
+            setTorWarm(have)
+          }
+        } catch (e) {
+          if (cancelled) return
+          torInfo.current = null
+          setToast({ text: `Торрент не открылся: ${e instanceof Error ? e.message : e}` })
+          resumeAt.current = startAt
+          setTor(null)
+          return
+        }
+      }
+      setTorLive(live)
       hlsRef.current?.destroy()
       hlsRef.current = null
-      if (!off && (nativeHls() || !Hls.isSupported())) {
-        v.src = src.url
+      if (direct) {
+        v.src = direct
         const onMeta = () => {
           if (startAt) v.currentTime = startAt
           v.removeEventListener('loadedmetadata', onMeta)
@@ -258,7 +405,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
           else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError()
           else setError('Не удалось загрузить видео')
         })
-        hls.loadSource(src.url)
+        hls.loadSource(src!.url)
         hls.attachMedia(v)
       }
       v.playbackRate = useStore.getState().local.rate
@@ -269,7 +416,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [episode.id, quality])
+  }, [episode.id, quality, tor])
 
   // new episode → reset session, save the old one on the way out
   useEffect(() => {
@@ -427,9 +574,38 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
   const changeQuality = (q: Quality) => {
     const v = videoRef.current
     resumeAt.current = v?.currentTime ?? 0
+    setTor(null)
+    setLocal({ torrent: '' })
     setQuality(q)
     setPrefs({ quality: q })
     setMenu(null)
+  }
+
+  const pickTorrent = (t: Torrent) => {
+    resumeAt.current = videoRef.current?.currentTime ?? 0
+    setTor(t)
+    setLocal({ torrent: torrentTitle(t) })
+    setMenu(null)
+  }
+
+  // the bytes around the playhead are on disk: the same second continues from the torrent
+  function swapToTorrent(p: NonNullable<typeof pending.current>) {
+    const v = videoRef.current
+    if (!v) return
+    pending.current = null
+    const t = v.currentTime
+    const wasPlaying = !v.paused
+    hlsRef.current?.destroy()
+    hlsRef.current = null
+    v.src = p.url
+    const onMeta = () => {
+      v.currentTime = t
+      v.removeEventListener('loadedmetadata', onMeta)
+    }
+    v.addEventListener('loadedmetadata', onMeta)
+    if (wasPlaying) v.play().catch(() => {})
+    setTorLive(true)
+    setTorWarm(null)
   }
 
   const goNext = useCallback(() => {
@@ -657,7 +833,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
     <div
       ref={wrapRef}
       className={cn(
-        'group/player relative w-full overflow-hidden bg-black select-none',
+        'group/player @container-size relative w-full overflow-hidden bg-black select-none',
         fullscreen ? 'h-full' : 'aspect-video rounded-3xl shadow-2xl shadow-black/60 ring-1 ring-white/5',
         !controls && playing && 'cursor-none',
       )}
@@ -702,7 +878,7 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
           report()
         }}
         onEnded={onEnded}
-        onError={() => !hlsRef.current && setError('Не удалось воспроизвести видео')}
+        onError={() => !hlsRef.current && setError(torLive ? 'Видео из торрента не воспроизводится на этом компьютере' : 'Не удалось воспроизвести видео')}
       />
 
       {upscaleMode !== 'off' && fit && (
@@ -747,10 +923,11 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
             className="rounded-full bg-white px-5 py-2 text-sm font-bold text-black"
             onClick={() => {
               resumeAt.current = videoRef.current?.currentTime ?? 0
-              setQuality((q) => (q === '1080' ? '720' : q === '720' ? '480' : '1080'))
+              if (tor) setTor(null)
+              else setQuality((q) => (q === '1080' ? '720' : q === '720' ? '480' : '1080'))
             }}
           >
-            Попробовать другое качество
+            {tor ? 'Смотреть с AniLibria' : 'Попробовать другое качество'}
           </button>
         </div>
       )}
@@ -777,6 +954,13 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
         <div className="text-lg font-bold">
           {fmtOrdinal(episode.ordinal)} серия{episode.name ? <span className="font-medium text-white/70"> · {episode.name}</span> : null}
         </div>
+        {tor && (
+          <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-white/70">
+            <Magnet size={13} className="text-accent-2" /> Торрент · {torrentTitle(tor)}
+            {!torLive && torWarm != null && ` · готовим, ${Math.round(torWarm * 100)}%`}
+            {torStats && ` · ${torStats.peers} пир. · ${(torStats.down / 1024 ** 2).toFixed(1)} МБ/с`}
+          </div>
+        )}
       </div>
 
       {/* toast */}
@@ -925,6 +1109,9 @@ export default function Player({ release, episode, next, prev, onSelect }: Props
                 episode={episode}
                 quality={quality}
                 changeQuality={changeQuality}
+                torrents={episodeTorrents}
+                tor={tor}
+                pickTorrent={pickTorrent}
                 rate={local.rate}
                 setRate={setRate}
                 upscale={upscaleMode}
@@ -1041,6 +1228,9 @@ function SettingsMenu({
   episode,
   quality,
   changeQuality,
+  torrents,
+  tor,
+  pickTorrent,
   rate,
   setRate,
   upscale,
@@ -1051,6 +1241,9 @@ function SettingsMenu({
   episode: Episode
   quality: Quality
   changeQuality: (q: Quality) => void
+  torrents: Torrent[]
+  tor: Torrent | null
+  pickTorrent: (t: Torrent) => void
   rate: number
   setRate: (r: number) => void
   upscale: UpscaleMode
@@ -1081,12 +1274,12 @@ function SettingsMenu({
   )
   return (
     <div
-      className="animate-pop glass absolute right-0 bottom-full mb-2 w-72 rounded-2xl p-2 text-sm shadow-2xl ring-1 ring-white/10"
+      className="animate-pop glass absolute right-0 bottom-full mb-2 max-h-[calc(100cqh-156px)] w-72 overflow-y-auto overscroll-contain rounded-2xl p-2 text-sm shadow-2xl ring-1 ring-white/10"
       onPointerUp={(e) => e.stopPropagation()}
     >
       {menu === 'main' && (
         <>
-          <Row label="Качество" value={`${quality}p`} onClick={() => setMenu('quality')} />
+          <Row label="Качество" value={tor ? `Торрент ${tor.quality?.value ?? ''}` : `${quality}p`} onClick={() => setMenu('quality')} />
           <Row label="Скорость" value={rate === 1 ? 'Обычная' : `${rate}×`} onClick={() => setMenu('speed')} />
           {upscaleSupported() ? (
             <Row label="Апскейл Anime4K" value={UPSCALE_MODES.find((m) => m.id === upscale)!.label} onClick={() => setMenu('upscale')} />
@@ -1110,9 +1303,25 @@ function SettingsMenu({
               <span className="font-semibold">
                 {q}p {q === '1080' && <span className="ml-1 rounded bg-accent px-1.5 py-0.5 text-[10px] font-extrabold">FHD</span>}
               </span>
-              {q === quality && <Check size={18} className="text-accent-2" />}
+              {!tor && q === quality && <Check size={18} className="text-accent-2" />}
             </button>
           ))}
+          {torrents.length > 0 && (
+            <>
+              <div className="mx-3 mt-2 mb-1 flex items-center gap-1.5 border-t border-white/10 pt-2.5 text-xs font-bold text-white/50">
+                <Magnet size={13} /> Торрент · максимальное качество
+              </div>
+              {torrents.map((t) => (
+                <button key={t.id} className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left hover:bg-white/10" onClick={() => pickTorrent(t)}>
+                  <span>
+                    <span className="block font-semibold">{torrentTitle(t)}</span>
+                    <span className="block text-xs text-white/50">{torrentHint(t)}</span>
+                  </span>
+                  {tor?.id === t.id && <Check size={18} className="shrink-0 text-accent-2" />}
+                </button>
+              ))}
+            </>
+          )}
         </>
       )}
       {menu === 'upscale' && (

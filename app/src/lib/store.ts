@@ -66,6 +66,8 @@ export interface LocalPrefs {
   scale: number
   /** Anime4K level; per device because it depends on the GPU */
   upscale: UpscaleMode
+  /** torrent source picked last ("WEBRip · 1080p · AVC"); per device, only the desktop app streams torrents */
+  torrent?: string
   /** color theme of the app */
   theme?: Theme
 }

@@ -147,6 +147,20 @@ ipcMain.handle('fetch-image', async (_e, url) => {
 })
 ipcMain.on('close-ok', () => win && !win.isDestroyed() && win.destroy())
 
+// Torrent streaming (AniLibria's own torrents): loaded on first use, pieces live in a temp folder until the app quits
+let torrent = null
+const tor = () => (torrent ??= require('./torrent.cjs'))
+ipcMain.handle('torrent-open', async (_e, id) => {
+  const t = tor()
+  const info = await t.open(id)
+  return { ...info, files: info.files.map((f) => ({ ...f, url: t.streamUrl(info.infoHash, f.index) })) }
+})
+ipcMain.handle('torrent-stats', (_e, hash, index) => tor().stats(hash, index))
+ipcMain.handle('torrent-drop', (_e, hash) => tor().drop(hash))
+ipcMain.handle('torrent-warm', (_e, hash, index, from, to) => tor().warm(hash, index, from, to))
+ipcMain.handle('torrent-ready', (_e, hash, index, from, to) => tor().ready(hash, index, from, to))
+app.on('will-quit', () => torrent?.shutdown())
+
 // Voice module: F5-TTS on the GPU, installed apart from the app (several GB) in %USERPROFILE%\AniPlayer-voice.
 // Started on the first read-aloud, not with the app, so the GPU memory stays free until then.
 const VOICE_HOME = path.join(app.getPath('home'), 'AniPlayer-voice')

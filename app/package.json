@@ -31,6 +31,7 @@
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router-dom": "^7.18.5",
+    "webtorrent": "^3.0.21",
     "zustand": "^5.0.16"
   },
   "devDependencies": {
@@ -93,6 +94,7 @@
       "createDesktopShortcut": true,
       "shortcutName": "Anyflow Desktop",
       "artifactName": "Anyflow-Desktop-Setup-${version}.exe"
-    }
+    },
+    "npmRebuild": false
   }
 }

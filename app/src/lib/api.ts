@@ -101,6 +101,7 @@ export const api = {
   search: (query: string) => get<Release[]>('app/search/releases', { query }),
   scheduleWeek: () => get<ScheduleItem[]>('anime/schedule/week', undefined, 10 * 60_000),
   franchiseOf: (releaseId: number) => get<Franchise[]>(`anime/franchises/release/${releaseId}`, undefined, 30 * 60_000),
+  torrents: (releaseId: number) => get<Torrent[]>(`anime/torrents/release/${releaseId}`, undefined, 10 * 60_000),
   genres: () => get<Genre[]>('anime/genres', undefined, 60 * 60_000),
   years: () => get<number[]>('anime/catalog/references/years', undefined, 60 * 60_000),
   catalog: (p: CatalogParams) =>
@@ -116,6 +117,19 @@ export const api = {
       'f[years][to_year]': p.yearTo,
       'f[publish_statuses][]': p.status,
     }),
+}
+
+/** AniLibria's own torrent of a release: the same dub at the source's full bitrate */
+export interface Torrent {
+  id: number
+  label: string
+  size: number
+  seeders: number
+  description: string | null
+  type?: { value: string } | null
+  quality?: { value: string } | null
+  codec?: { value: string; label: string } | null
+  is_hardsub?: boolean
 }
 
 export interface CatalogParams {

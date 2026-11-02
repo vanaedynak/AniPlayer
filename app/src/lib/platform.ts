@@ -17,6 +17,16 @@ interface ElectronBridge {
   /** starts the F5 voice module if it is installed */
   voice?: { start: () => Promise<{ installed: boolean }> }
   version?: () => Promise<string>
+  /** desktop only: streams AniLibria torrents through a local server */
+  torrent?: {
+    open: (id: number) => Promise<{ infoHash: string; files: { index: number; name: string; length: number; url: string }[] }>
+    stats: (hash: string, index: number) => Promise<{ peers: number; down: number; progress: number } | null>
+    drop: (hash: string) => Promise<void>
+    /** downloads bytes [from, to] of a file ahead of playback */
+    warm: (hash: string, index: number, from: number, to: number) => Promise<void>
+    /** share of bytes [from, to] already downloaded, 0..1 */
+    ready: (hash: string, index: number, from: number, to: number) => Promise<number>
+  }
   updates?: {
     get: () => Promise<UpdateState>
     check: () => void

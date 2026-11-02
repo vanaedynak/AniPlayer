@@ -70,6 +70,8 @@ body {
 ::-webkit-scrollbar-thumb:hover { background-color: #ffffff33; }
 
 button { cursor: pointer; -webkit-user-select: none; user-select: none; }
+/* a native dropdown list takes the select's own background: a see-through hover tint turned it white */
+select option { background-color: var(--color-card-2); color: #f4f4f7; }
 img { -webkit-user-drag: none; }
 
 .no-scrollbar::-webkit-scrollbar { display: none; }

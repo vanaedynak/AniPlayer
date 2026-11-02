@@ -26,6 +26,23 @@ contextBridge.exposeInMainWorld('aniplayer', {
       return ipcRenderer.invoke('voice-start')
     },
   },
+  torrent: {
+    open(id) {
+      return ipcRenderer.invoke('torrent-open', id)
+    },
+    stats(hash, index) {
+      return ipcRenderer.invoke('torrent-stats', hash, index)
+    },
+    drop(hash) {
+      return ipcRenderer.invoke('torrent-drop', hash)
+    },
+    warm(hash, index, from, to) {
+      return ipcRenderer.invoke('torrent-warm', hash, index, from, to)
+    },
+    ready(hash, index, from, to) {
+      return ipcRenderer.invoke('torrent-ready', hash, index, from, to)
+    },
+  },
   fetchImage(url) {
     return ipcRenderer.invoke('fetch-image', url)
   },
