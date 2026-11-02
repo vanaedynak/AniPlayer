@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ChevronLeft, ChevronRight, List, Type, Maximize, Minimize, Loader2, AlertCircle, Languages, Headphones } from 'lucide-react'
 import { openBook, useBooks, type Parsed } from './books'
@@ -11,6 +11,8 @@ import { cn } from '../lib/format'
 import { Narrator } from './Narrator'
 import { isElectron } from '../lib/platform'
 import { useReadingClock } from '../lib/activity'
+import { awayAfter, minutesLeft, usePresence, useTextPace, wordCount } from '../lib/reading'
+import { SelectionTranslate } from './SelectionTranslate'
 
 type Doc = Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void }
 type El = HTMLElement & { webkitRequestFullscreen?: () => void }
@@ -41,6 +43,7 @@ export default function BookReader() {
   const scroller = useRef<HTMLDivElement>(null)
   const text = useRef<HTMLDivElement>(null)
   const [narrate, setNarrate] = useState(false)
+  const [speaking, setSpeaking] = useState(false)
   const restore = useRef(book?.frac ?? 0)
   const lastY = useRef(0)
   const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -108,6 +111,13 @@ export default function BookReader() {
   }, [translating, parsed, chapter, id, tr.geminiKeys, tr.geminiModel, trTry])
   const shownRu = translating && ru?.chapter === chapter && ru.html ? ru : null
   const trBusy = translating && !trError && (!ru || ru.chapter !== chapter || ru.done < ru.total || !ru.html)
+
+  // the screen stays on while someone reads or listens; their pace says how long the chapter has left
+  const present = usePresence(awayAfter(80), narrate && speaking)
+  const shownHtml = shownRu?.html || source?.html || ''
+  const words = useMemo(() => wordCount(shownHtml.replace(/<[^>]+>/g, ' ')), [shownHtml])
+  const wpm = useTextPace(words, frac, present)
+  const left = minutesLeft(((words * (1 - frac)) / wpm) * 60)
   const goChapter = (i: number) => {
     if (i < 0 || i >= count) return
     setChapter(i)
@@ -219,7 +229,7 @@ export default function BookReader() {
         <div className="min-w-0 flex-1">
           <div className="truncate font-extrabold">{book.title}</div>
           <div className="truncate text-xs font-semibold text-white/70">
-            {ch?.title} · {total}%
+            {ch?.title} · {total}%{left && ` · до конца главы ${left}`}
           </div>
         </div>
         {(foreign || prefs.translate) && (
@@ -274,6 +284,7 @@ export default function BookReader() {
           ready={!trBusy}
           onEnd={() => (chapter < count - 1 ? goChapter(chapter + 1) : setNarrate(false))}
           close={() => setNarrate(false)}
+          onPlaying={setSpeaking}
         />
       )}
       {panel && <div className="absolute inset-0 z-20 bg-black/40" onClick={() => setPanel(null)} />}
@@ -293,11 +304,13 @@ export default function BookReader() {
           </div>
         </Sheet>
       )}
-      {panel === 'type' && <TypeSheet prefs={prefs} set={setBook} close={() => setPanel(null)} />}
+      {panel === 'type' && <TypeSheet prefs={prefs} set={setBook} close={() => setPanel(null)} onTranslator={() => setPanel('translate')} />}
+      <SelectionTranslate root={text} enabled={foreign && !shownRu} title={parsed?.title || book.title || ''} keys={tr.geminiKeys} model={tr.geminiModel} />
       {panel === 'translate' && (
         <Sheet title="Переводчик" close={() => setPanel(null)}>
           <TranslatorSetup
             book
+            glossary={id}
             prefs={tr}
             set={setPrefs}
             onSaved={() => {
@@ -330,7 +343,20 @@ export default function BookReader() {
   )
 }
 
-export function TypeSheet({ prefs, set, close, paged }: { prefs: BookPrefs; set: (p: Partial<BookPrefs>) => void; close: () => void; paged?: boolean }) {
+export function TypeSheet({
+  prefs,
+  set,
+  close,
+  paged,
+  onTranslator,
+}: {
+  prefs: BookPrefs
+  set: (p: Partial<BookPrefs>) => void
+  close: () => void
+  paged?: boolean
+  /** opens the translator's sheet (keys and the names list) */
+  onTranslator?: () => void
+}) {
   return (
     <Sheet title="Шрифт и тема" close={close}>
       <div className="flex flex-col gap-6">
@@ -373,6 +399,13 @@ export function TypeSheet({ prefs, set, close, paged }: { prefs: BookPrefs; set:
         <Toggle label="Выравнивание по ширине" value={prefs.justify} onChange={(justify) => set({ justify })} />
         <Toggle label="Красная строка" value={prefs.indent} onChange={(indent) => set({ indent })} />
         {paged && <Toggle label="Постранично (касание слева / справа листает)" value={!!prefs.paged} onChange={(p) => set({ paged: p })} />}
+        {paged && prefs.paged && <Toggle label="Перелистывание как у бумажной книги" value={prefs.curl !== false} onChange={(curl) => set({ curl })} />}
+        {paged && prefs.paged && prefs.curl !== false && <Toggle label="Звук перелистывания" value={prefs.flipSound !== false} onChange={(flipSound) => set({ flipSound })} />}
+        {onTranslator && (
+          <button onClick={onTranslator} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-white/10 text-sm font-bold hover:bg-white/15">
+            Переводчик и словарик имён
+          </button>
+        )}
       </div>
     </Sheet>
   )

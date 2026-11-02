@@ -7,6 +7,7 @@ import { MangaCard, EntryCard, ReadTabs } from './ui'
 import { CardSkeletons, Chip, Empty, Row, Section } from '../components/ui'
 import { cn } from '../lib/format'
 import { isNovelEntry } from '../ranobe/shelf'
+import { NewChapters, ReadingSchedule } from './ChapterUpdates'
 
 const GRID = 'grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6'
 
@@ -174,6 +175,8 @@ export default function MangaHome() {
               </Row>
             </Section>
           )}
+          <NewChapters kind="manga" />
+          <ReadingSchedule kind="manga" />
           {shelf.length > 0 && (
             <Section title="Моя полка">
               <Row>

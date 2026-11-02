@@ -9,6 +9,8 @@ import { cn } from '../lib/format'
 import { sourceById } from './registry'
 import { loadNovel } from './cache'
 import { chapterPath, entryId, rememberNovel } from './shelf'
+import { useSaved } from '../manga/saved'
+import { ChapterSave, SaveMenu, pickToSave, useSavedFor } from '../manga/SaveButtons'
 
 /** a ranobe from an online source: cover, description, status and every chapter with what is already read */
 export default function NovelPage() {
@@ -21,6 +23,7 @@ export default function NovelPage() {
   const toggleRead = useManga((s) => s.toggleRead)
   const [reverse, setReverse] = useState(false)
   const [more, setMore] = useState(false)
+  const saved = useSavedFor(eid)
 
   const read = useMemo(() => new Set(entry?.read ?? []), [entry?.read])
   const chapters = n ? (reverse ? [...n.chapters].reverse() : n.chapters) : []
@@ -42,6 +45,10 @@ export default function NovelPage() {
     useManga.getState().touch({ id: eid, title: n.title, cover: n.cover, lang: source.lang }, { kind: 'Ранобэ', status })
   }
   const start = resume ?? firstUnread ?? n.chapters[0]
+  const saveSome = (ids: string[]) => {
+    rememberNovel(src, n, source.lang)
+    useSaved.getState().saveNovel(src, n, ids)
+  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -116,6 +123,14 @@ export default function NovelPage() {
           <h2 className="text-2xl font-extrabold">
             Главы <span className="text-base font-semibold text-muted">· {n.chapters.length}</span>
           </h2>
+          <div className="flex items-center gap-2">
+          {n.chapters.length > 0 && (
+            <SaveMenu
+              saved={saved.done}
+              total={n.chapters.length}
+              onPick={(k) => saveSome(pickToSave(n.chapters, start ? n.chapters.indexOf(start) : 0, k, (c) => read.has(c.id)).map((c) => c.id))}
+            />
+          )}
           <button
             onClick={() => setReverse(!reverse)}
             title="Порядок"
@@ -123,6 +138,7 @@ export default function NovelPage() {
           >
             <ArrowDownUp size={16} />
           </button>
+          </div>
         </div>
         {!n.chapters.length ? (
           <Empty icon={<Loader2 />} title="Глав пока нет" />
@@ -139,6 +155,7 @@ export default function NovelPage() {
                       {c.title}
                     </Link>
                     {c.id === entry?.lastChapterId && <span className="shrink-0 rounded-full bg-accent px-2.5 py-0.5 text-xs font-bold">Здесь</span>}
+                    <ChapterSave it={saved.byChapter[c.id]} onSave={() => saveSome([c.id])} />
                     <button
                       onClick={() => {
                         rememberNovel(src, n, source.lang)

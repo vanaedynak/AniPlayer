@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
-import { Pause, Play, SkipBack, SkipForward, X, Loader2 } from 'lucide-react'
+import { Pause, Play, SkipBack, SkipForward, X, Loader2, Moon } from 'lucide-react'
 import { blocksOf, linesOf, type Line } from '../lib/narrate'
 import { piperPrepare, piperSpeak, voiceCaster, type Voice } from '../lib/piper'
 import { f5Ready, f5Speak, f5Voice } from '../lib/f5'
@@ -8,6 +8,8 @@ import { cn } from '../lib/format'
 
 const RATES = [0.9, 1, 1.15, 1.3, 1.5]
 const AHEAD = 3 // lines synthesized ahead of the one playing
+/** the sleep timer's steps: minutes, or the end of the chapter */
+const SLEEP: (number | 'chapter' | null)[] = [null, 15, 30, 60, 'chapter']
 
 /**
  * Reads the chapter aloud line by line, each character in their own voice, highlighting the paragraph
@@ -19,6 +21,7 @@ export function Narrator({
   ready,
   onEnd,
   close,
+  onPlaying,
 }: {
   /** the element holding the chapter text */
   content: RefObject<HTMLDivElement | null>
@@ -28,8 +31,38 @@ export function Narrator({
   ready: boolean
   onEnd: () => void
   close: () => void
+  /** reading or paused, for keeping the screen on only while it reads */
+  onPlaying?: (playing: boolean) => void
 }) {
   const [playing, setPlaying] = useState(true)
+  // sleep timer: stops reading at a set time or at the end of the chapter, the screen then goes dark by itself
+  const [sleep, setSleep] = useState<{ step: number; until: number | null }>({ step: 0, until: null })
+  const sleepRef = useRef(sleep)
+  sleepRef.current = sleep
+  const [, tick] = useState(0)
+  useEffect(() => onPlaying?.(playing), [playing, onPlaying])
+  useEffect(() => {
+    if (!sleep.until) return
+    const t = setInterval(() => {
+      if (Date.now() >= sleep.until!) {
+        setPlaying(false)
+        setSleep({ step: 0, until: null })
+      } else tick((n) => n + 1)
+    }, 5000)
+    return () => clearInterval(t)
+  }, [sleep.until])
+  const nextSleep = () => {
+    const step = (sleep.step + 1) % SLEEP.length
+    const v = SLEEP[step]
+    setSleep({ step, until: typeof v === 'number' ? Date.now() + v * 60_000 : null })
+    if (v) setPlaying(true)
+  }
+  const sleepLabel = (() => {
+    const v = SLEEP[sleep.step]
+    if (v === 'chapter') return 'до конца главы'
+    if (!sleep.until) return ''
+    return `${Math.max(1, Math.ceil((sleep.until - Date.now()) / 60_000))} мин`
+  })()
   const [idx, setIdx] = useState(-1)
   const [busy, setBusy] = useState('')
   const [rate, setRate] = useState(() => Number(localStorage.getItem('aniplayer-narrator-rate')) || 1)
@@ -129,7 +162,11 @@ export function Narrator({
       a.onended = () => {
         if (!alive) return
         if (idx + 1 < lines.current.length) setIdx(idx + 1)
-        else onEnd()
+        else if (SLEEP[sleepRef.current.step] === 'chapter') {
+          // the timer said "to the end of the chapter": stop here, the next one waits
+          setPlaying(false)
+          setSleep({ step: 0, until: null })
+        } else onEnd()
       }
       void a.play().catch(() => setPlaying(false))
     }).catch((e) => alive && setBusy(`Не получилось озвучить: ${e?.message ?? e}`))
@@ -184,6 +221,14 @@ export function Narrator({
       </button>
       <button onClick={() => step(1)} title="Дальше" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/10">
         <SkipForward size={17} />
+      </button>
+      <button
+        onClick={nextSleep}
+        title={sleep.step ? `Таймер сна: ${sleepLabel}. Нажмите, чтобы изменить` : 'Таймер сна: остановить чтение через 15 / 30 / 60 минут или в конце главы'}
+        className={cn('flex h-9 shrink-0 items-center gap-1 rounded-full px-2 text-xs font-extrabold hover:bg-white/10', sleep.step > 0 && 'text-accent-2')}
+      >
+        <Moon size={15} />
+        {sleep.step ? <span className="max-w-24 truncate">{sleepLabel}</span> : null}
       </button>
       <button
         onClick={() => setSpeed(RATES[(RATES.indexOf(rate) + 1) % RATES.length] ?? 1)}

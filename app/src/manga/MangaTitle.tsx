@@ -5,6 +5,8 @@ import { manga, coverUrl, mangaName, chapterKey, chapterLabel, KIND, LANGS, STAT
 import { useManga, READ_LABELS, type ReadStatus } from './store'
 import { useChapters, pickLang } from './useChapters'
 import { Cover } from './ui'
+import { savedManga, useSaved } from './saved'
+import { ChapterSave, SaveMenu, pickToSave, useSavedFor } from './SaveButtons'
 import { useAsync } from '../lib/useAsync'
 import { Empty, Skeleton } from '../components/ui'
 import { cn, relTime } from '../lib/format'
@@ -18,12 +20,25 @@ const rank = (l: string) => {
 export default function MangaTitle() {
   const { id = '' } = useParams()
   const nav = useNavigate()
-  const { data: m, error } = useAsync(() => manga(id), [id])
+  // with no connection, what was saved along with downloaded chapters
+  const { data: m, error } = useAsync(() => manga(id).catch(async (e) => (await savedManga(id)) ?? Promise.reject(e)), [id])
   const entry = useManga((s) => s.entries[id])
   const preferred = useManga((s) => s.prefs.lang)
   const { touch, toggleRead } = useManga.getState()
   const lang = m ? pickLang(m.langs, entry?.lang, preferred) : null
-  const { list, groups, loading } = useChapters(id, lang, m?.sk)
+  const online = useChapters(id, lang, m?.sk)
+  const { groups, loading } = online
+  const saved = useSavedFor(id)
+  const list = useMemo(
+    () =>
+      online.list.length || loading
+        ? online.list
+        : Object.values(saved.byChapter)
+            .filter((i) => i.status === 'done' && i.chapter)
+            .sort((a, b) => a.order - b.order)
+            .map((i) => i.chapter!),
+    [online.list, loading, saved.byChapter],
+  )
   const [desc, setDesc] = useState(false)
   const [newest, setNewest] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
@@ -58,6 +73,12 @@ export default function MangaTitle() {
     nav(`/manga/read/${id}/${chapterId}`)
   }
   const genres = m.tags.filter((t) => GENRES[t]).map((t) => GENRES[t])
+  const order = (c: (typeof list)[number]) => list.indexOf(c)
+  const saveSome = (n: number | 'unread') => {
+    if (!entry) save({})
+    const from = start ? readable.indexOf(start) : 0
+    useSaved.getState().saveManga(m, pickToSave(readable, from, n, (c) => read.has(chapterKey(c))), order)
+  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -206,6 +227,7 @@ export default function MangaTitle() {
                 className="h-10 w-28 rounded-full bg-card-2 px-4 text-sm font-bold ring-1 ring-white/5 outline-none placeholder:text-dim"
               />
             )}
+            {readable.length > 0 && <SaveMenu onPick={saveSome} saved={saved.done} total={readable.length} />}
             <button onClick={() => setNewest(!newest)} className="flex h-10 items-center gap-2 rounded-full bg-card-2 px-4 text-sm font-bold ring-1 ring-white/5 hover:bg-white/10">
               <ArrowDownUp size={15} /> {newest ? 'Сначала новые' : 'По порядку'}
             </button>
@@ -256,6 +278,15 @@ export default function MangaTitle() {
                     <button onClick={() => open(c.id)} className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4 text-left">
                       {body}
                     </button>
+                  )}
+                  {!c.external && (
+                    <ChapterSave
+                      it={saved.byChapter[c.id]}
+                      onSave={() => {
+                        if (!entry) save({})
+                        useSaved.getState().saveManga(m, [c], order)
+                      }}
+                    />
                   )}
                   <button
                     onClick={() => {

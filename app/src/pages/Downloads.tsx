@@ -6,10 +6,13 @@ import { posterUrl } from '../lib/api'
 import { freeSpace } from '../lib/offline'
 import { DownloadRow } from '../components/Downloads'
 import { Empty, Panel } from '../components/ui'
+import { SavedShelf } from '../manga/SavedShelf'
+import { useSaved } from '../manga/saved'
 
 export default function Downloads() {
   const items = useDownloads((s) => s.items)
   const releases = useDownloads((s) => s.releases)
+  const chapters = useSaved((s) => Object.keys(s.items).length)
   const [free, setFree] = useState<number | null>(null)
   const [online, setOnline] = useState(navigator.onLine)
   useEffect(() => {
@@ -42,7 +45,7 @@ export default function Downloads() {
         </div>
         {!online && (
           <span className="flex items-center gap-2 rounded-full bg-yellow-400/10 px-4 py-2 text-sm font-bold text-yellow-300">
-            <WifiOff size={16} /> Нет интернета — доступны скачанные серии
+            <WifiOff size={16} /> Нет интернета — доступно всё скачанное
           </span>
         )}
       </div>
@@ -79,13 +82,14 @@ export default function Downloads() {
             </Panel>
           )
         })
-      ) : (
+      ) : chapters ? null : (
         <Empty
           icon={<HardDriveDownload />}
           title="Пока ничего не скачано"
-          text="Откройте аниме с AniLibria и нажмите «Скачать сезон» или «Скачать» у серии — смотреть можно будет без интернета."
+          text="Откройте аниме с AniLibria и нажмите «Скачать сезон» или «Скачать» у серии, а у манги и ранобэ — «Скачать» над главами: смотреть и читать можно будет без интернета."
         />
       )}
+      <SavedShelf />
     </div>
   )
 }

@@ -56,6 +56,10 @@ export interface ReaderPrefs {
   geminiModel: string
   /** page mode magnification on top of the fit (1 = as fitted), kept from page to page */
   pageZoom?: number
+  /** page mode: pages turn like paper (off: they just change) */
+  curl?: boolean
+  /** the paper turn makes its sound */
+  flipSound?: boolean
 }
 
 export interface BookPrefs {
@@ -70,6 +74,9 @@ export interface BookPrefs {
   translate: boolean
   /** turn the text a screen at a time instead of scrolling (online ranobe) */
   paged?: boolean
+  /** page mode: pages turn like paper */
+  curl?: boolean
+  flipSound?: boolean
 }
 
 interface MangaState {

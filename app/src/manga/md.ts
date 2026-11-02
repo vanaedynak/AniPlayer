@@ -384,23 +384,42 @@ export async function chapters(id: string, lang: string): Promise<Chapter[]> {
       },
       3 * 60_000,
     )
-    for (const c of r.data) {
-      const a = c.attributes
-      out.push({
-        id: c.id,
-        num: a.chapter,
-        volume: a.volume,
-        title: a.title ?? '',
-        pages: a.pages,
-        lang: a.translatedLanguage,
-        group: String(c.relationships.find((x) => x.type === 'scanlation_group')?.attributes?.name ?? ''),
-        external: a.externalUrl,
-        at: Date.parse(a.readableAt),
-      })
-    }
+    out.push(...r.data.map(toChapter))
     if (offset + 500 >= r.total) break
   }
   return out
+}
+
+function toChapter(c: RawChapter): Chapter {
+  const a = c.attributes
+  return {
+    id: c.id,
+    num: a.chapter,
+    volume: a.volume,
+    title: a.title ?? '',
+    pages: a.pages,
+    lang: a.translatedLanguage,
+    group: String(c.relationships.find((x) => x.type === 'scanlation_group')?.attributes?.name ?? ''),
+    external: a.externalUrl,
+    at: Date.parse(a.readableAt),
+  }
+}
+
+/** a title's latest chapters in one language, newest first: one light request, for the new chapter check */
+export async function recentChapters(id: string, lang: string): Promise<Chapter[]> {
+  const r = await get<{ data: RawChapter[] }>(
+    `/manga/${id}/feed`,
+    {
+      limit: 40,
+      translatedLanguage: [lang],
+      includes: ['scanlation_group'],
+      contentRating: ['safe', 'suggestive', 'erotica', 'pornographic'],
+      'order[readableAt]': 'desc',
+      includeEmptyPages: 0,
+    },
+    20 * 60_000,
+  )
+  return r.data.map(toChapter)
 }
 
 /** one entry per chapter number: the preferred group's version, else the most prolific group's */

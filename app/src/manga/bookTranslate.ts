@@ -3,6 +3,7 @@
 // next to the book file, so re-reading costs no quota.
 import { askGemini, type GeminiOpts } from './translate'
 import { storage } from '../lib/offline'
+import { glossaryPrompt, NAMES_SCHEMA, useGlossary } from './glossary'
 
 const BLOCKS = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, dt, dd, figcaption, td, th, pre'
 const BATCH_CHARS = 4000
@@ -80,7 +81,7 @@ export function translateChapter(
       for (const [i, batch] of batches.entries()) {
         const ru = await translateBatch(
           batch.map((el) => el.textContent!.replace(/\s+/g, ' ').trim()),
-          ctx,
+          { ...ctx, glossary: bookId },
         )
         // the text replaces the paragraph's own text; pictures inside it stay
         batch.forEach((el, j) => {
@@ -101,21 +102,27 @@ export function translateChapter(
   return running.get(k)!
 }
 
-async function translateBatch(paras: string[], ctx: GeminiOpts & { title: string }) {
+async function translateBatch(paras: string[], ctx: GeminiOpts & { title: string; glossary: string }) {
   const json = await askGemini(
     {
-      contents: [{ parts: [{ text: `${PROMPT(ctx.title)}\n\n${JSON.stringify(paras)}` }] }],
+      contents: [{ parts: [{ text: `${PROMPT(ctx.title)}\nPut the paragraphs in "paragraphs". ${glossaryPrompt(ctx.glossary)}\n\n${JSON.stringify(paras)}` }] }],
       safetySettings: ['HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH', 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'HARM_CATEGORY_DANGEROUS_CONTENT'].map((category) => ({
         category,
         threshold: 'BLOCK_NONE',
       })),
-      generationConfig: { temperature: 0.5, responseMimeType: 'application/json', responseSchema: { type: 'ARRAY', items: { type: 'STRING' } } },
+      generationConfig: {
+        temperature: 0.5,
+        responseMimeType: 'application/json',
+        responseSchema: { type: 'OBJECT', properties: { paragraphs: { type: 'ARRAY', items: { type: 'STRING' } }, names: NAMES_SCHEMA }, required: ['paragraphs'] },
+      },
     },
     ctx,
   )
   const text: string = json?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? ''
   if (!text) throw new Error(json?.promptFeedback?.blockReason ? 'Gemini отказался переводить эту главу' : 'Пустой ответ Gemini')
-  const out = JSON.parse(text) as string[]
+  const res = JSON.parse(text) as string[] | { paragraphs: string[]; names?: { original: string; russian: string }[] }
+  const out = Array.isArray(res) ? res : res.paragraphs
   if (!Array.isArray(out)) throw new Error('Gemini вернул перевод в неожиданном виде')
+  if (!Array.isArray(res) && res.names) useGlossary.getState().learn(ctx.glossary, res.names)
   return out
 }

@@ -1,7 +1,9 @@
 // Novels and chapters opened in this run of the app: the title page, the reader and the next chapter
-// share one request instead of three.
+// share one request instead of three. Downloaded chapters are read from the device.
 import { sourceById } from './registry'
 import type { Novel } from './sources'
+import { entryId } from './shelf'
+import { savedChapter, savedMeta, savedText } from '../manga/saved'
 
 const novels = new Map<string, Promise<Novel>>()
 const chapters = new Map<string, Promise<string>>()
@@ -19,11 +21,21 @@ function once<T>(map: Map<string, Promise<T>>, key: string, load: () => Promise<
 export function loadNovel(src: string, id: string) {
   const s = sourceById(src)
   if (!s) return Promise.reject(new Error('Неизвестный источник'))
-  return once(novels, `${src}:${id}`, () => s.novel(id))
+  // with no connection, the copy kept along with downloaded chapters
+  return once(novels, `${src}:${id}`, () =>
+    s.novel(id).catch(async (e) => {
+      const copy = await savedMeta<Novel>(entryId(src, id))
+      if (copy) return copy
+      throw e
+    }),
+  )
 }
 
-export function loadChapter(src: string, novelId: string, chapterId: string) {
+/** a chapter's HTML: from the device when it was downloaded (unless `fresh`), else from the source */
+export function loadChapter(src: string, novelId: string, chapterId: string, fresh = false) {
   const s = sourceById(src)
   if (!s) return Promise.reject(new Error('Неизвестный источник'))
+  const saved = !fresh && savedChapter(entryId(src, novelId), chapterId)
+  if (saved) return savedText(saved).catch(() => s.chapter(novelId, chapterId))
   return once(chapters, `${src}:${chapterId}`, () => s.chapter(novelId, chapterId))
 }

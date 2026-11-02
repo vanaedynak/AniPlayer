@@ -1,6 +1,7 @@
 // Page translator: Gemini looks at the whole page, finds every speech bubble and caption,
 // reads it and translates it into Russian with the scene in mind (who speaks, puns, tone).
 // Uses the reader's own free Google AI Studio key; nothing goes through our servers.
+import { glossaryPrompt, NAMES_SCHEMA, useGlossary } from './glossary'
 
 export interface Bubble {
   /** position on the page as fractions of its width / height */
@@ -76,6 +77,8 @@ async function work() {
 
 export interface PageContext extends GeminiOpts {
   title: string
+  /** the title's names list (see glossary.ts) */
+  glossary?: string
   /** another copy of the page (MangaDex's own server) to try when the first one won't load */
   alt?: string
 }
@@ -221,29 +224,39 @@ export async function askGemini(body: object, { keys, model }: GeminiOpts): Prom
 async function run(url: string, ctx: PageContext): Promise<Bubble[]> {
   const image = await pageImage(url, ctx.alt)
   const body = {
-    contents: [{ parts: [{ inline_data: { mime_type: 'image/jpeg', data: image } }, { text: PROMPT(ctx.title) }] }],
+    contents: [{ parts: [{ inline_data: { mime_type: 'image/jpeg', data: image } }, { text: `${PROMPT(ctx.title)}\n${glossaryPrompt(ctx.glossary)}` }] }],
     safetySettings: SAFETY,
     generationConfig: {
       temperature: 0.4,
       responseMimeType: 'application/json',
       responseSchema: {
-        type: 'ARRAY',
-        items: {
-          type: 'OBJECT',
-          properties: {
-            box_2d: { type: 'ARRAY', items: { type: 'INTEGER' } },
-            text: { type: 'STRING' },
-            ru: { type: 'STRING' },
+        type: 'OBJECT',
+        properties: {
+          bubbles: {
+            type: 'ARRAY',
+            items: {
+              type: 'OBJECT',
+              properties: {
+                box_2d: { type: 'ARRAY', items: { type: 'INTEGER' } },
+                text: { type: 'STRING' },
+                ru: { type: 'STRING' },
+              },
+              required: ['box_2d', 'text', 'ru'],
+            },
           },
-          required: ['box_2d', 'text', 'ru'],
+          names: NAMES_SCHEMA,
         },
+        required: ['bubbles'],
       },
     },
   }
   const json = await askGemini(body, ctx)
   const text: string = json?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? ''
   if (!text) throw new Error(json?.promptFeedback?.blockReason ? 'Gemini отказался переводить эту страницу' : 'Пустой ответ Gemini')
-  const items = JSON.parse(text) as { box_2d: number[]; text: string; ru: string }[]
+  type Item = { box_2d: number[]; text: string; ru: string }
+  const out = JSON.parse(text) as Item[] | { bubbles: Item[]; names?: { original: string; russian: string }[] }
+  const items = Array.isArray(out) ? out : (out.bubbles ?? [])
+  if (!Array.isArray(out) && out.names && ctx.glossary) useGlossary.getState().learn(ctx.glossary, out.names)
   return items
     .filter((i) => i.box_2d?.length === 4 && i.ru?.trim())
     .map((i) => {

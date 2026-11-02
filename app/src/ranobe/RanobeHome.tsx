@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { Search, X, Loader2, FolderOpen, Languages, BookText } from 'lucide-react'
 import { ReadTabs, Cover } from '../manga/ui'
 import { Section, Row, Empty, Chip } from '../components/ui'
+import { NewChapters, ReadingSchedule } from '../manga/ChapterUpdates'
 import { SOURCES, sourceById } from './registry'
 import type { NovelItem } from './sources'
 import { chapterPath, novelPath, parseEntry, useReadingNovels } from './shelf'
@@ -114,6 +115,8 @@ export default function RanobeHome() {
               </Row>
             </Section>
           )}
+          <NewChapters kind="novel" />
+          <ReadingSchedule kind="novel" />
           <Section
             title={src.sorts.find((s) => s.value === sort)?.label ?? 'Популярное'}
             action={
