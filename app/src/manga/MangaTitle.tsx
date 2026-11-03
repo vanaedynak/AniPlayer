@@ -4,7 +4,7 @@ import { BookOpen, Check, ChevronDown, ExternalLink, Heart, Loader2, Star, Arrow
 import { manga, coverUrl, mangaName, chapterKey, chapterLabel, KIND, LANGS, STATUS, GENRES } from './md'
 import { useManga, READ_LABELS, type ReadStatus } from './store'
 import { useChapters, pickLang } from './useChapters'
-import { Cover } from './ui'
+import { Cover, MdImg } from './ui'
 import { savedManga, useSaved } from './saved'
 import { ChapterSave, SaveMenu, pickToSave, useSavedFor } from './SaveButtons'
 import { useAsync } from '../lib/useAsync'
@@ -84,7 +84,7 @@ export default function MangaTitle() {
     <div className="flex flex-col gap-8">
       <div className="relative -mx-4 -mt-4 overflow-hidden px-4 pt-6 pb-2 sm:-mx-6 sm:px-6 lg:mx-0 lg:rounded-[32px] lg:px-8 lg:pt-8">
         <div className="absolute inset-0 -z-10">
-          {m.cover && <img src={coverUrl(m, 512)} alt="" referrerPolicy="no-referrer" className="h-full w-full scale-110 object-cover opacity-30 blur-3xl" />}
+          {m.cover && <MdImg src={coverUrl(m, 512)} alt="" referrerPolicy="no-referrer" className="h-full w-full scale-110 object-cover opacity-30 blur-3xl" />}
           <div className="absolute inset-0 bg-gradient-to-b from-bg/40 via-bg/70 to-bg" />
         </div>
         <div className="flex flex-col gap-6 sm:flex-row">

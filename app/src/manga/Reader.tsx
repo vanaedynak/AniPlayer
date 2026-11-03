@@ -8,7 +8,7 @@ import { translatePage, savedTranslation, KEY_URL, MODELS, DEFAULT_MODEL, type B
 /** translated bubbles for page i, if any */
 const BubblesCtx = createContext<(i: number) => Bubble[] | undefined>(() => undefined)
 import { useChapters, pickLang } from './useChapters'
-import { PAPER } from './ui'
+import { MdImg, PAPER } from './ui'
 import { useAsync } from '../lib/useAsync'
 import { cn } from '../lib/format'
 import { isElectron, isIOS } from '../lib/platform'
@@ -211,7 +211,8 @@ function ReaderView({
     }
   }, [translating, page, n, urls, bubbles, prefs.geminiKeys, prefs.geminiModel, m?.title, trTry])
   const bubblesFor = useCallback((i: number) => (translating && !original ? bubbles[urls[i]] : undefined), [translating, original, bubbles, urls])
-  const onImgError = (i: number) => setFailed((f) => (f[i] && f[i] > 2 ? f : { ...f, [i]: (f[i] ?? 0) + 1 }))
+  // a failed page tries MangaDex's own server, then twice more; after that it waits for a tap ("Ещё раз")
+  const onImgError = (i: number, again?: boolean) => setFailed((f) => (!again && f[i] && f[i] > 2 ? f : { ...f, [i]: (f[i] ?? 0) + 1 }))
 
   const go = useCallback(
     (to: number) => {
@@ -858,13 +859,15 @@ function Page({
 }: {
   i: number
   src: string
-  onError: (i: number) => void
+  onError: (i: number, again?: boolean) => void
   eager?: boolean
   className?: string
   /** classes for the page's own box (fit-to-height needs it as tall as the screen) */
   wrap?: string
 }) {
   const [loaded, setLoaded] = useState(false)
+  // the address that last failed: when the reader has nothing else to try, the page says so instead of spinning
+  const [broken, setBroken] = useState('')
   const bubbles = useContext(BubblesCtx)(i)
   const img = useRef<HTMLImageElement>(null)
   const [box, setBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null)
@@ -880,12 +883,25 @@ function Page({
   }, [bubbles, loaded])
   return (
     <div id={`mp-${i}`} data-i={i} className={cn('relative', wrap, !loaded && 'aspect-[5/7] max-h-[90vh] w-full')}>
-      {!loaded && (
+      {!loaded && broken !== src && (
         <div className="absolute inset-0 flex items-center justify-center opacity-40">
           <Loader2 className="animate-spin" />
         </div>
       )}
-      <img
+      {!loaded && broken === src && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center">
+          <AlertCircle size={28} className="text-rose-400" />
+          <div className="text-sm font-bold opacity-70">Страница {i + 1} не загрузилась</div>
+          <button
+            onClick={() => onError(i, true)}
+            onPointerUp={(e) => e.stopPropagation()}
+            className="rounded-full bg-white/15 px-5 py-2 text-sm font-bold hover:bg-white/25"
+          >
+            Ещё раз
+          </button>
+        </div>
+      )}
+      <MdImg
         src={src}
         alt=""
         draggable={false}
@@ -894,7 +910,10 @@ function Page({
         decoding="async"
         ref={img}
         onLoad={() => setLoaded(true)}
-        onError={() => onError(i)}
+        onError={() => {
+          setBroken(src)
+          onError(i)
+        }}
         className={cn('mx-auto block', className)}
       />
       {loaded && bubbles && box && (

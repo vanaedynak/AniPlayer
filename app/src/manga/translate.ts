@@ -2,6 +2,7 @@
 // reads it and translates it into Russian with the scene in mind (who speaks, puns, tone).
 // Uses the reader's own free Google AI Studio key; nothing goes through our servers.
 import { glossaryPrompt, NAMES_SCHEMA, useGlossary } from './glossary'
+import { mdBytes, viaNative } from './mdImage'
 
 export interface Bubble {
   /** position on the page as fractions of its width / height */
@@ -105,6 +106,14 @@ export function translatePage(url: string, ctx: PageContext): Promise<Bubble[]> 
 async function download(url: string, alt?: string): Promise<Blob> {
   const bridge = window.aniplayer?.fetchImage
   for (const u of alt && alt !== url ? [url, alt] : [url]) {
+    // iPad and Android: MangaDex pictures come through the native layer, under the app's name
+    if (viaNative(u)) {
+      try {
+        return new Blob([(await mdBytes(u)) as BlobPart])
+      } catch {
+        continue
+      }
+    }
     // Windows app: the main process fetches it, no CORS in the way
     if (bridge) {
       try {

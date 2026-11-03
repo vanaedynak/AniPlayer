@@ -1,9 +1,22 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ComponentProps, type ReactNode } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { BookOpen, Star } from 'lucide-react'
 import { coverUrl, mangaName, KIND, STATUS, type Manga } from './md'
 import { useManga, type MangaEntry } from './store'
 import { cn } from '../lib/format'
+import { useImgSrc } from './mdImage'
+
+/** an <img> that gets MangaDex pictures past its bot check on the iPad and Android (see mdImage.ts) */
+export function MdImg({ src, onError, ...rest }: ComponentProps<'img'> & { src: string }) {
+  const shown = useImgSrc(src)
+  // couldn't be had: reported like a picture that failed to load
+  useEffect(() => {
+    if (shown === '') onError?.({} as React.SyntheticEvent<HTMLImageElement>)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown])
+  if (!shown) return null
+  return <img src={shown} onError={onError} {...rest} />
+}
 
 /**
  * cover with a soft fallback: some MangaDex titles have no cover art. No Referer: MangaDex swaps covers
@@ -14,7 +27,7 @@ export function Cover({ src, className, children }: { src: string; className?: s
   return (
     <div className={cn('relative overflow-hidden bg-card', className)}>
       {src && !bad ? (
-        <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBad(true)} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+        <MdImg src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBad(true)} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-accent/30 to-pink/20 text-white/50">
           <BookOpen size={36} />

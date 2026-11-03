@@ -8,6 +8,7 @@ import { storage, keepStorage } from '../lib/offline'
 import { isNative } from '../lib/platform'
 import type { Chapter, Manga } from './md'
 import type { Novel } from '../ranobe/sources'
+import { mdBytes, viaNative } from './mdImage'
 
 export type SaveStatus = 'queued' | 'saving' | 'done' | 'error'
 
@@ -201,6 +202,7 @@ function pump() {
 async function bytes(url: string, signal: AbortSignal): Promise<Uint8Array> {
   const bridge = window.aniplayer?.fetchImage
   if (bridge) return (await bridge(url)) as Uint8Array
+  if (viaNative(url)) return mdBytes(url)
   if (isNative) {
     const r = await CapacitorHttp.get({ url, responseType: 'arraybuffer' })
     if (r.status >= 400) throw new Error(`HTTP ${r.status}`)
