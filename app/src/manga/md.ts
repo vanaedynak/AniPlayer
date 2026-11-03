@@ -31,6 +31,18 @@ export interface Manga {
   names: string[]
   /** the same title on Senkuro, where Russian chapters often continue */
   sk?: string
+  /** where the title is published officially: shop or reader name → address */
+  official?: Record<string, string>
+}
+
+// MangaDex's link keys for official editions, and how to call them
+const OFFICIAL: Record<string, (v: string) => [string, string]> = {
+  engtl: (v) => ['Официальный перевод', v],
+  raw: (v) => ['Оригинал', v],
+  bw: (v) => ['BookWalker', `https://bookwalker.jp/${v}`],
+  amz: (v) => ['Amazon', v],
+  ebj: (v) => ['ebookjapan', v],
+  cdj: (v) => ['CDJapan', v],
 }
 
 export interface Chapter {
@@ -205,6 +217,11 @@ function toManga(r: RawManga): Manga {
     demographic: a.publicationDemographic,
     lastChapter: a.lastChapter || null,
     names: [...Object.values(a.title), ...a.altTitles.flatMap((t) => Object.values(t))],
+    official: Object.fromEntries(
+      Object.entries(a.links ?? {})
+        .filter(([k, v]) => OFFICIAL[k] && v)
+        .map(([k, v]) => OFFICIAL[k](v)),
+    ),
   }
 }
 

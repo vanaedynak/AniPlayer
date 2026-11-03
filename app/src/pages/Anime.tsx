@@ -13,6 +13,7 @@ import { ThemesSection } from '../components/Music'
 import { RatingBlock, Comments } from '../components/Social'
 import { Skeleton, Empty, Chip } from '../components/ui'
 import { SeasonEpisodes } from '../components/SeasonEpisodes'
+import { ContinueReading } from '../components/ContinueReading'
 import { cn, fmtOrdinal } from '../lib/format'
 
 const DUB_KEY = 'aniplayer-yummy-dub' // remembered dub per title, on this device
@@ -232,6 +233,7 @@ export default function Anime() {
         current={showPlayer || entry?.lastOrdinal ? { releaseId: r.id, ordinal: episode } : undefined}
         replace={showPlayer}
       />
+      <ContinueReading malId={a.id} title={a.name || a.russian} episodes={a.episodes || null} />
       <RatingBlock animeId={a.id} />
       <ThemesSection malId={a.id} />
       <FranchiseRow malId={a.id} />

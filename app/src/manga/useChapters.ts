@@ -21,7 +21,7 @@ export function useChapters(mangaId: string, lang: string | null, sk?: string) {
     const [md, ru, en] = await Promise.all([
       mdOnly ? [] : chapters(mangaId, lang),
       lang === 'ru' && sk ? skChapters(sk).catch(() => []) : [],
-      // chapters nobody has translated into this language yet are read in English
+      // chapters nobody has translated into this language are read in English (Gemini translates them)
       lang !== 'en' && !mdOnly ? chapters(mangaId, 'en').catch(() => []) : [],
     ])
     return { main: [...md, ...ru], more: en }
@@ -29,9 +29,13 @@ export function useChapters(mangaId: string, lang: string | null, sk?: string) {
   const list = useMemo(() => {
     if (!all.data) return []
     const main = dedupe(all.data.main, group)
-    const last = Math.max(-1, ...main.map((c) => (c.num != null ? parseFloat(c.num) : -1)))
-    const tail = dedupe(all.data.more).filter((c) => c.num != null && parseFloat(c.num) > last && !c.external)
-    return [...main, ...tail]
+    // every chapter missing in this language, wherever it is: a team often starts translating mid-way
+    // (chapters 97 on), and the title would otherwise seem to begin there
+    const have = new Set(main.map((c) => c.num))
+    const fill = dedupe(all.data.more).filter((c) => c.num != null && !have.has(c.num) && !c.external)
+    if (!fill.length) return main
+    const at = (c: (typeof main)[number]) => (c.num != null ? parseFloat(c.num) : -1)
+    return [...main, ...fill].sort((a, b) => at(a) - at(b))
   }, [all.data, group])
   const groups = useMemo(() => [...new Set((all.data?.main ?? []).map((c) => c.group).filter(Boolean))], [all.data])
   const every = useMemo(() => (all.data ? [...all.data.main, ...all.data.more] : []), [all.data])

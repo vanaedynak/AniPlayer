@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { BookOpen, Check, ChevronDown, ExternalLink, Heart, Loader2, Star, ArrowDownUp, Users, Play, Tv } from 'lucide-react'
 import { manga, coverUrl, mangaName, chapterKey, chapterLabel, KIND, LANGS, STATUS, GENRES } from './md'
 import { useManga, READ_LABELS, type ReadStatus } from './store'
@@ -19,6 +19,8 @@ const rank = (l: string) => {
 
 export default function MangaTitle() {
   const { id = '' } = useParams()
+  // "continue from chapter N" from an anime's page opens the list right there
+  const [sp] = useSearchParams()
   const nav = useNavigate()
   // with no connection, what was saved along with downloaded chapters
   const { data: m, error } = useAsync(() => manga(id).catch(async (e) => (await savedManga(id)) ?? Promise.reject(e)), [id])
@@ -42,7 +44,7 @@ export default function MangaTitle() {
   const [desc, setDesc] = useState(false)
   const [newest, setNewest] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
-  const [filter, setFilter] = useState('')
+  const [filter, setFilter] = useState(() => sp.get('ch') ?? '')
 
   const read = useMemo(() => new Set(entry?.read ?? []), [entry?.read])
   const shown = useMemo(() => {
@@ -234,6 +236,7 @@ export default function MangaTitle() {
           </div>
         </div>
 
+        {!loading && <MissingChapters list={list} official={m.official} />}
         {loading ? (
           <div className="flex flex-col gap-2">
             {Array.from({ length: 8 }, (_, i) => (
@@ -304,6 +307,37 @@ export default function MangaTitle() {
           </div>
         )}
       </section>
+    </div>
+  )
+}
+
+/**
+ * The title's chapters begin past the first: the earlier ones were taken down (an official edition
+ * asked for it) and no language has them. Said plainly, with where the title is published officially.
+ */
+function MissingChapters({ list, official }: { list: { num: string | null }[]; official?: Record<string, string> }) {
+  const nums = list.map((c) => (c.num != null ? parseFloat(c.num) : NaN)).filter((n) => !Number.isNaN(n))
+  const first = nums.length ? Math.min(...nums) : 0
+  if (first <= 1) return null
+  const shops = Object.entries(official ?? {})
+  return (
+    <div className="mb-4 flex flex-col gap-2 rounded-2xl bg-amber-400/10 px-5 py-4 text-sm ring-1 ring-amber-400/20">
+      <div className="font-bold text-amber-200">
+        Главы {first - 1 > 1 ? `1–${Math.ceil(first) - 1}` : '1'} здесь недоступны ни на одном языке
+      </div>
+      <div className="text-white/70">
+        Их удалили по просьбе правообладателя: манга издаётся официально. Здесь есть главы с {nums.length ? Math.min(...nums) : first}-й.
+        {shops.length ? ' Начало можно прочитать в официальном издании:' : ''}
+      </div>
+      {shops.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {shops.map(([name, url]) => (
+            <a key={name} href={url} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 font-bold hover:bg-white/15">
+              <ExternalLink size={13} /> {name}
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

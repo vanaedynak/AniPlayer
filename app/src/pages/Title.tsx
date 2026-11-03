@@ -8,6 +8,7 @@ import { Skeleton, Empty } from '../components/ui'
 import { SeasonEpisodes } from '../components/SeasonEpisodes'
 import { StatusPicker } from '../components/TitleBits'
 import { FranchiseRow, SeasonTabs } from '../components/FranchiseRow'
+import { ContinueReading } from '../components/ContinueReading'
 import { DownloadSeason } from '../components/Downloads'
 import { releaseOrOffline } from '../lib/downloads'
 import { ThemesSection } from '../components/Music'
@@ -156,6 +157,7 @@ export default function Title() {
         </section>
       </div>
 
+      {r.mal?.id ? <ContinueReading malId={r.mal.id} title={r.name.english || r.name.main} episodes={r.episodes_total} /> : null}
       {r.mal?.id ? <FranchiseRow malId={r.mal.id} /> : null}
       {r.mal?.id ? <RatingBlock animeId={r.mal.id} /> : null}
       {r.mal?.id ? <ThemesSection malId={r.mal.id} /> : null}
