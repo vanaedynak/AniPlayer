@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { UpscaleMode } from './upscale'
 import { persist } from 'zustand/middleware'
 import { posterUrl, type Release } from './api'
+import { isSignedIn, needAccount } from './guest'
 
 export interface Progress {
   releaseId: number
@@ -167,6 +168,8 @@ export const useStore = create<State>()(
         const prev = get().progress[key]
         const watched = prev?.watched || (p.duration > 0 && p.time / p.duration >= WATCHED_RATIO) || p.watched
         const next: Progress = { ...p, watched, updatedAt: Date.now() }
+        // guests: the player still gets its position, history does not
+        if (!isSignedIn()) return next
         set((s) => ({ progress: { ...s.progress, [key]: next } }))
         syncHooks.progress?.(next, force)
         if (watched && !prev?.watched) syncHooks.finished?.(key)
@@ -191,6 +194,7 @@ export const useStore = create<State>()(
       },
 
       setWatched: (releaseId, ordinal, watched, duration) => {
+        if (!needAccount('Отмечать просмотренные серии')) return
         const key = progressKey(releaseId, ordinal)
         const prev = get().progress[key]
         const next: Progress = {
@@ -208,16 +212,19 @@ export const useStore = create<State>()(
 
       touchTitle: (r, patch) => {
         const entry = { ...entryFromRelease(r, get().titles[r.id]), ...patch, updatedAt: Date.now() }
+        if (!isSignedIn()) return entry
         set((s) => ({ titles: { ...s.titles, [r.id]: entry } }))
         syncHooks.title?.(entry)
         return entry
       },
 
       setStatus: (r, status) => {
+        if (!needAccount('Списки «Смотрю», «В планах», «Просмотрено»')) return
         get().touchTitle(r, { status })
       },
 
       toggleFavorite: (r) => {
+        if (!needAccount('Избранное')) return
         get().touchTitle(r, { favorite: !get().titles[r.id]?.favorite })
       },
 
@@ -230,7 +237,7 @@ export const useStore = create<State>()(
       },
 
       addWatchTime: (seconds) => {
-        if (seconds <= 0) return
+        if (seconds <= 0 || !isSignedIn()) return
         const d = dayKey()
         set((s) => ({
           statsDays: { ...s.statsDays, [d]: (s.statsDays[d] ?? 0) + seconds },
@@ -310,6 +317,15 @@ export function releaseProgress(progress: Record<string, Progress>, releaseId: n
 }
 
 /** routes for an entry: Shikimori/Kodik titles use /anime/:id, AniLibria ones /title and /watch */
+/** where "continue" leads: the last episode, or the next one once the last was watched to the end */
+export function continueTarget(t: TitleEntry, progress: Record<string, Progress>) {
+  const last = t.lastOrdinal ?? 1
+  const p = progress[progressKey(t.releaseId, last)]
+  const next = Math.floor(last) + 1
+  if (p?.watched && (!t.episodesTotal || next <= t.episodesTotal)) return { ordinal: next, progress: progress[progressKey(t.releaseId, next)], next: true }
+  return { ordinal: last, progress: p, next: false }
+}
+
 export const titleHref = (alias: string) => (alias.startsWith('shiki-') ? `/anime/${alias.slice(6)}` : `/title/${alias}`)
 export const watchHref = (alias: string, ordinal: number) =>
   alias.startsWith('shiki-') ? `/anime/${alias.slice(6)}?ep=${ordinal}` : `/watch/${alias}/${ordinal}`

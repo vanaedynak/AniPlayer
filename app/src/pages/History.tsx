@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Clock, History as HistoryIcon, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { useStore, watchHref, startedReleases, STARTED_SECONDS, type Progress, type TitleEntry } from '../lib/store'
+import { useStore, watchHref, startedReleases, continueTarget, STARTED_SECONDS, type Progress, type TitleEntry } from '../lib/store'
 import { WideCard, Empty, Chip } from '../components/ui'
 import { fmtTime, fmtOrdinal, cn } from '../lib/format'
 import { useTitleGroups } from '../lib/franchise'
@@ -108,11 +108,11 @@ export default function History() {
           {byTitle.map((t) => (
             <div key={t.releaseId} className="group relative">
               <WideCard
-                to={watchHref(t.alias, t.lastOrdinal ?? 1)}
+                to={watchHref(t.alias, continueTarget(t, progress).ordinal)}
                 image={t.lastPreview || t.poster}
                 malId={t.malId}
                 title={nameOf(t)}
-                subtitle={`${labelOf(t) ? labelOf(t) + ' · ' : ''}${fmtOrdinal(t.lastOrdinal ?? 1)} серия${t.episodesTotal ? ` из ${t.episodesTotal}` : ''}`}
+                subtitle={`${labelOf(t) ? labelOf(t) + ' · ' : ''}${fmtOrdinal(continueTarget(t, progress).ordinal)} серия${t.episodesTotal ? ` из ${t.episodesTotal}` : ''}`}
               />
               <button
                 onClick={() => (groupOf(t.releaseId)?.parts ?? [t]).filter((p) => p.lastWatchedAt).forEach((p) => removeFromHistory(p.releaseId))}

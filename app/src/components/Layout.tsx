@@ -32,7 +32,7 @@ import { UpdatePill } from './Updates'
 import { MiniPlayer } from './Music'
 import { RoomBridge, RoomButton } from './Room'
 import { cn } from '../lib/format'
-import { CrashGuard, Welcome } from './Crash'
+import { CrashGuard } from './Crash'
 import { Avatar } from './Social'
 import { useMyProfile } from '../lib/social'
 import { SUPPORT_URL } from '../lib/links'
@@ -405,7 +405,6 @@ export default function Layout({ children }: { children: ReactNode }) {
       <TabBar />
       <MiniPlayer />
       <RoomBridge />
-      <Welcome />
       <AchievementToasts />
     </div>
   )

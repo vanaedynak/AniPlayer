@@ -5,7 +5,7 @@ import { shiki, shikiToRelease, shImg, shikiTitle, stripBB, useShikiPoster, KIND
 import { findYummy, yummyDubs, dubLabel, type YDub } from '../lib/yummy'
 import { useLibriaIndex } from '../lib/libriaIndex'
 import { useAsync } from '../lib/useAsync'
-import { useStore } from '../lib/store'
+import { useStore, continueTarget } from '../lib/store'
 import KodikPlayer from '../components/KodikPlayer'
 import { StatusPicker } from '../components/TitleBits'
 import { FranchiseRow, SeasonTabs } from '../components/FranchiseRow'
@@ -67,7 +67,8 @@ export default function Anime() {
   const dub = dubs?.find((d) => d.key === dubKey) ?? null
   const numbers = useMemo(() => (dub ? [...dub.episodes.keys()].sort((x, y) => x - y) : []), [dub])
   const epParam = Number(sp.get('ep'))
-  const wanted = epParam > 0 ? epParam : entry?.lastOrdinal ?? numbers[0] ?? 1
+  const progress = useStore((s) => s.progress)
+  const wanted = epParam > 0 ? epParam : entry?.lastOrdinal != null ? continueTarget(entry, progress).ordinal : numbers[0] ?? 1
   const episode = dub?.episodes.has(wanted) ? wanted : numbers.find((n) => n >= wanted) ?? numbers[numbers.length - 1] ?? 1
   const players = dub?.episodes.get(episode) ?? []
   const video = players[Math.min(playerIdx, players.length - 1)]

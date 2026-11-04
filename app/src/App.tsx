@@ -1,5 +1,6 @@
 import { HashRouter, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
+import { Boot } from './components/Boot'
 import Home from './pages/Home'
 import Catalog from './pages/Catalog'
 import Search from './pages/Search'
@@ -32,40 +33,42 @@ import Achievements from './pages/Achievements'
 export default function App() {
   return (
     <HashRouter>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/catalog" element={<Catalog />} />
-          <Route path="/search" element={<Search />} />
-          <Route path="/schedule" element={<Schedule />} />
-          <Route path="/title/:alias" element={<Title />} />
-          <Route path="/watch/:alias/:ordinal" element={<Watch />} />
-          <Route path="/anime/:id" element={<Anime />} />
-          <Route path="/history" element={<History />} />
-          <Route path="/collection" element={<Collection />} />
-          <Route path="/stats" element={<Stats />} />
-          <Route path="/top" element={<Top />} />
-          <Route path="/achievements" element={<Achievements />} />
-          <Route path="/achievements/:username" element={<Achievements />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/downloads" element={<Downloads />} />
-          <Route path="/torrent" element={<TorrentPlayer />} />
-          <Route path="/manga" element={<MangaHome />} />
-          <Route path="/manga/:id" element={<MangaTitle />} />
-          <Route path="/manga/read/:id/:chapterId" element={<MangaReader />} />
-          <Route path="/ranobe" element={<RanobeHome />} />
-          <Route path="/ranobe/files" element={<Ranobe />} />
-          <Route path="/ranobe/n/:src/:id" element={<NovelPage />} />
-          <Route path="/ranobe/n/:src/:id/:ch" element={<NovelReader />} />
-          <Route path="/ranobe/:id" element={<BookReader />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/about/:page" element={<About />} />
-          <Route path="/status" element={<Status />} />
-          <Route path="/u/:username" element={<ProfilePage />} />
-          <Route path="/moderation" element={<Moderation />} />
-          <Route path="*" element={<Home />} />
-        </Routes>
-      </Layout>
+      <Boot>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/catalog" element={<Catalog />} />
+            <Route path="/search" element={<Search />} />
+            <Route path="/schedule" element={<Schedule />} />
+            <Route path="/title/:alias" element={<Title />} />
+            <Route path="/watch/:alias/:ordinal" element={<Watch />} />
+            <Route path="/anime/:id" element={<Anime />} />
+            <Route path="/history" element={<History />} />
+            <Route path="/collection" element={<Collection />} />
+            <Route path="/stats" element={<Stats />} />
+            <Route path="/top" element={<Top />} />
+            <Route path="/achievements" element={<Achievements />} />
+            <Route path="/achievements/:username" element={<Achievements />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/downloads" element={<Downloads />} />
+            <Route path="/torrent" element={<TorrentPlayer />} />
+            <Route path="/manga" element={<MangaHome />} />
+            <Route path="/manga/:id" element={<MangaTitle />} />
+            <Route path="/manga/read/:id/:chapterId" element={<MangaReader />} />
+            <Route path="/ranobe" element={<RanobeHome />} />
+            <Route path="/ranobe/files" element={<Ranobe />} />
+            <Route path="/ranobe/n/:src/:id" element={<NovelPage />} />
+            <Route path="/ranobe/n/:src/:id/:ch" element={<NovelReader />} />
+            <Route path="/ranobe/:id" element={<BookReader />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/about/:page" element={<About />} />
+            <Route path="/status" element={<Status />} />
+            <Route path="/u/:username" element={<ProfilePage />} />
+            <Route path="/moderation" element={<Moderation />} />
+            <Route path="*" element={<Home />} />
+          </Routes>
+        </Layout>
+      </Boot>
     </HashRouter>
   )
 }

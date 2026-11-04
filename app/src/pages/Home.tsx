@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom'
 import { Play, Info, Star, Shuffle, ChevronRight } from 'lucide-react'
 import { api, episodePreview, posterUrl, type Release } from '../lib/api'
 import { useAsync } from '../lib/useAsync'
-import { useStore, progressKey, watchHref, startedReleases } from '../lib/store'
+import { useStore, watchHref, startedReleases, continueTarget } from '../lib/store'
 import { useTitleGroups } from '../lib/franchise'
 import { Section, Row, ReleaseCard, WideCard, CardSkeletons, Skeleton } from '../components/ui'
 import { fmtTime, fmtOrdinal, cn } from '../lib/format'
+import { HomeShelves } from '../components/HomeShelves'
 
 function Hero({ items }: { items: Release[] }) {
   const [i, setI] = useState(0)
@@ -96,17 +97,18 @@ export function ContinueRow() {
     <Section title="Продолжить просмотр" action={<Link to="/history" className="flex items-center text-sm font-bold text-muted hover:text-white">Вся история <ChevronRight size={16} /></Link>}>
       <Row itemClass="w-[290px] sm:w-[400px]">
         {items.map((t) => {
-          const p = progress[progressKey(t.releaseId, t.lastOrdinal!)]
+          // a finished episode hands over to the next one, even if that one only played a few seconds
+          const { ordinal, progress: p, next } = continueTarget(t, progress)
           const ratio = p ? (p.watched ? 1 : p.duration ? p.time / p.duration : 0) : 0
           return (
             <WideCard
               key={t.releaseId}
-              to={watchHref(t.alias, t.lastOrdinal!)}
+              to={watchHref(t.alias, ordinal)}
               image={p?.preview || t.lastPreview || t.poster}
               malId={t.malId}
               title={nameOf(t)}
-              subtitle={[labelOf(t), `${fmtOrdinal(t.lastOrdinal!)} серия`].filter(Boolean).join(' · ')}
-              badge={p?.watched ? 'Просмотрено' : p && p.time > 5 ? fmtTime(p.time) : undefined}
+              subtitle={[labelOf(t), `${fmtOrdinal(ordinal)} серия`].filter(Boolean).join(' · ')}
+              badge={p?.watched ? 'Просмотрено' : p && p.time > 5 ? fmtTime(p.time) : next ? 'Следующая' : undefined}
               ratio={ratio}
             />
           )
@@ -169,6 +171,7 @@ export default function Home() {
             : [<CardSkeletons key="a" n={1} />, <CardSkeletons key="b" n={1} />, <CardSkeletons key="c" n={1} />, <CardSkeletons key="d" n={1} />]}
         </Row>
       </Section>
+      <HomeShelves />
     </div>
   )
 }

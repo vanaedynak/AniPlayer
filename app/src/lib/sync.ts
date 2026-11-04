@@ -7,11 +7,14 @@ import { create } from 'zustand'
 import { SUPABASE_URL, SUPABASE_KEY } from '../supabase-config'
 import { useStore, syncHooks, progressKey, type Progress, type TitleEntry, type SyncedPrefs } from './store'
 import { vaultLogin, vaultRemember, vaultForget } from './vault'
+import { setSignedIn } from './guest'
 import { takeActivity, restoreActivity, countFinished, type Activity } from './activity'
 
 export type SyncStatus = 'disabled' | 'signed-out' | 'connecting' | 'synced' | 'offline' | 'error'
 
-export const useSync = create<{ status: SyncStatus; user: User | null; error: string; moving: boolean }>(() => ({
+/** ready: the saved session (or the keychain's account) has been tried, so the app knows who is here */
+export const useSync = create<{ status: SyncStatus; user: User | null; error: string; moving: boolean; ready: boolean }>(() => ({
+  ready: false,
   status: 'disabled',
   user: null,
   error: '',
@@ -71,8 +74,10 @@ export function initSync() {
   sb.auth.onAuthStateChange((event, session) => {
     const user = session?.user ?? null
     if (event === 'TOKEN_REFRESHED' && user?.id === uid) return
+    setSignedIn(!!user)
     useSync.setState({ user })
     if (user) {
+      useSync.setState({ ready: true })
       if (user.id !== uid) void start(user.id)
     } else {
       stop()
@@ -81,8 +86,10 @@ export function initSync() {
       const saved = vaultLogin()
       if (!restored && saved && event === 'INITIAL_SESSION') {
         restored = true
-        void signIn(saved.login, saved.password).catch(() => {})
-      }
+        void signIn(saved.login, saved.password)
+          .catch(() => {})
+          .finally(() => useSync.setState({ ready: true }))
+      } else useSync.setState({ ready: true })
       firstSyncResolve?.()
     }
   })

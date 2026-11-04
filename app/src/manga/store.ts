@@ -5,6 +5,7 @@ import { persist } from 'zustand/middleware'
 import { pushDoc, registerDocs } from '../lib/sync'
 import { setAdult, type Manga } from './md'
 import { countFinished } from '../lib/activity'
+import { isSignedIn, needAccount } from '../lib/guest'
 
 export type ReadStatus = 'reading' | 'planned' | 'completed' | 'postponed' | 'dropped'
 export const READ_LABELS: Record<ReadStatus, string> = {
@@ -101,6 +102,7 @@ export const useManga = create<MangaState>()(
       book: { size: 19, leading: 1.7, font: 'serif', paper: 'dark', width: 720, justify: true, indent: true, translate: false },
 
       touch: (m, patch) => {
+        if ('status' in patch || 'favorite' in patch ? !needAccount('Полка: «Читаю», «В планах» и избранное') : !isSignedIn()) return
         const cur = get().entries[m.id]
         const e: MangaEntry = {
           ...cur,
@@ -118,7 +120,7 @@ export const useManga = create<MangaState>()(
 
       progress: (mangaId, p) => {
         const cur = get().entries[mangaId]
-        if (!cur) return
+        if (!cur || !isSignedIn()) return
         const read = p.done && !cur.read.includes(p.key) ? [...cur.read, p.key] : cur.read
         if (read !== cur.read) countFinished(mangaId.startsWith('ln-') ? 'l' : 'c', `${mangaId}:${p.key}`)
         const e: MangaEntry = {
@@ -137,6 +139,7 @@ export const useManga = create<MangaState>()(
       },
 
       toggleRead: (mangaId, keys, read) => {
+        if (!needAccount('Отмечать прочитанные главы')) return
         const cur = get().entries[mangaId]
         if (!cur) return
         const s = new Set(cur.read)
