@@ -61,6 +61,10 @@ export interface ReaderPrefs {
   curl?: boolean
   /** the paper turn makes its sound */
   flipSound?: boolean
+  /** lettering of translated bubbles */
+  bubbleFont?: import('./bubbleFont').BubbleFont
+  /** pages translated ahead of the one on screen */
+  ahead?: number
 }
 
 export interface BookPrefs {

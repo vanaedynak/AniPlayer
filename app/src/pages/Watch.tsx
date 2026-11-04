@@ -11,6 +11,7 @@ import { StatusPicker, Franchise } from '../components/TitleBits'
 import { DownloadEpisodeButton } from '../components/Downloads'
 import { releaseOrOffline } from '../lib/downloads'
 import { fmtOrdinal, cn } from '../lib/format'
+import { useFillers, nextSkipping, KIND_LABEL } from '../lib/fillers'
 
 export default function Watch() {
   const { alias = '', ordinal = '1' } = useParams()
@@ -22,6 +23,8 @@ export default function Watch() {
   const touchTitle = useStore((s) => s.touchTitle)
   const p = useStore((s) => (r && episode ? s.progress[progressKey(r.id, episode.ordinal)] : undefined))
   const setWatched = useStore((s) => s.setWatched)
+  const skipFillers = useStore((s) => !!s.prefs.skipFillers)
+  const fillers = useFillers([r?.mal?.id])[r?.mal?.id ?? 0]
 
   // opening an episode only remembers the title; it reaches history once the episode plays (saveProgress)
   useEffect(() => {
@@ -49,7 +52,9 @@ export default function Watch() {
     )
   if (!episode) return <Empty icon={<Film />} title="Серий пока нет" text={r.notification ?? undefined} action={<Link to={`/title/${r.alias}`} className="font-bold text-accent-2">К тайтлу</Link>} />
 
-  const next = episodes[idx + 1]
+  // with «Пропускать филлеры» on, the next episode is the next canon one
+  const { next, skipped } = nextSkipping(episodes, idx, fillers, skipFillers)
+  const kind = fillers?.[Math.floor(episode.ordinal)]
   const prev = episodes[idx - 1]
 
   return (
@@ -85,6 +90,16 @@ export default function Watch() {
                 {fmtOrdinal(episode.ordinal)} серия
               </h1>
               {episode.name && <div className="mt-1 text-lg font-semibold text-muted">{episode.name}</div>}
+              {(kind || skipped > 0) && (
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm font-semibold">
+                  {kind && <span className="rounded-full bg-amber-400/15 px-3 py-1 text-amber-300 ring-1 ring-amber-400/30">{KIND_LABEL[kind]}: не по сюжету манги</span>}
+                  {skipped > 0 && next && (
+                    <span className="text-muted">
+                      Следующая — {fmtOrdinal(next.ordinal)}: {skipped} {skipped === 1 ? 'филлер пропущен' : 'филлеров пропущено'}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button

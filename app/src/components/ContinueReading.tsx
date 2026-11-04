@@ -16,6 +16,8 @@ interface Related {
 }
 
 const NOVEL = /novel/
+/** «Читать мангу / манхву …» */
+const READ_KIND: Record<string, string> = { manga: 'мангу', manhwa: 'манхву', manhua: 'маньхуа', one_shot: 'ваншот' }
 const KIND: Record<string, string> = { manga: 'Манга', manhwa: 'Манхва', manhua: 'Маньхуа', light_novel: 'Ранобэ', novel: 'Новелла', one_shot: 'Ваншот' }
 
 /** where the source is readable here: the MangaDex title with the same MAL id, or ranobe found by name */
@@ -82,15 +84,61 @@ Check it with a search. Reply with only JSON, no other text:
  * «Читать дальше»: the manga or ranobe this anime is made from, readable here, and — on request — the
  * chapter to pick it up from once the anime is over.
  */
+const relatedCache = new Map<number, Promise<NonNullable<Related['manga']>[]>>()
+/** the manga and ranobe the anime is made from, by its MAL id on Shikimori (asked once per page visit) */
+function sourcesOf(malId: number) {
+  let p = relatedCache.get(malId)
+  if (!p) {
+    p = fetch(`https://shikimori.io/api/animes/${malId}/related`, { headers: { Accept: 'application/json' } })
+      .then(async (res) => {
+        if (!res.ok) return []
+        const list = ((await res.json()) as Related[]).filter((r) => r.manga && (r.relation === 'Adaptation' || r.relation === 'Source'))
+        return list.map((r) => r.manga!).slice(0, 3)
+      })
+      .catch(() => {
+        relatedCache.delete(malId)
+        return []
+      })
+    relatedCache.set(malId, p)
+  }
+  return p
+}
+
+const savedPoint = (anime: string, srcId: number): Point | null => {
+  try {
+    return JSON.parse(localStorage.getItem(`aniplayer-continue-${anime}-${srcId}`) ?? 'null') as Point | null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Next to the title's buttons: «Читать мангу-первоисточник» or «…ранобэ…», and once the chapter the anime
+ * ends on is known, «Продолжить историю · гл. 89». It leads to the «Читать дальше» block below.
+ */
+export function SourceButton({ malId, title }: { malId: number; title: string }) {
+  const src = useAsync(() => sourcesOf(malId), [malId])
+  const m = src.data?.[0]
+  if (!m) return null
+  const novel = NOVEL.test(m.kind)
+  const point = savedPoint(title, m.id)
+  return (
+    <button
+      onClick={() => document.getElementById('read-on')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+      title={m.russian || m.name}
+      className="flex h-12 items-center gap-2 rounded-full bg-white/10 px-5 font-bold ring-1 ring-white/10 transition hover:bg-white/15"
+    >
+      {novel ? <BookText size={17} /> : <BookOpen size={17} />}
+      {point?.chapter ? `Продолжить историю · гл. ${point.chapter}` : novel ? 'Читать ранобэ-первоисточник' : `Читать ${READ_KIND[m.kind] ?? 'мангу'}-первоисточник`}
+    </button>
+  )
+}
+
 export function ContinueReading({ malId, title, episodes }: { malId: number; title: string; episodes: number | null }) {
-  const src = useAsync(async () => {
-    const res = await fetch(`https://shikimori.io/api/animes/${malId}/related`, { headers: { Accept: 'application/json' } })
-    if (!res.ok) return []
-    const list = ((await res.json()) as Related[]).filter((r) => r.manga && (r.relation === 'Adaptation' || r.relation === 'Source'))
-    return list.map((r) => r.manga!).slice(0, 3)
-  }, [malId])
+  const src = useAsync(() => sourcesOf(malId), [malId])
   if (!src.data?.length) return null
   return (
+    <div id="read-on" className="scroll-mt-24">
     <Section
       title={
         <span className="flex items-center gap-2">
@@ -104,19 +152,15 @@ export function ContinueReading({ malId, title, episodes }: { malId: number; tit
         ))}
       </div>
     </Section>
+    </div>
   )
 }
 
 function SourceCard({ m, anime, episodes }: { m: NonNullable<Related['manga']>; anime: string; episodes: number | null }) {
   const here = useAsync(() => findHere(m), [m.id])
   const hasKey = useManga((s) => s.prefs.geminiKeys.some((k) => k.trim()))
-  const [point, setPoint] = useState<Point | null>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(`aniplayer-continue-${anime}-${m.id}`) ?? 'null') as Point | null
-    } catch {
-      return null
-    }
-  })
+  // the answer is kept on the device: the button asks the network once per anime season
+  const [point, setPoint] = useState<Point | null>(() => savedPoint(anime, m.id))
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const novel = NOVEL.test(m.kind)
@@ -171,7 +215,7 @@ function SourceCard({ m, anime, episodes }: { m: NonNullable<Related['manga']>; 
           {!point &&
             (hasKey ? (
               <button onClick={ask} disabled={busy} className="flex h-9 items-center gap-1.5 rounded-full bg-white/10 px-4 text-sm font-bold hover:bg-white/15 disabled:opacity-60">
-                {busy ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />} С какой главы продолжить?
+                {busy ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />} Продолжить историю после аниме
               </button>
             ) : (
               <span className="text-xs text-dim">С ключом Gemini (переводчик манги) подскажу, с какой главы продолжить после аниме</span>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { miniClick } from './MiniProfile'
 import { Star, Heart, MessageCircle, Flag, Trash2, Pencil, EyeOff, Eye, Ban, Loader2, Send, ShieldCheck, X } from 'lucide-react'
 import { useSync } from '../lib/sync'
 import {
@@ -294,12 +295,12 @@ function CommentItem({ c, me, animeId, onChange, onRemove, onReply }: { c: Comme
 
   return (
     <div className={cn('flex gap-3', c.hidden && 'opacity-50')}>
-      <Link to={c.author ? `/u/${c.author.username}` : '#'}>
+      <Link to={c.author ? `/u/${c.author.username}` : '#'} onClick={c.author ? miniClick(c.author.username) : undefined}>
         <Avatar p={c.author} size={c.parent_id ? 32 : 40} />
       </Link>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 text-sm">
-          <Link to={c.author ? `/u/${c.author.username}` : '#'} className="font-extrabold hover:text-accent-2">
+          <Link to={c.author ? `/u/${c.author.username}` : '#'} onClick={c.author ? miniClick(c.author.username) : undefined} className="font-extrabold hover:text-accent-2">
             {displayName(c.author)}
           </Link>
           {c.author && c.author.role !== 'user' && (

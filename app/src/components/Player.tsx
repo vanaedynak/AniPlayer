@@ -23,7 +23,8 @@ import {
   Magnet,
   X,
 } from 'lucide-react'
-import { api, episodePreview, aniskip, sortedEpisodes, type Episode, type Release, type Torrent } from '../lib/api'
+import { api, episodePreview, aniskip, sortedEpisodes, posterUrl, type Episode, type Release, type Torrent } from '../lib/api'
+import { setNowPlaying } from '../lib/discord'
 import {
   torrentSupported,
   torrentsFor,
@@ -121,6 +122,23 @@ export default function Player({ release, episode, next, prev, onSelect, source,
   const [duration, setDuration] = useState(episode.duration ?? 0)
   const [buffered, setBuffered] = useState(0)
   const [controls, setControls] = useState(true)
+
+  // what is playing, for the Discord status (a few times a minute is plenty)
+  const tick = Math.floor(time / 15)
+  useEffect(() => {
+    const poster = posterUrl(release)
+    setNowPlaying({
+      title: release.name.main,
+      episode: `Серия ${episode.ordinal}${release.episodes_total ? ` из ${release.episodes_total}` : ''}`,
+      poster: poster.startsWith('http') ? poster : '',
+      path: location.hash.replace(/^#/, '') || `/watch/${release.alias}/${episode.ordinal}`,
+      time,
+      duration,
+      playing,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [release.id, episode.ordinal, playing, tick, duration])
+  useEffect(() => () => setNowPlaying(null), [])
   const [fullscreen, setFullscreen] = useState(false)
   const [menu, setMenu] = useState<null | Menu>(null)
   const [hover, setHover] = useState<{ x: number; t: number } | null>(null)
@@ -1489,6 +1507,7 @@ function SettingsMenu({
           <Toggle label="Пропускать опенинг" on={prefs.autoSkipOpening} set={(v) => setPrefs({ autoSkipOpening: v })} />
           <Toggle label="Пропускать эндинг" on={prefs.autoSkipEnding} set={(v) => setPrefs({ autoSkipEnding: v })} />
           <Toggle label="Автопереход" on={prefs.autoNext} set={(v) => setPrefs({ autoNext: v })} />
+          <Toggle label="Пропускать филлеры" on={!!prefs.skipFillers} set={(v) => setPrefs({ skipFillers: v })} />
         </>
       )}
       {menu === 'quality' && (

@@ -13,8 +13,9 @@ import { ThemesSection } from '../components/Music'
 import { RatingBlock, Comments } from '../components/Social'
 import { Skeleton, Empty, Chip } from '../components/ui'
 import { SeasonEpisodes } from '../components/SeasonEpisodes'
-import { ContinueReading } from '../components/ContinueReading'
+import { ContinueReading, SourceButton } from '../components/ContinueReading'
 import { cn, fmtOrdinal } from '../lib/format'
+import { useFillers, nextSkipping } from '../lib/fillers'
 
 const DUB_KEY = 'aniplayer-yummy-dub' // remembered dub per title, on this device
 
@@ -72,7 +73,14 @@ export default function Anime() {
   const episode = dub?.episodes.has(wanted) ? wanted : numbers.find((n) => n >= wanted) ?? numbers[numbers.length - 1] ?? 1
   const players = dub?.episodes.get(episode) ?? []
   const video = players[Math.min(playerIdx, players.length - 1)]
-  const nextEp = numbers[numbers.indexOf(episode) + 1]
+  const skipFillers = useStore((s) => !!s.prefs.skipFillers)
+  const fillers = useFillers([a?.id])[a?.id ?? 0]
+  const nextEp = nextSkipping(
+    numbers.map((n) => ({ ordinal: n })),
+    numbers.indexOf(episode),
+    fillers,
+    skipFillers,
+  ).next?.ordinal
   // the page opens on the episode list; the player comes up once an episode is picked
   const showPlayer = epParam > 0
   const playerRef = useRef<HTMLDivElement>(null)
@@ -168,6 +176,7 @@ export default function Anime() {
                 </button>
               )}
               <StatusPicker r={r} />
+              <SourceButton malId={a.id} title={a.name || a.russian} />
               {libria && (
                 <Link to={`/title/${libria.alias}`} className="flex h-12 items-center rounded-full bg-white px-6 font-extrabold text-black">
                   Смотреть в озвучке AniLibria

@@ -197,9 +197,12 @@ export function EpisodeCard({
   replace,
   num,
   missing,
+  kind,
 }: {
   r: Release
   e: Episode
+  /** MAL marks it a filler or a recap: a badge in the bottom-right corner */
+  kind?: 'filler' | 'recap'
   active?: boolean
   onClick?: () => void
   /** where the card leads (the AniLibria watch page by default) */
@@ -237,7 +240,18 @@ export function EpisodeCard({
           <span className="absolute top-2 left-2 rounded-full bg-accent px-2.5 py-1 text-xs font-bold">Сейчас</span>
         )}
         {missing && <span className="absolute top-2 left-2 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white/70">Пока нет</span>}
-        <div className="absolute inset-x-0 bottom-0 p-3">
+        {kind && (
+          <span
+            title={kind === 'filler' ? 'Филлер: история, которой нет в манге' : 'Рекап: пересказ прошлых серий'}
+            className={cn(
+              'absolute right-2 bottom-3 rounded-full px-2.5 py-1 text-[11px] font-extrabold tracking-wide uppercase ring-1 backdrop-blur',
+              kind === 'filler' ? 'bg-amber-400/20 text-amber-200 ring-amber-300/40' : 'bg-sky-400/20 text-sky-200 ring-sky-300/40',
+            )}
+          >
+            {kind === 'filler' ? 'Филлер' : 'Рекап'}
+          </span>
+        )}
+        <div className={cn('absolute inset-x-0 bottom-0 p-3', kind && 'pr-24')}>
           <div className="text-[17px] font-extrabold">Серия {fmtOrdinal(num ?? e.ordinal)}</div>
           {e.name && <div className="line-clamp-1 text-xs font-medium text-white/70">{e.name}</div>}
         </div>

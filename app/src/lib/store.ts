@@ -53,6 +53,8 @@ export interface SyncedPrefs {
   autoSkipOpening: boolean
   autoSkipEnding: boolean
   autoNext: boolean
+  /** the next episode passes over fillers and recaps of long shows */
+  skipFillers?: boolean
   anilistToken: string
   anilistSync: boolean
   kodikToken: string
@@ -71,6 +73,12 @@ export interface LocalPrefs {
   torrent?: string
   /** color theme of the app */
   theme?: Theme
+  /** desktop: show what is playing as the Discord status */
+  discord?: boolean
+  /** the Discord application the status is shown under (its name is what Discord shows) */
+  discordAppId?: string
+  /** desktop: while watching, keep a watch-together room open so the status carries a «Смотреть вместе» button */
+  discordInvite?: boolean
 }
 
 /** a palette id from lib/palettes */

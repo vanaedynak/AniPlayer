@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Users, Copy, Check, LogOut, MessageCircle, Send, X, Loader2 } from 'lucide-react'
+import { Users, Copy, Check, LogOut, MessageCircle, Send, X, Loader2, Link2 } from 'lucide-react'
 import { type RoomEvent, useRoom, createRoom, joinRoom, leaveRoom, publishPath, publishPlayback, sendEvent, resumeRoom, myUid, roomTime, onlineMembers } from '../lib/room'
 import { useSync } from '../lib/sync'
 import { cn } from '../lib/format'
+import { inviteLink } from '../lib/discord'
 
 const EMOJI = ['😂', '❤️', '😮', '🔥', '👏', '😭']
 const isWatchPath = (p: string) => p.startsWith('/watch/') || p.startsWith('/anime/')
@@ -124,6 +125,7 @@ function RoomDialog({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [copied, setCopied] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
   const canCreate = isWatchPath(loc.pathname)
 
   const run = async (fn: () => Promise<unknown>) => {
@@ -164,8 +166,17 @@ function RoomDialog({ onClose }: { onClose: () => void }) {
             <div className="rounded-2xl bg-white/[0.04] p-4 text-center ring-1 ring-white/5">
               <div className="text-xs font-bold tracking-widest text-muted uppercase">Код комнаты</div>
               <div className="mt-1 font-mono text-4xl font-extrabold tracking-[0.3em]">{code}</div>
-              <div className="mt-1 text-sm text-muted">Друг вводит этот код в Anyflow: значок 👥 сверху</div>
+              <div className="mt-1 text-sm text-muted">Друг вводит этот код в Anyflow: значок 👥 сверху — или открывает ссылку-приглашение</div>
             </div>
+            <button
+              className="flex h-11 items-center justify-center gap-2 rounded-2xl bg-white/10 font-bold hover:bg-white/15"
+              onClick={() => {
+                void navigator.clipboard?.writeText(inviteLink(code))
+                setLinkCopied(true)
+              }}
+            >
+              {linkCopied ? <Check size={17} /> : <Link2 size={17} />} {linkCopied ? 'Ссылка скопирована' : 'Копировать ссылку-приглашение'}
+            </button>
             <div className="text-sm text-white/80">
               В комнате: {onlineMembers(room).map((m) => m.name).join(', ') || '…'}
             </div>

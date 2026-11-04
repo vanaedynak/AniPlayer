@@ -8,7 +8,7 @@ import { Skeleton, Empty } from '../components/ui'
 import { SeasonEpisodes } from '../components/SeasonEpisodes'
 import { StatusPicker } from '../components/TitleBits'
 import { FranchiseRow, SeasonTabs } from '../components/FranchiseRow'
-import { ContinueReading } from '../components/ContinueReading'
+import { ContinueReading, SourceButton } from '../components/ContinueReading'
 import { DownloadSeason } from '../components/Downloads'
 import { releaseOrOffline } from '../lib/downloads'
 import { ThemesSection } from '../components/Music'
@@ -127,6 +127,7 @@ export default function Title() {
               )}
               <StatusPicker r={r} />
               <DownloadSeason r={r} episodes={episodes} />
+              {r.mal?.id ? <SourceButton malId={r.mal.id} title={r.name.english || r.name.main} /> : null}
               {r.mal?.id ? (
                 <Link
                   to={`/anime/${r.mal.id}?kodik=1`}

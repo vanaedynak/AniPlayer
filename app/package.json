@@ -20,6 +20,8 @@
     "@capacitor/filesystem": "^8.1.5",
     "@capacitor/status-bar": "^8.0.4",
     "@fontsource-variable/manrope": "^5.3.0",
+    "@fontsource/comic-relief": "^5.3.0",
+    "@fontsource/pangolin": "^5.3.0",
     "@mintplex-labs/piper-tts-web": "^1.0.5",
     "@supabase/supabase-js": "^2.118.0",
     "anime4k-webgpu": "^1.0.0",
@@ -64,6 +66,14 @@
   "build": {
     "appId": "app.aniplayer.desktop",
     "productName": "Anyflow Desktop",
+    "protocols": [
+      {
+        "name": "Anyflow",
+        "schemes": [
+          "anyflow"
+        ]
+      }
+    ],
     "publish": [
       {
         "provider": "generic",

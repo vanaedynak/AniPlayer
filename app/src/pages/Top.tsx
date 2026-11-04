@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { miniClick } from '../components/MiniProfile'
 import { Trophy, Clock, Tv, BookOpen, BookText, Glasses, Flame, Crown, Heart, Star, Sparkles, Info, AlertCircle } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Panel, PanelTitle, Empty, Skeleton } from '../components/ui'
@@ -164,6 +165,7 @@ function PodiumCard({ r, unit, first }: { r: Place; unit: (v: number) => string;
   return (
     <Link
       to={`/u/${r.username}`}
+      onClick={miniClick(r.username)}
       className={cn(
         'flex min-w-0 flex-col items-center gap-2 rounded-[28px] bg-card px-2 text-center ring-1 transition hover:bg-card-2',
         first ? 'pt-6 pb-6' : 'pt-5 pb-4',
@@ -189,6 +191,7 @@ function Row({ r, unit }: { r: Place; unit: (v: number) => string }) {
   return (
     <Link
       to={`/u/${r.username}`}
+      onClick={miniClick(r.username)}
       className={cn('flex items-center gap-3 rounded-2xl bg-card px-4 py-3 ring-1 transition hover:bg-card-2', r.me ? 'ring-accent' : 'ring-white/5')}
     >
       <span className="w-8 text-center text-lg font-extrabold text-muted">{r.place}</span>

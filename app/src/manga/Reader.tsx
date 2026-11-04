@@ -4,6 +4,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, List, Settings2, Maximize, Minimi
 import { manga, pages, chapterKey, chapterLabel, mangaName, type Chapter, type Manga } from './md'
 import { useManga, type ReaderPrefs } from './store'
 import { translatePage, savedTranslation, KEY_URL, MODELS, DEFAULT_MODEL, type Bubble } from './translate'
+import { BUBBLE_FONTS, fontCss, loadCustomFont, saveCustomFont, customFontName } from './bubbleFont'
 
 /** translated bubbles for page i, if any */
 const BubblesCtx = createContext<(i: number) => Bubble[] | undefined>(() => undefined)
@@ -186,7 +187,7 @@ function ReaderView({
   useEffect(() => {
     if (!translating || !n) return
     let alive = true
-    const want = Array.from({ length: AHEAD + 1 }, (_, k) => page + k).filter((i) => i < n).map((i) => urls[i])
+    const want = Array.from({ length: (prefs.ahead ?? AHEAD) + 1 }, (_, k) => page + k).filter((i) => i < n).map((i) => urls[i])
     const todo = want.filter((u) => !bubbles[u])
     for (const u of todo) {
       const hit = savedTranslation(u)
@@ -209,7 +210,7 @@ function ReaderView({
     return () => {
       alive = false
     }
-  }, [translating, page, n, urls, bubbles, prefs.geminiKeys, prefs.geminiModel, m?.title, trTry])
+  }, [translating, page, n, urls, bubbles, prefs.geminiKeys, prefs.geminiModel, prefs.ahead, m?.title, trTry])
   const bubblesFor = useCallback((i: number) => (translating && !original ? bubbles[urls[i]] : undefined), [translating, original, bubbles, urls])
   // a failed page tries MangaDex's own server, then twice more; after that it waits for a tap ("Ещё раз")
   const onImgError = (i: number, again?: boolean) => setFailed((f) => (!again && f[i] && f[i] > 2 ? f : { ...f, [i]: (f[i] ?? 0) + 1 }))
@@ -930,8 +931,24 @@ function Page({
  *  over a neighbouring bubble */
 const MIN_TEXT = 13
 const LAST_RESORT = 10
+// a shout: the original in capitals with "!!", or only exclamations
+const shout = (b: Bubble) => /!{2,}|!\?|\?!/.test(b.text) && b.text.replace(/[^A-Za-z]/g, '').length > 2 && b.text === b.text.toUpperCase()
 function Bubbles({ list, width, height }: { list: Bubble[]; width: number; height: number }) {
   const refs = useRef<(HTMLDivElement | null)[]>([])
+  const font = useManga((s) => s.prefs.bubbleFont)
+  const [fontReady, setFontReady] = useState(0)
+  // a font file has to be measured with, so the sizes are laid out again once it has loaded
+  useEffect(() => {
+    let on = true
+    const css = fontCss(font)
+    ;(font === 'custom' ? loadCustomFont() : Promise.resolve(true))
+      .then(() => document.fonts.load(`700 20px ${css}`, 'Привет'))
+      .then(() => on && setFontReady((n) => n + 1))
+      .catch(() => {})
+    return () => {
+      on = false
+    }
+  }, [font])
   useLayoutEffect(() => {
     const raw = list.map((b) => ({ l: b.x * width, t: b.y * height, r: (b.x + b.w) * width, b: (b.y + b.h) * height }))
     const placed: (typeof raw)[number][] = []
@@ -985,7 +1002,7 @@ function Bubbles({ list, width, height }: { list: Bubble[]; width: number; heigh
       if (over()) shrink(LAST_RESORT)
       if (over()) el.style.overflowWrap = 'anywhere'
     })
-  }, [list, width, height])
+  }, [list, width, height, font, fontReady])
   return (
     <>
       {list.map((b, k) => (
@@ -995,8 +1012,13 @@ function Bubbles({ list, width, height }: { list: Bubble[]; width: number; heigh
             refs.current[k] = el
           }}
           title={b.text}
-          className="absolute flex items-center justify-center overflow-hidden rounded-[40%/30%] bg-white px-[3%] py-1 text-center leading-[1.15] font-bold text-black shadow-[0_0_6px_4px_white]"
-          style={{ fontFamily: '"Comic Neue", "Manrope Variable", system-ui, sans-serif' }}
+          // white fill whose edge melts into the drawing instead of a hard sticker border
+          className={cn(
+            'absolute flex items-center justify-center overflow-hidden rounded-[45%/35%] bg-white px-[4%] py-1 text-center leading-[1.12] text-black shadow-[0_0_10px_7px_white]',
+            shout(b) ? 'font-black tracking-tight uppercase' : 'font-bold',
+          )}
+          style={{ fontFamily: fontCss(font), hyphens: 'auto' }}
+          lang="ru"
         >
           {b.ru}
         </div>
@@ -1074,6 +1096,23 @@ export function TranslatorSetup({
         {saved ? 'Сохранить и перевести' : 'Сохранить ключи'}
       </button>
       {!book && <Toggle label="Переводить главы не на русском" value={prefs.translate} onChange={(translate) => set({ translate })} />}
+      {!book && (
+        <Field label="Переводить наперёд">
+          <div className="flex gap-1.5">
+            {[2, 3, 5, 8].map((n) => (
+              <button
+                key={n}
+                onClick={() => set({ ahead: n })}
+                className={cn('h-9 flex-1 rounded-xl text-sm font-bold ring-1 ring-white/10', (prefs.ahead ?? AHEAD) === n ? 'bg-white text-black' : 'bg-white/5 hover:bg-white/10')}
+              >
+                {n} стр.
+              </button>
+            ))}
+          </div>
+          <div className="mt-1.5 text-xs text-white/45">Пока вы читаете, следующие страницы переводятся в фоне и запоминаются на этом устройстве — даже после закрытия манги.</div>
+        </Field>
+      )}
+      {!book && <FontPicker value={prefs.bubbleFont} set={(bubbleFont) => set({ bubbleFont })} />}
       <Field label="Модель">
         <select
           value={prefs.geminiModel}
@@ -1094,6 +1133,56 @@ export function TranslatorSetup({
         </div>
       )}
     </div>
+  )
+}
+
+/** the lettering of translated bubbles, with a slot for the reader's own font file */
+function FontPicker({ value, set }: { value: ReaderPrefs['bubbleFont']; set: (v: NonNullable<ReaderPrefs['bubbleFont']>) => void }) {
+  const [name, setName] = useState(customFontName)
+  const [err, setErr] = useState('')
+  const file = useRef<HTMLInputElement>(null)
+  const cur = value ?? 'comic'
+  return (
+    <Field label="Шрифт перевода">
+      <div className="grid grid-cols-2 gap-1.5">
+        {BUBBLE_FONTS.map((f) => (
+          <button
+            key={f.id}
+            onClick={() => (f.id === 'custom' && !name ? file.current?.click() : set(f.id))}
+            style={{ fontFamily: f.id === 'custom' && !name ? undefined : f.css }}
+            className={cn('h-10 truncate rounded-xl px-2 text-sm font-bold ring-1 ring-white/10', cur === f.id ? 'bg-white text-black' : 'bg-white/5 hover:bg-white/10')}
+          >
+            {f.id === 'custom' ? (name ?? 'Свой файл…') : f.label}
+          </button>
+        ))}
+      </div>
+      <input
+        ref={file}
+        type="file"
+        accept=".ttf,.otf,.woff,.woff2"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          e.target.value = ''
+          if (!f) return
+          setErr('')
+          saveCustomFont(f)
+            .then(() => {
+              setName(customFontName())
+              set('custom')
+            })
+            .catch((x: Error) => setErr(x.message))
+        }}
+      />
+      <div className="mt-1.5 text-xs text-white/45">
+        Есть свой шрифт тайпсеттеров с кириллицей (Anime Ace, CC Wild Words)?{' '}
+        <button onClick={() => file.current?.click()} className="font-bold text-accent-2 underline">
+          {name ? 'Заменить файл' : 'Загрузите его файл'}
+        </button>{' '}
+        — он останется только на этом устройстве. Размер текста подбирается под каждое облачко сам.
+      </div>
+      {err && <div className="mt-1 text-xs text-rose-300">{err}</div>}
+    </Field>
   )
 }
 

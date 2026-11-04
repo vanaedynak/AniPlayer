@@ -28,6 +28,8 @@ import ProfilePage from './pages/Profile'
 import Moderation from './pages/Moderation'
 import Top from './pages/Top'
 import Achievements from './pages/Achievements'
+import Roulette from './pages/Roulette'
+import AiSearch from './pages/AiSearch'
 
 // HashRouter: works from file:// in Electron and capacitor:// on iPad
 export default function App() {
@@ -47,6 +49,8 @@ export default function App() {
             <Route path="/collection" element={<Collection />} />
             <Route path="/stats" element={<Stats />} />
             <Route path="/top" element={<Top />} />
+            <Route path="/roulette" element={<Roulette />} />
+            <Route path="/ai" element={<AiSearch />} />
             <Route path="/achievements" element={<Achievements />} />
             <Route path="/achievements/:username" element={<Achievements />} />
             <Route path="/settings" element={<Settings />} />

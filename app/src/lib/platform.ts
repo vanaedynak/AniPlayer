@@ -15,9 +15,15 @@ interface ElectronBridge {
   onBeforeClose: (cb: () => Promise<void>) => void
   setZoom: (factor: number) => void
   fetchImage?: (url: string) => Promise<Uint8Array>
+  /** a MyAnimeList page's HTML, read by the main process (no CORS) */
+  fetchText?: (url: string) => Promise<string>
   /** starts the F5 voice module if it is installed */
   voice?: { start: () => Promise<{ installed: boolean }> }
   version?: () => Promise<string>
+  /** Discord Rich Presence through the desktop Discord app */
+  discord?: { setActivity: (appId: string, activity: object | null) => Promise<void> }
+  /** anyflow:// links that opened or reached the app */
+  onDeepLink?: (cb: (url: string) => void) => () => void
   /** desktop only: streams AniLibria torrents through a local server */
   torrent?: {
     open: (id: number) => Promise<TorrentInfo>

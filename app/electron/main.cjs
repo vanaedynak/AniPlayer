@@ -21,6 +21,26 @@ app.setPath('userData', path.join(app.getPath('appData'), 'aniplayer'))
 
 if (!app.requestSingleInstanceLock()) app.quit()
 
+// anyflow://join/CODE: an invite to a watch-together room (the Discord button, a link from a friend).
+// The link is kept until the page takes it, so one that starts the app is not lost while it loads.
+if (process.defaultApp && process.argv.length >= 2) app.setAsDefaultProtocolClient('anyflow', process.execPath, [path.resolve(process.argv[1])])
+else app.setAsDefaultProtocolClient('anyflow')
+let pendingLink = process.argv.find((a) => a.startsWith('anyflow://')) ?? null
+function deliverLink(url) {
+  pendingLink = url
+  if (win && !win.isDestroyed()) win.webContents.send('deep-link')
+}
+ipcMain.handle('deep-link-take', () => {
+  const url = pendingLink
+  pendingLink = null
+  return url
+})
+
+// Discord status, loaded on first use
+let discord = null
+ipcMain.handle('discord-activity', (_e, id, activity) => (discord ??= require('./discord.cjs')).setActivity(String(id ?? ''), activity ?? null))
+app.on('will-quit', () => discord?.shutdown())
+
 nativeTheme.themeSource = 'dark'
 // no default menu: its zoom shortcuts would fight the in-app scale setting
 Menu.setApplicationMenu(null)
@@ -147,6 +167,14 @@ ipcMain.handle('fetch-image', async (_e, url) => {
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return new Uint8Array(await res.arrayBuffer())
 })
+// Filler marks come from MyAnimeList's episode pages when its API mirror (Jikan) can't be reached
+ipcMain.handle('fetch-text', async (_e, url) => {
+  const u = new URL(url)
+  if (u.protocol !== 'https:' || u.hostname !== 'myanimelist.net' || !/^\/anime\/\d+\/[^/]*\/episode$/.test(u.pathname)) throw new Error('url not allowed')
+  const res = await net.fetch(url)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.text()
+})
 ipcMain.on('close-ok', () => win && !win.isDestroyed() && win.destroy())
 
 // Torrent streaming (AniLibria's own torrents): loaded on first use, pieces live in a temp folder until the app quits
@@ -184,7 +212,9 @@ ipcMain.handle('voice-start', () => {
 })
 app.on('will-quit', () => voiceProc?.kill())
 
-app.on('second-instance', () => {
+app.on('second-instance', (_e, argv) => {
+  const link = argv.find((a) => a.startsWith('anyflow://'))
+  if (link) deliverLink(link)
   if (!win) return
   if (win.isMinimized()) win.restore()
   win.focus()

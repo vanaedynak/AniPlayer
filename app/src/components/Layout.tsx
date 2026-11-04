@@ -37,6 +37,9 @@ import { Avatar } from './Social'
 import { useMyProfile } from '../lib/social'
 import { SUPPORT_URL } from '../lib/links'
 import { AchievementToasts } from './AchievementToasts'
+import { MiniProfile } from './MiniProfile'
+import { DiscordBridge } from '../lib/discord'
+import { Dices, Sparkles } from 'lucide-react'
 
 const NAV = [
   { to: '/', label: 'Главная', icon: Home },
@@ -46,6 +49,7 @@ const NAV = [
   { to: '/collection', label: 'Моя коллекция', icon: Library },
   { to: '/manga', label: 'Манга и ранобэ', icon: BookOpen },
   { to: '/stats', label: 'Статистика', icon: BarChart3 },
+  { to: '/roulette', label: 'Аниме-рулетка', icon: Dices },
   { to: '/top', label: 'Топы', icon: Trophy },
   { to: '/achievements', label: 'Достижения', icon: Award },
   { to: '/downloads', label: 'Загрузки', icon: HardDriveDownload },
@@ -215,11 +219,32 @@ function SearchBox() {
             <X size={18} />
           </button>
         ) : (
-          <kbd className="hidden rounded-md bg-white/10 px-2 py-0.5 text-xs font-bold text-muted lg:block">/</kbd>
+          <>
+            <Link to="/ai" title="Умный поиск: опишите, что хочется посмотреть" className="flex items-center gap-1 rounded-full bg-accent/20 px-2.5 py-1 text-xs font-extrabold text-accent-2 hover:bg-accent/30">
+              <Sparkles size={13} /> ИИ
+            </Link>
+            <kbd className="hidden rounded-md bg-white/10 px-2 py-0.5 text-xs font-bold text-muted lg:block">/</kbd>
+          </>
         )}
       </div>
       {open && q.trim().length >= 2 && (
         <div className="animate-pop glass absolute inset-x-0 top-14 z-50 overflow-hidden rounded-3xl p-2 shadow-2xl ring-1 ring-white/10">
+          {q.trim().split(/\s+/).length >= 3 && (
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setOpen(false)
+                nav(`/ai?q=${encodeURIComponent(q.trim())}`)
+              }}
+              className="mb-1 flex w-full items-center gap-3 rounded-2xl bg-accent/15 p-3 text-left ring-1 ring-accent/30 hover:bg-accent/25"
+            >
+              <Sparkles size={18} className="shrink-0 text-accent-2" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-extrabold">Умный поиск с ИИ</span>
+                <span className="block truncate text-xs text-white/60">Подобрать аниме по описанию: «{q.trim()}»</span>
+              </span>
+            </button>
+          )}
           {items.length === 0 && !loading && <div className="px-4 py-6 text-center text-sm text-muted">Ничего не нашлось</div>}
           {items.map((r, i) => (
             <button
@@ -406,6 +431,8 @@ export default function Layout({ children }: { children: ReactNode }) {
       <MiniPlayer />
       <RoomBridge />
       <AchievementToasts />
+      <MiniProfile />
+      <DiscordBridge />
     </div>
   )
 }

@@ -49,6 +49,21 @@ contextBridge.exposeInMainWorld('aniplayer', {
       return ipcRenderer.invoke('torrent-ready', hash, index, from, to)
     },
   },
+  discord: {
+    setActivity(id, activity) {
+      return ipcRenderer.invoke('discord-activity', id, activity)
+    },
+  },
+  /** anyflow:// links that opened or reached the app; cb gets each one once */
+  onDeepLink(cb) {
+    const take = () => ipcRenderer.invoke('deep-link-take').then((url) => url && cb(url))
+    ipcRenderer.on('deep-link', take)
+    void take()
+    return () => ipcRenderer.removeListener('deep-link', take)
+  },
+  fetchText(url) {
+    return ipcRenderer.invoke('fetch-text', url)
+  },
   fetchImage(url) {
     return ipcRenderer.invoke('fetch-image', url)
   },

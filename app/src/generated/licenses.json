@@ -6,6 +6,12 @@
   "url": "https://github.com/aparajita/capacitor-secure-storage"
  },
  {
+  "name": "@capacitor-community/keep-awake",
+  "version": "8.0.1",
+  "license": "MIT",
+  "url": "https://github.com/capacitor-community/keep-awake"
+ },
+ {
   "name": "@capacitor/android",
   "version": "8.6.0",
   "license": "MIT",
@@ -322,6 +328,18 @@
   "version": "5.3.0",
   "license": "OFL-1.1",
   "url": "https://fontsource.org/fonts/manrope"
+ },
+ {
+  "name": "@fontsource/comic-relief",
+  "version": "5.3.0",
+  "license": "OFL-1.1",
+  "url": "https://fontsource.org/fonts/comic-relief"
+ },
+ {
+  "name": "@fontsource/pangolin",
+  "version": "5.3.0",
+  "license": "OFL-1.1",
+  "url": "https://fontsource.org/fonts/pangolin"
  },
  {
   "name": "@grpc/grpc-js",

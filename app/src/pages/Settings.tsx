@@ -12,6 +12,8 @@ import { UpdateSettings } from '../components/Updates'
 import { cn } from '../lib/format'
 import { SCALES } from '../lib/platform'
 import { SUPPORT_URL } from '../lib/links'
+import { discordAvailable } from '../lib/discord'
+import { MessageSquare } from 'lucide-react'
 
 const input = 'h-12 w-full rounded-2xl bg-white/[0.06] px-4 font-semibold ring-1 ring-white/10 outline-none focus:ring-accent/60 placeholder:text-dim'
 const btn = 'h-12 rounded-2xl px-5 font-bold transition disabled:opacity-50'
@@ -252,6 +254,12 @@ function PlayerSettings() {
       <Toggle label="Пропускать опенинг" hint="Через 5 секунд, если не нажать «Смотреть опенинг»" on={prefs.autoSkipOpening} set={(v) => setPrefs({ autoSkipOpening: v })} />
       <Toggle label="Пропускать эндинг" hint="Через 5 секунд сразу включается следующая серия" on={prefs.autoSkipEnding} set={(v) => setPrefs({ autoSkipEnding: v })} />
       <Toggle label="Автопереход к следующей серии" on={prefs.autoNext} set={(v) => setPrefs({ autoNext: v })} />
+      <Toggle
+        label="Пропускать филлеры"
+        hint="В длинных аниме (Блич, Наруто, Ван-Пис) следующая серия перескакивает филлеры и рекапы по отметкам MyAnimeList"
+        on={!!prefs.skipFillers}
+        set={(v) => setPrefs({ skipFillers: v })}
+      />
       <div className="mt-4 rounded-2xl bg-white/[0.03] p-4 text-sm text-muted ring-1 ring-white/5">
         <b className="text-white/80">Горячие клавиши:</b> Пробел/K — пауза · ←/→ — 5 сек · J/L — 10 сек · ↑/↓ — громкость · F — полный экран · M — звук · N — след. серия · S — пропустить опенинг · 0–9 — перейти к %
       </div>
@@ -346,6 +354,46 @@ function InterfaceSettings() {
   )
 }
 
+/** desktop: the Discord status and its «Смотреть вместе» button */
+function DiscordSettings() {
+  const local = useStore((s) => s.local)
+  const setLocal = useStore((s) => s.setLocal)
+  const [id, setId] = useState(local.discordAppId ?? '')
+  if (!discordAvailable()) return null
+  return (
+    <Panel>
+      <PanelTitle icon={<MessageSquare className="text-indigo-300" />} title="Статус в Discord" sub="«Смотрит Anyflow · название · серия» в вашем профиле Discord" />
+      <Toggle label="Показывать, что я смотрю" hint="Нужен запущенный Discord на этом компьютере" on={!!local.discord} set={(v) => setLocal({ discord: v })} />
+      <Toggle
+        label="Кнопка «Смотреть вместе»"
+        hint="Пока вы смотрите, открыта комната: друг жмёт кнопку в вашем статусе — и Anyflow открывается у него на той же серии и секунде, без кода"
+        on={!!local.discordInvite}
+        set={(v) => setLocal({ discordInvite: v })}
+      />
+      <div className="mt-3 flex flex-col gap-2">
+        <div className="text-sm font-bold">ID приложения Discord</div>
+        <div className="flex gap-2">
+          <input value={id} onChange={(e) => setId(e.target.value.replace(/\D/g, ''))} placeholder="Например 1234567890123456789" className={input} inputMode="numeric" />
+          <button onClick={() => setLocal({ discordAppId: id })} disabled={id === (local.discordAppId ?? '')} className={cn(btn, 'bg-white text-black')}>
+            Сохранить
+          </button>
+        </div>
+        <ol className="list-decimal pl-5 text-xs leading-relaxed text-muted">
+          <li>
+            Откройте{' '}
+            <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer" className="font-bold text-accent-2 underline">
+              discord.com/developers/applications
+            </a>{' '}
+            → New Application → назовите «Anyflow» (это имя и будет в статусе).
+          </li>
+          <li>Скопируйте Application ID со страницы General Information и вставьте сюда.</li>
+          <li>По желанию: Rich Presence → Art Assets → загрузите логотип с именем logo.</li>
+        </ol>
+      </div>
+    </Panel>
+  )
+}
+
 function DataSettings() {
   const [done, setDone] = useState(false)
   const exportData = () => {
@@ -405,6 +453,7 @@ export default function Settings() {
       <InterfaceSettings />
       <AniListSettings />
       <PlayerSettings />
+      <DiscordSettings />
       <DataSettings />
       <AboutLinks />
       <div className="px-2 text-xs text-dim">Anyflow · видео и озвучка AniLibria (anilibria.top) · неофициальный клиент для личного использования</div>

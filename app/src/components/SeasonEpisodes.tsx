@@ -7,6 +7,7 @@ import { useLibriaIndex } from '../lib/libriaIndex'
 import { useAsync } from '../lib/useAsync'
 import { EpisodeCard, Empty } from './ui'
 import { cn } from '../lib/format'
+import { useFillers } from '../lib/fillers'
 
 export interface SeasonItem {
   key: string
@@ -15,6 +16,8 @@ export interface SeasonItem {
   r: Release
   e: Episode
   to: string | null
+  /** the MAL id of the part it belongs to, for its filler marks */
+  mal?: number
 }
 interface SeasonPart {
   title: string
@@ -71,8 +74,8 @@ async function loadSeason(malId: number, current: Release | null): Promise<Seaso
       .sort((x, y) => x - y)
       .map((n): SeasonItem => {
         const e = byOrd.get(n)
-        if (e && lib) return { key: e.id, num: offset + n, r: lib, e, to: `/watch/${lib.alias}/${n}` }
-        return { key: `k${a.id}_${n}`, num: offset + n, r: sr, e: kodikEpisode(sr, n), to: kodik.includes(n) ? `/anime/${a.id}?kodik=1&ep=${n}` : null }
+        if (e && lib) return { key: e.id, num: offset + n, r: lib, e, to: `/watch/${lib.alias}/${n}`, mal: a.id }
+        return { key: `k${a.id}_${n}`, num: offset + n, r: sr, e: kodikEpisode(sr, n), to: kodik.includes(n) ? `/anime/${a.id}?kodik=1&ep=${n}` : null, mal: a.id }
       })
     offset += Math.floor(Math.max(0, ...nums))
     return { title: shikiTitle(a), items }
@@ -80,7 +83,7 @@ async function loadSeason(malId: number, current: Release | null): Promise<Seaso
 }
 
 const fromRelease = (r: Release): SeasonPart[] => [
-  { title: r.name.main, items: sortedEpisodes(r).map((e) => ({ key: e.id, num: e.ordinal, r, e, to: `/watch/${r.alias}/${e.ordinal}` })) },
+  { title: r.name.main, items: sortedEpisodes(r).map((e) => ({ key: e.id, num: e.ordinal, r, e, to: `/watch/${r.alias}/${e.ordinal}`, mal: r.mal?.id ?? undefined })) },
 ]
 
 /** one grid with all the episodes of the season, like a streaming site: no ranges to page through */
@@ -112,6 +115,7 @@ export function SeasonEpisodes({
   const grid = useRef<HTMLDivElement>(null)
   const total = useMemo(() => parts.reduce((s, p) => s + p.items.length, 0), [parts])
   const many = parts.length > 1
+  const fillers = useFillers(useMemo(() => [...new Set(parts.flatMap((p) => p.items.map((it) => it.mal)))], [parts]))
 
   useEffect(() => {
     if (flash == null) return
@@ -180,6 +184,7 @@ export function SeasonEpisodes({
                   num={it.num}
                   to={it.to ?? undefined}
                   missing={!it.to}
+                  kind={it.mal ? fillers[it.mal]?.[Math.floor(it.e.ordinal)] : undefined}
                   replace={replace}
                   active={current?.releaseId === it.r.id && current.ordinal === it.e.ordinal}
                 />

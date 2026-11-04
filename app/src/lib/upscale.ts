@@ -239,8 +239,16 @@ export async function startUpscale(video: HTMLVideoElement, canvas: HTMLCanvasEl
   let skipped = 0
   let warmup = 30
 
-  const draw = () => {
-    if (stopped || !video.videoWidth) return
+  // A frame can only be read once the element holds one. Right after a source change, while HLS is still
+  // buffering its first segment or mid-seek there is none, and reading it then throws
+  // ("Failed to execute 'copyExternalImageToTexture'"). Those moments are skipped and the next decoded
+  // frame is drawn; only a fault that keeps coming back while a real frame is there stops the upscaler.
+  const ready = () => video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0 && video.videoHeight > 0 && !video.seeking
+  let faults = 0
+  let extFaults = 0
+
+  const draw = (): void => {
+    if (stopped || !ready()) return
     if (busy) {
       skipped++
       return
@@ -249,16 +257,21 @@ export async function startUpscale(video: HTMLVideoElement, canvas: HTMLCanvasEl
       const b = build()
       const enc = device.createCommandEncoder()
       if (ingest) {
+        let external: GPUExternalTexture
         try {
-          const external = device.importExternalTexture({ source: video })
-          const bind = device.createBindGroup({ layout: ingest.getBindGroupLayout(0), entries: [{ binding: 0, resource: sampler }, { binding: 1, resource: external }] })
-          fill(enc, b.input.createView(), ingest, bind)
+          external = device.importExternalTexture({ source: video })
+          extFaults = 0
         } catch {
-          // this browser can't read the decoder's frame directly: copy it from now on
-          ingest = null
-          built = null
-          return draw()
+          // a few misses in a row with a frame there: this browser can't read the decoder's frame
+          // directly, so frames are copied from now on
+          if (++extFaults >= 3) {
+            ingest = null
+            built = null
+          }
+          return
         }
+        const bind = device.createBindGroup({ layout: ingest.getBindGroupLayout(0), entries: [{ binding: 0, resource: sampler }, { binding: 1, resource: external }] })
+        fill(enc, b.input.createView(), ingest, bind)
       } else if (b.raw) {
         device.queue.copyExternalImageToTexture({ source: video }, { texture: b.raw }, [b.raw.width, b.raw.height])
         fill(enc, b.input.createView(), toInput, b.rawBind!)
@@ -268,13 +281,30 @@ export async function startUpscale(video: HTMLVideoElement, canvas: HTMLCanvasEl
       b.chain.forEach((p) => p.pass(enc))
       fill(enc, ctx.getCurrentTexture().createView(), blit, b.bind)
       device.queue.submit([enc.finish()])
+      faults = 0
       busy = true
       void device.queue.onSubmittedWorkDone().then(() => (busy = false))
     } catch (e) {
-      stopped = true
-      onError(e as Error)
+      const err = e as Error
+      // a video from a server that doesn't allow reading its pixels never becomes readable
+      if (err.name === 'SecurityError') {
+        stopped = true
+        onError(new Error('этот источник не разрешает обработку кадров'))
+        return
+      }
+      // a frame that wasn't ready yet: try the next one; a second of nothing but faults is a real problem
+      if (++faults > 60) {
+        stopped = true
+        onError(err)
+      }
     }
   }
+
+  // the first frame of a new source or a finished seek is drawn as soon as it is there
+  const kick = () => draw()
+  video.addEventListener('loadeddata', kick)
+  video.addEventListener('seeked', kick)
+  video.addEventListener('canplay', kick)
 
   // requestVideoFrameCallback fires once per decoded frame, also after a seek while paused
   const loop = () => {
@@ -308,6 +338,9 @@ export async function startUpscale(video: HTMLVideoElement, canvas: HTMLCanvasEl
       stopped = true
       video.cancelVideoFrameCallback(frameHandle)
       ro.disconnect()
+      video.removeEventListener('loadeddata', kick)
+      video.removeEventListener('seeked', kick)
+      video.removeEventListener('canplay', kick)
       destroy(built)
       built = null
     },
