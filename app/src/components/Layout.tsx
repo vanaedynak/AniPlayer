@@ -39,6 +39,9 @@ import { SUPPORT_URL } from '../lib/links'
 import { AchievementToasts } from './AchievementToasts'
 import { MiniProfile } from './MiniProfile'
 import { DiscordBridge } from '../lib/discord'
+import { WebInstall } from './WebInstall'
+import { isWeb } from '../lib/platform'
+import { Download } from 'lucide-react'
 import { Dices, Sparkles } from 'lucide-react'
 
 const NAV = [
@@ -314,6 +317,16 @@ function Header() {
           <Link to="/search" className="no-drag flex h-11 w-11 items-center justify-center rounded-full hover:bg-white/10 md:hidden">
             <Search size={20} />
           </Link>
+          {isWeb && (
+            // the site's own page with the Android, Windows and iPad downloads
+            <a
+              href={new URL('../#download', location.href.split('#')[0]).href}
+              className="no-drag flex h-10 items-center gap-1.5 rounded-full bg-white px-4 text-sm font-extrabold text-black transition hover:scale-[1.03]"
+              title="Скачать приложение для Android, Windows и iPad"
+            >
+              <Download size={16} /> <span className="hidden sm:inline">Скачать приложение</span>
+            </a>
+          )}
           <UpdatePill />
           <RoomButton />
           <SyncBadge />
@@ -433,6 +446,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       <AchievementToasts />
       <MiniProfile />
       <DiscordBridge />
+      <WebInstall />
     </div>
   )
 }

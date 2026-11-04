@@ -30,6 +30,7 @@ import Top from './pages/Top'
 import Achievements from './pages/Achievements'
 import Roulette from './pages/Roulette'
 import AiSearch from './pages/AiSearch'
+import Join from './pages/Join'
 
 // HashRouter: works from file:// in Electron and capacitor:// on iPad
 export default function App() {
@@ -51,6 +52,7 @@ export default function App() {
             <Route path="/top" element={<Top />} />
             <Route path="/roulette" element={<Roulette />} />
             <Route path="/ai" element={<AiSearch />} />
+            <Route path="/join/:code" element={<Join />} />
             <Route path="/achievements" element={<Achievements />} />
             <Route path="/achievements/:username" element={<Achievements />} />
             <Route path="/settings" element={<Settings />} />

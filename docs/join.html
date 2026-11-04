@@ -22,8 +22,9 @@
       <p>Anyflow откроется сразу в комнате друга — с той же серии и секунды.</p>
       <div class="code" id="code"></div>
       <a class="btn" id="open" href="#">Открыть в Anyflow</a>
-      <a class="btn alt" href="https://github.com/vanaedynak/AniPlayer/releases/latest">Скачать Anyflow</a>
-      <p style="margin-top: 20px; font-size: 13px">Нет приложения? Установите его, войдите в аккаунт и нажмите «Открыть» ещё раз — или введите код в Anyflow: значок 👥 сверху.</p>
+      <a class="btn alt" id="web" href="app/">Смотреть в браузере</a>
+      <a class="btn alt" href="./#download">Скачать приложение</a>
+      <p style="margin-top: 20px; font-size: 13px">Нет приложения — смотрите прямо в браузере, ничего ставить не нужно. Или введите код в Anyflow: значок 👥 сверху.</p>
     </main>
     <script>
       // only the room code goes on: six letters and digits
@@ -31,6 +32,8 @@
       document.getElementById('code').textContent = code
       const link = 'anyflow://join/' + code
       document.getElementById('open').href = link
+      document.getElementById('web').href = 'app/#/join/' + code
+      // try the app; if it isn't installed the page stays, with the browser button
       if (code.length === 6) location.href = link
     </script>
   </body>

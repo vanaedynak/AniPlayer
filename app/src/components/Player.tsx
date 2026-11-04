@@ -20,6 +20,7 @@ import {
   FastForward,
   Loader2,
   Sparkles,
+  Sun,
   Magnet,
   X,
 } from 'lucide-react'
@@ -49,7 +50,7 @@ import { TorrentOpenForm } from './TorrentOpen'
 import { useStore, getProgress, progressKey, WATCHED_RATIO } from '../lib/store'
 import { waitForFirstSync } from '../lib/sync'
 import { anilistReportEpisode } from '../lib/anilist'
-import { onAppHide, isIOS, isElectron } from '../lib/platform'
+import { onAppHide, isIOS, isElectron, isTouch } from '../lib/platform'
 import { fmtTime, fmtOrdinal, cn } from '../lib/format'
 import { useRoomPlayback } from './Room'
 import { downloaded, offlineUrl, OfflineLoader, useDownloads, dlKey } from '../lib/downloads'
@@ -516,7 +517,7 @@ export default function Player({ release, episode, next, prev, onSelect, source,
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
-    v.volume = local.volume
+    v.volume = Number.isFinite(local.volume) ? Math.max(0, Math.min(1, local.volume)) : 1
     v.muted = local.muted
   }, [local.volume, local.muted])
 
@@ -934,6 +935,72 @@ export default function Player({ release, episode, next, prev, onSelect, source,
     return () => clearTimeout(t)
   }, [ripple])
 
+  // ---------- touch gestures (tablets and phones) ----------
+  // like a video app rather than a web page: drag sideways to scrub, up and down on the left for brightness
+  // and on the right for volume, hold for double speed. A vertical drag on the inline player scrolls the page.
+  const [brightness, setBrightness] = useState(1)
+  const [gesture, setGesture] = useState<{ kind: 'seek'; to: number; delta: number } | { kind: 'bright' | 'volume'; v: number } | { kind: 'speed' } | null>(null)
+  const touch = useRef<{ id: number; x0: number; y0: number; w: number; h: number; mode: null | 'seek' | 'bright' | 'volume' | 'hold'; base: number; to: number; rate: number; hold?: ReturnType<typeof setTimeout> } | null>(null)
+  const onSurfaceDown = (e: RPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse' || menu) return
+    const r = e.currentTarget.getBoundingClientRect()
+    const t = { id: e.pointerId, x0: e.clientX, y0: e.clientY, w: r.width, h: r.height, mode: null, base: 0, to: 0, rate: 1 } as NonNullable<typeof touch.current>
+    t.hold = setTimeout(() => {
+      const v = videoRef.current
+      if (!v || v.paused || touch.current !== t || t.mode) return
+      t.mode = 'hold'
+      t.rate = v.playbackRate
+      v.playbackRate = Math.max(2, t.rate)
+      setGesture({ kind: 'speed' })
+      navigator.vibrate?.(15)
+    }, 450)
+    touch.current = t
+  }
+  const onSurfaceMove = (e: RPointerEvent<HTMLDivElement>) => {
+    const t = touch.current
+    const v = videoRef.current
+    if (!t || t.id !== e.pointerId || !v || t.mode === 'hold') return
+    const dx = e.clientX - t.x0
+    const dy = e.clientY - t.y0
+    if (!t.mode) {
+      if (Math.abs(dx) < 14 && Math.abs(dy) < 14) return
+      clearTimeout(t.hold)
+      if (Math.abs(dx) > Math.abs(dy)) {
+        t.mode = 'seek'
+        t.base = v.currentTime
+      } else {
+        // the page scrolls instead while the player is inline (the browser cancels this pointer)
+        const left = t.x0 - e.currentTarget.getBoundingClientRect().left < t.w / 2
+        t.mode = left || isIOS ? 'bright' : 'volume'
+        t.base = t.mode === 'bright' ? brightness : local.muted ? 0 : local.volume
+      }
+    }
+    if (t.mode === 'seek') {
+      // the full width is two minutes, or the whole episode when it is shorter
+      const span = Math.min(v.duration || 0, 120)
+      t.to = Math.max(0, Math.min(v.duration || 0, t.base + (dx / t.w) * span))
+      setGesture({ kind: 'seek', to: t.to, delta: t.to - t.base })
+    } else {
+      const val = Math.max(t.mode === 'bright' ? 0.25 : 0, Math.min(1, t.base - dy / (t.h * 0.7)))
+      if (t.mode === 'bright') setBrightness(val)
+      else setVolume(val)
+      setGesture({ kind: t.mode, v: val })
+    }
+  }
+  const onSurfaceEnd = (e: RPointerEvent<HTMLDivElement>, cancel = false) => {
+    const t = touch.current
+    if (!t || t.id !== e.pointerId) return onSurfacePointerUp(e)
+    touch.current = null
+    clearTimeout(t.hold)
+    if (t.mode === 'hold') {
+      if (videoRef.current) videoRef.current.playbackRate = t.rate
+    } else if (t.mode === 'seek' && !cancel) {
+      seek(t.to)
+      poke()
+    } else if (!t.mode && !cancel) onSurfacePointerUp(e)
+    setGesture(null)
+  }
+
   // ---------- seek bar ----------
   const posFromEvent = (clientX: number) => {
     const r = barRef.current!.getBoundingClientRect()
@@ -1037,7 +1104,44 @@ export default function Player({ release, episode, next, prev, onSelect, source,
       )}
 
       {/* tap / click surface */}
-      <div className="absolute inset-0" onPointerUp={onSurfacePointerUp} />
+      <div
+        className={cn('absolute inset-0', fullscreen ? 'touch-none' : 'touch-pan-y')}
+        onPointerDown={onSurfaceDown}
+        onPointerMove={onSurfaceMove}
+        onPointerUp={(e) => onSurfaceEnd(e)}
+        onPointerCancel={(e) => onSurfaceEnd(e, true)}
+        onContextMenu={(e) => isTouch && e.preventDefault()}
+      />
+      {brightness < 1 && <div className="pointer-events-none absolute inset-0 bg-black" style={{ opacity: 1 - brightness }} />}
+
+      {/* what a drag is doing */}
+      {gesture && (
+        <div className="pointer-events-none absolute inset-x-0 top-[18%] flex justify-center">
+          <div className="animate-fade-in glass flex items-center gap-3 rounded-2xl px-5 py-3 text-lg font-extrabold tabular-nums ring-1 ring-white/10">
+            {gesture.kind === 'seek' ? (
+              <>
+                {gesture.delta < 0 ? <RotateCcw size={20} /> : <RotateCw size={20} />}
+                {fmtTime(gesture.to)}
+                <span className="text-sm font-bold text-white/60">
+                  {gesture.delta < 0 ? '−' : '+'}
+                  {fmtTime(Math.abs(gesture.delta))}
+                </span>
+              </>
+            ) : gesture.kind === 'speed' ? (
+              <>
+                <FastForward size={20} fill="currentColor" /> ×2
+              </>
+            ) : (
+              <>
+                {gesture.kind === 'bright' ? <Sun size={20} /> : <Volume2 size={20} />}
+                <span className="h-1.5 w-32 overflow-hidden rounded-full bg-white/20">
+                  <span className="block h-full rounded-full bg-white" style={{ width: `${Math.round(gesture.v * 100)}%` }} />
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* double-tap ripple */}
       {ripple && (
@@ -1079,8 +1183,27 @@ export default function Player({ release, episode, next, prev, onSelect, source,
         </div>
       )}
 
+      {/* touch: ⟲ ▶ ⟳ in the middle while the controls show, like a video app */}
+      {isTouch && (fullscreen || (fit?.h ?? 0) >= 330) && !error && countdown == null && !gesture && (controls || !playing) && (
+        <div className="absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-[clamp(28px,9cqw,96px)]">
+          <button className="flex h-14 w-14 items-center justify-center rounded-full bg-black/35 backdrop-blur-md active:scale-90" onClick={() => (seekBy(-10), poke())} aria-label="Назад 10 секунд">
+            <RotateCcw size={26} />
+          </button>
+          <button
+            className="flex h-20 w-20 items-center justify-center rounded-full bg-white/95 text-black shadow-2xl transition active:scale-90"
+            onClick={() => (togglePlay(), poke())}
+            aria-label={playing ? 'Пауза' : 'Смотреть'}
+          >
+            {waiting && playing ? <Loader2 size={32} className="animate-spin" /> : playing ? <Pause size={32} fill="currentColor" /> : <Play size={34} fill="currentColor" className="ml-1" />}
+          </button>
+          <button className="flex h-14 w-14 items-center justify-center rounded-full bg-black/35 backdrop-blur-md active:scale-90" onClick={() => (seekBy(10), poke())} aria-label="Вперёд 10 секунд">
+            <RotateCw size={26} />
+          </button>
+        </div>
+      )}
+
       {/* big center play */}
-      {!playing && !waiting && !error && countdown == null && (
+      {!(isTouch && (fullscreen || (fit?.h ?? 0) >= 330)) && !playing && !waiting && !error && countdown == null && (
         <button
           className="animate-pop absolute top-1/2 left-1/2 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-black shadow-2xl transition hover:scale-105"
           onClick={togglePlay}
@@ -1346,7 +1469,7 @@ export default function Player({ release, episode, next, prev, onSelect, source,
           <span className="w-14 text-sm font-bold tabular-nums">{fmtTime(shownTime)}</span>
           <div
             ref={barRef}
-            className="group/bar relative flex h-5 flex-1 cursor-pointer touch-none items-center"
+            className={cn('group/bar relative flex flex-1 cursor-pointer touch-none items-center', isTouch ? 'h-9' : 'h-5')}
             onPointerDown={onBarDown}
             onPointerMove={onBarMove}
             onPointerUp={onBarUp}
@@ -1365,7 +1488,8 @@ export default function Player({ release, episode, next, prev, onSelect, source,
             </div>
             <div
               className={cn(
-                'absolute h-4 w-4 -translate-x-1/2 rounded-full bg-white shadow-lg shadow-black/50 transition-transform',
+                'absolute -translate-x-1/2 rounded-full bg-white shadow-lg shadow-black/50 transition-transform',
+                isTouch ? 'h-5 w-5' : 'h-4 w-4',
                 scrub != null ? 'scale-125' : 'scale-100',
               )}
               style={{ left: `${pct(shownTime)}%` }}

@@ -57,6 +57,10 @@ export const isNative = !!window.Capacitor?.isNativePlatform?.()
 export const isIOS =
   /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 export const isTouch = matchMedia('(pointer: coarse)').matches
+/** the site in a browser, not one of the apps */
+export const isWeb = !window.aniplayer?.isElectron && !isNative
+/** the site opened from a home-screen icon: no browser bars, like an app */
+export const isStandalone = matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true
 
 type Saver = () => void
 const savers = new Set<Saver>()

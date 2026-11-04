@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Anyflow — аниме, манга и ранобэ</title>
+    <meta name="description" content="Смотрите аниме с озвучкой, читайте мангу и ранобэ — в браузере или в приложении для Windows, Android и iPad." />
+    <meta name="theme-color" content="#0b0b10" />
+    <link rel="icon" type="image/svg+xml" href="app/favicon.svg" />
+    <link rel="apple-touch-icon" href="app/apple-touch-icon.png" />
+    <meta property="og:title" content="Anyflow — аниме, манга и ранобэ" />
+    <meta property="og:description" content="Смотрите в браузере или скачайте приложение для Windows, Android и iPad." />
+    <meta property="og:image" content="app/icon-512.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #0b0b10;
+        --card: #15151d;
+        --line: #ffffff14;
+        --text: #f4f4f8;
+        --muted: #a1a1b5;
+        --accent: #8b5cf6;
+        --pink: #ec4899;
+        --glow: #8b5cf666;
+        color-scheme: dark;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; background: var(--bg); color: var(--text); font-family: Manrope, system-ui, sans-serif; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+      a { color: inherit; text-decoration: none; }
+      .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+      .glow { position: fixed; inset: -20% -10% auto; height: 80vh; pointer-events: none; background: radial-gradient(50% 50% at 30% 30%, #8b5cf633, transparent 70%), radial-gradient(40% 40% at 75% 20%, #ec489926, transparent 70%); z-index: 0; }
+      header, main, footer { position: relative; z-index: 1; }
+
+      nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: max(env(safe-area-inset-top), 16px) 0 16px; }
+      .logo { display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+      .logo img { width: 38px; height: 38px; filter: drop-shadow(0 6px 18px var(--glow)); }
+      .grad { background: linear-gradient(90deg, var(--accent), var(--pink)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      .navlinks { display: flex; gap: 8px; }
+
+      .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; padding: 0 22px; border-radius: 999px; font-weight: 800; font-size: 15px; transition: transform .15s, background .15s; white-space: nowrap; }
+      .btn:hover { transform: translateY(-1px) scale(1.02); }
+      .btn.white { background: #fff; color: #000; }
+      .btn.ghost { background: #ffffff12; box-shadow: inset 0 0 0 1px var(--line); }
+      .btn.ghost:hover { background: #ffffff1f; }
+      .btn.big { height: 58px; padding: 0 30px; font-size: 17px; }
+      .btn.grad-bg { background: linear-gradient(90deg, var(--accent), var(--pink)); color: #fff; box-shadow: 0 14px 40px -12px var(--glow); }
+      .btn svg { width: 19px; height: 19px; flex: none; }
+
+      .hero { padding: 56px 0 40px; text-align: center; }
+      .pill { display: inline-flex; gap: 8px; align-items: center; padding: 6px 14px; border-radius: 999px; background: #ffffff0d; box-shadow: inset 0 0 0 1px var(--line); font-size: 13px; font-weight: 700; color: var(--muted); }
+      .pill b { color: #4ade80; }
+      h1 { font-size: clamp(38px, 7vw, 76px); line-height: 1.02; letter-spacing: -0.035em; margin: 22px auto 18px; max-width: 900px; }
+      .lead { font-size: clamp(16px, 2.2vw, 20px); color: var(--muted); max-width: 640px; margin: 0 auto 32px; line-height: 1.55; }
+      .cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+      .note { margin-top: 16px; font-size: 13px; color: var(--muted); }
+
+      .shot { margin: 48px auto 0; max-width: 980px; aspect-ratio: 16 / 9; border-radius: 28px; background: linear-gradient(135deg, #1d1530, #0f1020 55%, #2a1124); box-shadow: 0 40px 120px -30px #000, inset 0 0 0 1px var(--line); position: relative; overflow: hidden; display: grid; place-items: center; }
+      .shot .play { width: 92px; height: 92px; border-radius: 999px; background: #fffffff2; display: grid; place-items: center; box-shadow: 0 20px 60px -10px var(--glow); }
+      .shot .bar { position: absolute; left: 4%; right: 4%; bottom: 7%; height: 6px; border-radius: 9px; background: #ffffff26; }
+      .shot .bar i { position: absolute; inset: 0 62% 0 0; border-radius: 9px; background: #fff; }
+      .shot .bar u { position: absolute; left: 6%; width: 7%; inset-block: 0; background: #34d399d9; }
+      .shot .tag { position: absolute; top: 6%; left: 4%; text-align: left; }
+      .shot .tag small { display: block; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #ffffff99; font-weight: 700; }
+      .shot .tag strong { font-size: clamp(16px, 2.4vw, 24px); }
+      .shot .skip { position: absolute; right: 4%; bottom: 15%; background: #fff; color: #000; font-weight: 800; padding: 12px 18px; border-radius: 16px; font-size: 14px; }
+      .shot .a4k { position: absolute; top: 6%; right: 4%; background: linear-gradient(90deg, var(--accent), var(--pink)); padding: 6px 10px; border-radius: 10px; font-weight: 800; font-size: 13px; }
+
+      section { padding: 72px 0 0; }
+      h2 { font-size: clamp(28px, 4vw, 44px); letter-spacing: -0.03em; margin: 0 0 10px; }
+      .sub { color: var(--muted); margin: 0 0 32px; font-size: 17px; }
+      .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+      .card { background: var(--card); border-radius: 24px; padding: 22px; box-shadow: inset 0 0 0 1px var(--line); }
+      .card .ic { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; margin-bottom: 14px; background: #8b5cf626; color: #c4b5fd; }
+      .card h3 { margin: 0 0 6px; font-size: 18px; }
+      .card p { margin: 0; color: var(--muted); line-height: 1.55; font-size: 15px; }
+
+      .dl { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); }
+      .dl .card { display: flex; flex-direction: column; gap: 14px; }
+      .dl .card .btn { margin-top: auto; }
+      .dl .os { display: flex; align-items: center; gap: 12px; }
+      .dl .os svg { width: 34px; height: 34px; }
+      .dl .os b { font-size: 19px; display: block; }
+      .dl .os span { font-size: 13px; color: var(--muted); }
+      .dl .card.browser { background: linear-gradient(135deg, #2a1650, #3b1033); }
+
+      .faq details { background: var(--card); border-radius: 18px; padding: 16px 20px; box-shadow: inset 0 0 0 1px var(--line); margin-bottom: 10px; }
+      .faq summary { cursor: pointer; font-weight: 800; font-size: 16px; list-style: none; }
+      .faq summary::after { content: '+'; float: right; color: var(--muted); }
+      .faq details[open] summary::after { content: '−'; }
+      .faq p { color: var(--muted); line-height: 1.6; margin: 10px 0 0; }
+
+      footer { padding: 72px 0 max(env(safe-area-inset-bottom), 32px); color: var(--muted); font-size: 13px; line-height: 1.6; }
+      footer .row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; border-top: 1px solid var(--line); padding-top: 24px; }
+
+      @media (max-width: 560px) {
+        .navlinks .btn.ghost { display: none; }
+        .hero { padding-top: 32px; }
+        .cta .btn { width: 100%; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="glow"></div>
+    <header class="wrap">
+      <nav>
+        <a class="logo" href="./"><img src="app/favicon.svg" alt="" /> any<span class="grad">flow</span></a>
+        <div class="navlinks">
+          <a class="btn ghost" href="app/">Смотреть в браузере</a>
+          <a class="btn white" href="#download">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 21h16" /></svg>
+            Скачать приложение
+          </a>
+        </div>
+      </nav>
+    </header>
+
+    <main>
+      <div class="wrap hero">
+        <span class="pill"><b>●</b> Бесплатно · без рекламы · Windows, Android, iPad и браузер</span>
+        <h1>Аниме, манга и ранобэ — <span class="grad">в одном месте</span></h1>
+        <p class="lead">Новые серии с русской озвучкой в день выхода, манга и ранобэ с переводом нейросетью, совместный просмотр с друзьями и прогресс, который ждёт вас на любом устройстве.</p>
+        <div class="cta">
+          <a class="btn big grad-bg" href="app/">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z" /></svg>
+            Смотреть в браузере
+          </a>
+          <a class="btn big white" href="#download">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 21h16" /></svg>
+            Скачать приложение
+          </a>
+        </div>
+        <div class="note">В браузере ничего не нужно устанавливать — регистрация за 10 секунд, можно и гостем.</div>
+
+        <div class="shot" aria-hidden="true">
+          <div class="tag"><small>Магическая битва</small><strong>8 серия · Пробуждение</strong></div>
+          <div class="a4k">✦ 4K</div>
+          <div class="play"><svg width="40" height="40" viewBox="0 0 24 24" fill="#000"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z" /></svg></div>
+          <div class="skip">⏩ Пропустить опенинг</div>
+          <div class="bar"><i></i><u></u></div>
+        </div>
+      </div>
+
+      <section class="wrap" id="features">
+        <h2>Что умеет Anyflow</h2>
+        <p class="sub">Всё, что нужно анимешнику, — без десятка вкладок.</p>
+        <div class="grid">
+          <div class="card"><div class="ic">▶</div><h3>Озвучка в день выхода</h3><p>Каталог AniLibria и другие озвучки, пропуск опенингов и эндингов, автопереход и отметки филлеров в длинных тайтлах.</p></div>
+          <div class="card"><div class="ic">✦</div><h3>Апскейл до 4K</h3><p>Нейросеть Anime4K дорисовывает чёткие линии прямо на видеокарте — даже 720p выглядит как Blu-ray.</p></div>
+          <div class="card"><div class="ic">📖</div><h3>Манга и ранобэ</h3><p>Читалка со страницами, которые листаются как бумага, перевод облачков нейросетью и озвучка ранобэ голосом.</p></div>
+          <div class="card"><div class="ic">👥</div><h3>Смотреть вместе</h3><p>Комната с другом: пауза и перемотка у всех одновременно, чат и реакции. Приглашение — одной ссылкой.</p></div>
+          <div class="card"><div class="ic">☁</div><h3>Всё синхронизируется</h3><p>История, «Продолжить просмотр», коллекция и полка манги — одинаковые на компьютере, телефоне и iPad.</p></div>
+          <div class="card"><div class="ic">🏆</div><h3>Профиль и достижения</h3><p>Уровни, редкие ачивки, топы зрителей, аниме-рулетка и умный поиск: опишите словами, что хочется посмотреть.</p></div>
+        </div>
+      </section>
+
+      <section class="wrap" id="download">
+        <h2>Скачать Anyflow</h2>
+        <p class="sub">Приложение умеет больше, чем сайт: торренты, скачивание серий, 4K-апскейл и статус в Discord на компьютере.</p>
+        <div class="dl">
+          <div class="card">
+            <div class="os">
+              <svg viewBox="0 0 24 24" fill="#60a5fa"><path d="M3 5.5 10.5 4.4v7.1H3V5.5Zm0 13 7.5 1.1v-7H3v5.9Zm8.4 1.2L21 21v-8.4h-9.6v7.1Zm0-15.4v7.2H21V3l-9.6 1.3Z" /></svg>
+              <div><b>Windows</b><span>Windows 10 и 11 · обновляется сам</span></div>
+            </div>
+            <a class="btn white" id="dl-win" href="https://github.com/vanaedynak/AniPlayer/releases/latest">Скачать для Windows</a>
+          </div>
+          <div class="card">
+            <div class="os">
+              <svg viewBox="0 0 24 24" fill="#4ade80"><path d="M17.5 9.3 19.3 6a.4.4 0 0 0-.7-.4l-1.8 3.3A10.9 10.9 0 0 0 12 8a10.9 10.9 0 0 0-4.8 1L5.4 5.6a.4.4 0 0 0-.7.4l1.8 3.3A9.6 9.6 0 0 0 1.5 17h21a9.6 9.6 0 0 0-5-7.7ZM7.5 14.2a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm9 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" /></svg>
+              <div><b>Android</b><span>Телефоны и планшеты · APK</span></div>
+            </div>
+            <a class="btn white" href="https://github.com/vanaedynak/AniPlayer/releases/latest/download/Anyflow.apk">Скачать APK</a>
+          </div>
+          <div class="card">
+            <div class="os">
+              <svg viewBox="0 0 24 24" fill="#e5e7eb"><path d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9a4.8 4.8 0 0 0-3.8-2c-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9a5 5 0 0 0-4.2 2.6c-1.8 3.1-.5 7.7 1.3 10.2.8 1.2 1.8 2.6 3.1 2.5 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4a10.7 10.7 0 0 0 1.4-2.8 4.3 4.3 0 0 1-2.6-4.2ZM14 4.9A4.3 4.3 0 0 0 15 1.8a4.4 4.4 0 0 0-2.9 1.5 4.1 4.1 0 0 0-1 3 3.6 3.6 0 0 0 2.9-1.4Z" /></svg>
+              <div><b>iPad и iPhone</b><span>IPA · ставится через Sideloadly или AltStore</span></div>
+            </div>
+            <a class="btn white" href="https://github.com/vanaedynak/AniPlayer/releases/latest/download/Anyflow.ipa">Скачать IPA</a>
+          </div>
+          <div class="card browser">
+            <div class="os">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#f0abfc" stroke-width="2"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></svg>
+              <div><b>Браузер</b><span>Без установки · на iPad — «На экран Домой»</span></div>
+            </div>
+            <a class="btn grad-bg" href="app/">Открыть в браузере</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="wrap faq" id="faq">
+        <h2>Вопросы</h2>
+        <details><summary>Это бесплатно?</summary><p>Да, полностью: без подписок и рекламы. Видео и озвучка — от AniLibria и других команд, Anyflow лишь удобно их показывает.</p></details>
+        <details><summary>Чем приложение отличается от сайта?</summary><p>В браузере работают просмотр, регистрация, история, коллекция, манга и совместный просмотр. Приложение добавляет торренты, скачивание серий без интернета, источники манги, которые закрыты для сайтов, и статус в Discord.</p></details>
+        <details><summary>Как поставить на iPad без компьютера?</summary><p>Откройте сайт в Safari, нажмите «Поделиться» → «На экран „Домой“». Anyflow откроется на весь экран, со своим значком — как обычное приложение.</p></details>
+        <details><summary>Нужна ли регистрация?</summary><p>Смотреть можно и гостем. Аккаунт нужен, чтобы сохранялись история, коллекция и прогресс, писать комментарии и смотреть вместе с друзьями.</p></details>
+      </section>
+    </main>
+
+    <footer class="wrap">
+      <div class="row">
+        <div>Anyflow · неофициальный клиент для личного использования · видео и озвучка — AniLibria</div>
+        <div><a href="https://github.com/vanaedynak/AniPlayer">GitHub</a> · <a href="app/">Открыть в браузере</a></div>
+      </div>
+    </footer>
+
+    <script>
+      // the Windows installer's file name carries the build number: ask GitHub which one is current
+      fetch('https://api.github.com/repos/vanaedynak/AniPlayer/releases/tags/latest')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((rel) => {
+          const exe = rel && rel.assets.find((a) => /\.exe$/.test(a.name))
+          if (exe) document.getElementById('dl-win').href = exe.browser_download_url
+        })
+        .catch(() => {})
+    </script>
+  </body>
+</html>

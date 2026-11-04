@@ -313,6 +313,12 @@ export const useStore = create<State>()(
         if (version < 4 && st?.local) st.local = { ...st.local, upscale: 'off' }
         return st
       },
+      // a saved state missing some settings (an older version, or one written partly) gets the defaults
+      // for them instead of losing them: a missing volume used to crash the player
+      merge: (saved, current) => {
+        const s = (saved ?? {}) as Partial<State>
+        return { ...current, ...s, prefs: { ...current.prefs, ...s.prefs }, local: { ...current.local, ...s.local } }
+      },
     },
   ),
 )
