@@ -188,10 +188,43 @@ export const downloaded = (releaseId: number, ordinal: number) => {
 // ---- playback: hls.js asks for offline:// URLs, we answer from storage ----
 const Base = Hls.DefaultConfig.loader
 
+// The site in a browser: AniLibria's video server allows the asking site by name but doesn't mark its answer
+// as depending on the site (no «Vary: Origin»), so a copy the browser cached for another site (AniLibria's
+// own, say) is refused here. The web version asks the network every time instead of trusting that cache.
+const freshOnly = !window.aniplayer?.isElectron && !window.Capacitor?.isNativePlatform?.()
+
 export class OfflineLoader extends Base {
+  private ctl: AbortController | null = null
+  abort() {
+    this.ctl?.abort()
+    super.abort()
+  }
   load(...args: Parameters<InstanceType<typeof Base>['load']>) {
-    const [context, , callbacks] = args
-    if (!context.url.startsWith(OFFLINE)) return super.load(...args)
+    const [context, config, callbacks] = args
+    if (!context.url.startsWith(OFFLINE)) {
+      if (!freshOnly) return super.load(...args)
+      const stats = this.stats
+      stats.loading.start = performance.now()
+      const ctl = (this.ctl = new AbortController())
+      const timer = setTimeout(() => ctl.abort(), config.loadPolicy?.maxLoadTimeMs || config.timeout || 20_000)
+      const headers: Record<string, string> = {}
+      if (context.rangeEnd) headers.Range = `bytes=${context.rangeStart ?? 0}-${context.rangeEnd - 1}`
+      fetch(context.url, { cache: 'reload', signal: ctl.signal, headers })
+        .then(async (res) => {
+          if (!res.ok) throw Object.assign(new Error(res.statusText), { code: res.status })
+          stats.loading.first = performance.now()
+          const data = context.responseType === 'arraybuffer' ? await res.arrayBuffer() : await res.text()
+          stats.loading.end = performance.now()
+          stats.loaded = stats.total = typeof data === 'string' ? data.length : data.byteLength
+          callbacks.onSuccess({ url: res.url || context.url, data: data as ArrayBuffer, code: res.status }, stats, context, null)
+        })
+        .catch((e: Error & { code?: number }) => {
+          if (ctl.signal.aborted && !stats.aborted) return callbacks.onTimeout?.(stats, context, null)
+          if (!stats.aborted) callbacks.onError({ code: e.code ?? 0, text: e.message }, context, null, stats)
+        })
+        .finally(() => clearTimeout(timer))
+      return
+    }
     const stats = this.stats
     stats.loading.start = performance.now()
     const path = context.url.slice(OFFLINE.length).split('?')[0]
