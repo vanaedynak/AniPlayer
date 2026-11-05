@@ -135,7 +135,7 @@ function query(params: Params) {
 
 // MangaDex asks API clients to name themselves and sends anything with a browser User-Agent to a bot check,
 // so the app introduces itself honestly (the desktop app sets the same header in electron/main.cjs)
-export const CLIENT = `Anyflow/${__APP_VERSION__} (+https://github.com/vanaedynak/AniPlayer)`
+export const CLIENT = `Anyflow/${__APP_VERSION__} (+https://github.com/${__FLAVOR__.repo})`
 
 async function fetchJson<T>(url: string): Promise<T> {
   // iPad and Android: through the native layer, where the header can be set (and capacitor:// is no CORS origin)

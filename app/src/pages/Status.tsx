@@ -76,7 +76,7 @@ function checks(): Check[] {
         if (status === 'offline') throw new Error('нет связи')
       },
     },
-    { id: 'github', name: 'Обновления', what: 'новые версии', run: async () => void (await ok('https://api.github.com/repos/vanaedynak/AniPlayer/releases/latest')) },
+    { id: 'github', name: 'Обновления', what: 'новые версии', run: async () => void (await ok(`https://api.github.com/repos/${__FLAVOR__.repo}/releases/latest`)) },
   ]
   keys.forEach((k, i) =>
     list.push({

@@ -6,6 +6,8 @@ const fs = require('node:fs')
 const { pathToFileURL } = require('node:url')
 const { spawn } = require('node:child_process')
 const { autoUpdater } = require('electron-updater')
+// names, data folder, link scheme and update address: this copy of the project (the main app or the lab)
+const flavor = require('../flavor.json')
 
 const DEV_URL = process.env.VITE_DEV_URL
 const DIST = path.join(__dirname, '..', 'dist')
@@ -17,15 +19,15 @@ protocol.registerSchemesAsPrivileged([
 
 // the app was called AniPlayer before: its data folder keeps that name, so a renamed app finds
 // the history, downloads and logins where they always were
-app.setPath('userData', path.join(app.getPath('appData'), 'aniplayer'))
+app.setPath('userData', path.join(app.getPath('appData'), flavor.dataFolder))
 
 if (!app.requestSingleInstanceLock()) app.quit()
 
 // anyflow://join/CODE: an invite to a watch-together room (the Discord button, a link from a friend).
 // The link is kept until the page takes it, so one that starts the app is not lost while it loads.
-if (process.defaultApp && process.argv.length >= 2) app.setAsDefaultProtocolClient('anyflow', process.execPath, [path.resolve(process.argv[1])])
-else app.setAsDefaultProtocolClient('anyflow')
-let pendingLink = process.argv.find((a) => a.startsWith('anyflow://')) ?? null
+if (process.defaultApp && process.argv.length >= 2) app.setAsDefaultProtocolClient(flavor.scheme, process.execPath, [path.resolve(process.argv[1])])
+else app.setAsDefaultProtocolClient(flavor.scheme)
+let pendingLink = process.argv.find((a) => a.startsWith(`${flavor.scheme}://`)) ?? null
 function deliverLink(url) {
   pendingLink = url
   if (win && !win.isDestroyed()) win.webContents.send('deep-link')
@@ -213,7 +215,7 @@ ipcMain.handle('voice-start', () => {
 app.on('will-quit', () => voiceProc?.kill())
 
 app.on('second-instance', (_e, argv) => {
-  const link = argv.find((a) => a.startsWith('anyflow://'))
+  const link = argv.find((a) => a.startsWith(`${flavor.scheme}://`))
   if (link) deliverLink(link)
   if (!win) return
   if (win.isMinimized()) win.restore()
@@ -245,7 +247,7 @@ app.whenReady().then(() => {
   // MangaDex asks API clients to name themselves; a browser User-Agent gets sent to its bot check (HTTP 403).
   // Its pictures (covers, and pages on its own and MD@Home servers) are behind the same check now
   session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['https://api.mangadex.org/*', 'https://uploads.mangadex.org/*', 'https://*.mangadex.network/*'] }, (d, cb) => {
-    d.requestHeaders['User-Agent'] = `Anyflow/${app.getVersion()} (+https://github.com/vanaedynak/AniPlayer)`
+    d.requestHeaders['User-Agent'] = `Anyflow/${app.getVersion()} (+https://github.com/${flavor.repo})`
     cb({ requestHeaders: d.requestHeaders })
   })
   createWindow()

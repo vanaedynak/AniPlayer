@@ -24,7 +24,7 @@ export const setNowPlaying = (now: NowPlaying | null) => useNowPlaying.setState(
 
 export const JOIN_PAGE = 'https://vanaedynak.github.io/AniPlayer/join.html'
 export const inviteLink = (code: string) => `${JOIN_PAGE}?r=${code}`
-export const appInviteLink = (code: string) => `anyflow://join/${code}`
+export const appInviteLink = (code: string) => `${__FLAVOR__.scheme}://join/${code}`
 
 export const discordAvailable = () => !!window.aniplayer?.discord
 
@@ -103,7 +103,7 @@ export function DiscordBridge() {
       if (now.playing && now.duration > 0) activity.timestamps = { start, end: start + now.duration * 1000 }
       const buttons = []
       if (code) buttons.push({ label: 'Смотреть вместе', url: inviteLink(code) })
-      buttons.push({ label: 'Скачать Anyflow', url: 'https://github.com/vanaedynak/AniPlayer/releases/latest' })
+      buttons.push({ label: 'Скачать Anyflow', url: `https://github.com/${__FLAVOR__.repo}/releases/latest` })
       activity.buttons = buttons
       void d.setActivity(appId, activity).catch(() => {})
     }, 600)

@@ -9,7 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "electron:dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV_URL=http://localhost:5173 electron .\"",
-    "electron:build": "npm run build && electron-builder --win --x64",
+    "electron:build": "npm run build && electron-builder --config electron-builder.config.cjs --win --x64",
     "icons": "node scripts/icons.mjs",
     "licenses": "node scripts/licenses.mjs"
   },
@@ -66,51 +66,5 @@
   },
   "description": "Anyflow — anime, manga and ranobe",
   "author": "Ivan",
-  "main": "electron/main.cjs",
-  "build": {
-    "appId": "app.aniplayer.desktop",
-    "productName": "Anyflow Desktop",
-    "protocols": [
-      {
-        "name": "Anyflow",
-        "schemes": [
-          "anyflow"
-        ]
-      }
-    ],
-    "publish": [
-      {
-        "provider": "generic",
-        "url": "https://github.com/vanaedynak/AniPlayer/releases/latest/download"
-      }
-    ],
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**",
-      "electron/**",
-      "build/icon.png",
-      "package.json"
-    ],
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "build/icon.png"
-    },
-    "nsis": {
-      "oneClick": true,
-      "perMachine": false,
-      "createDesktopShortcut": true,
-      "shortcutName": "Anyflow Desktop",
-      "artifactName": "Anyflow-Desktop-Setup-${version}.exe"
-    },
-    "npmRebuild": false
-  }
+  "main": "electron/main.cjs"
 }

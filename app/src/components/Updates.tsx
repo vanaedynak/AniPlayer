@@ -18,7 +18,7 @@ export function useUpdates() {
   return state
 }
 
-const RELEASE = 'https://api.github.com/repos/vanaedynak/AniPlayer/releases/tags/latest'
+const RELEASE = `https://api.github.com/repos/${__FLAVOR__.repo}/releases/tags/latest`
 const patch = (v: string) => Number(v.split('.')[2]) || 0
 
 /** the phone and iPad builds can't update themselves: they only learn that a newer build is out */

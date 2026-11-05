@@ -46,6 +46,8 @@ interface ElectronBridge {
 
 declare global {
   const __APP_VERSION__: string
+  /** app/flavor.json: which copy of the project this is (the main app or the lab) */
+  const __FLAVOR__: { name: string; desktopName: string; appId: string; dataFolder: string; scheme: string; repo: string; lab: boolean }
   interface Window {
     aniplayer?: ElectronBridge
     Capacitor?: { isNativePlatform(): boolean; getPlatform(): string }

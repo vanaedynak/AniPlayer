@@ -44,7 +44,7 @@ jobs:
         run: |
           P=ios/App/App/Info.plist
           pb() { /usr/libexec/PlistBuddy -c "$1" "$P" || true; }
-          pb "Set :CFBundleDisplayName Anyflow"
+          pb "Set :CFBundleDisplayName $(node -p "require('./flavor.json').name")"
           pb "Add :UIBackgroundModes array"
           pb "Add :UIBackgroundModes:0 string audio"
           pb "Add :UIStatusBarStyle string UIStatusBarStyleLightContent"
@@ -153,7 +153,7 @@ jobs:
       # every build gets a higher version so installed apps see it as an update
       - run: npm version 1.0.${{ github.run_number }} --no-git-tag-version
       - run: npm run build
-      - run: npx electron-builder --win --x64 --publish never
+      - run: npx electron-builder --config electron-builder.config.cjs --win --x64 --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: Anyflow-windows
