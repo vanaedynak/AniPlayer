@@ -10,6 +10,7 @@ import slayerArt from '../assets/theme-art/slayer.webp'
 import cursedArt from '../assets/theme-art/cursed.webp'
 import isekaiArt from '../assets/theme-art/isekai.webp'
 import grandlineArt from '../assets/theme-art/grandline.webp'
+import eightySixArt from '../assets/theme-art/eightysix.webp'
 
 export interface Palette {
   id: string
@@ -379,6 +380,21 @@ export const PALETTES: Palette[] = [
     pink: '#0ea5e9',
     pattern: 'repeating-radial-gradient(ellipse at 50% 130%, #0ea5e910 0 2px, transparent 2px 28px)',
     unlock: 'ep1000',
+  },
+  {
+    id: 'eightysix',
+    art: eightySixArt,
+    label: '86: Eighty-Six',
+    group: 'Уникальные',
+    bg: '#07090e',
+    card: '#0f1420',
+    muted: '#94a3b8',
+    accent: '#0284c7',
+    light: '#38bdf8',
+    pink: '#ef4444',
+    pattern:
+      'linear-gradient(rgba(56, 189, 248, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(56, 189, 248, 0.04) 1px, transparent 1px), radial-gradient(circle at 85% 15%, rgba(239, 68, 68, 0.08) 0%, transparent 60%)',
+    patternSize: '48px 48px, 48px 48px, auto',
   },
 ]
 

@@ -32,6 +32,7 @@ import { UpdatePill } from './Updates'
 import { MiniPlayer } from './Music'
 import { RoomBridge, RoomButton } from './Room'
 import { cn } from '../lib/format'
+import { useStore } from '../lib/store'
 import { CrashGuard } from './Crash'
 import { Avatar } from './Social'
 import { useMyProfile } from '../lib/social'
@@ -70,12 +71,41 @@ const TABS = [
 ]
 
 export function Logo() {
+  const theme = useStore((s) => s.local.theme)
+  const is86 = theme === 'eightysix'
   return (
-    <Link to="/" className="no-drag flex items-center gap-2.5">
-      <img src="favicon.svg" alt="" className="h-10 w-10 drop-shadow-[0_6px_18px_var(--color-glow)]" />
-      <span className="text-[22px] font-extrabold tracking-tight">
-        any<span className="text-gradient">flow</span>
-      </span>
+    <Link to="/" className="group no-drag flex items-center gap-2.5">
+      <div className="relative">
+        <img
+          src="favicon.svg"
+          alt=""
+          className={cn(
+            'h-10 w-10 drop-shadow-[0_6px_18px_var(--color-glow)] transition-all duration-300 group-hover:scale-105 group-hover:drop-shadow-[0_8px_24px_var(--color-glow)]',
+            is86 && 'rounded-xl ring-1 ring-sky-400/50 shadow-[0_0_16px_rgba(56,189,248,0.35)]',
+          )}
+        />
+        {is86 && (
+          <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5" title="Para-RAID: Active">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-rose-500 ring-1 ring-black" />
+          </span>
+        )}
+      </div>
+      <div className="flex flex-col">
+        <div className="flex items-center gap-1.5 leading-none">
+          <span className="text-[22px] font-extrabold tracking-tight">
+            any<span className="text-gradient">flow</span>
+          </span>
+          <span className="rounded border border-accent/40 bg-accent/15 px-1 py-0.5 text-[9px] font-black tracking-widest text-accent-2 uppercase shadow-[0_0_10px_var(--color-glow)]">
+            LAB
+          </span>
+        </div>
+        {is86 && (
+          <span className="text-[9px] font-mono font-bold tracking-wider text-sky-300/80 uppercase">
+            86 // SPEARHEAD
+          </span>
+        )}
+      </div>
     </Link>
   )
 }
@@ -293,6 +323,7 @@ function SearchBox() {
 
 function Header() {
   const nav = useNavigate()
+  const theme = useStore((s) => s.local.theme)
   return (
     <header
       className={cn('drag sticky top-0 z-40 border-b border-white/[0.04] bg-bg/75 pb-3 backdrop-blur-2xl backdrop-saturate-150', isElectron && 'pr-[140px]')}
@@ -313,6 +344,17 @@ function Header() {
         <div className="hidden flex-1 justify-center md:flex">
           <SearchBox />
         </div>
+        {theme === 'eightysix' && (
+          <div className="hidden xl:flex items-center gap-2 px-3 py-1 rounded-full bg-sky-950/50 border border-sky-400/30 text-[11px] font-mono tracking-wider text-sky-200 shadow-[0_0_15px_rgba(56,189,248,0.2)] animate-fade-in">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-500" />
+            </span>
+            <span className="font-bold text-sky-300">HANDLER ONE</span>
+            <span className="text-white/30">|</span>
+            <span className="text-slate-300">PARA-RAID: SYNC 100%</span>
+          </div>
+        )}
         <div className="ml-auto flex items-center gap-1">
           <Link to="/search" className="no-drag flex h-11 w-11 items-center justify-center rounded-full hover:bg-white/10 md:hidden">
             <Search size={20} />

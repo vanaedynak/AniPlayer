@@ -1,40 +1,128 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
+    <!-- Background Gradients -->
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#050b12"/>
-      <stop offset="0.6" stop-color="#08202a"/>
-      <stop offset="1" stop-color="#0c3a3f"/>
+      <stop offset="0%" stop-color="#04060b"/>
+      <stop offset="50%" stop-color="#081422"/>
+      <stop offset="100%" stop-color="#0a2630"/>
     </linearGradient>
-    <radialGradient id="glow" cx="0.5" cy="0.42" r="0.55">
-      <stop offset="0" stop-color="#2dd4bf" stop-opacity="0.42"/>
-      <stop offset="0.55" stop-color="#22d3ee" stop-opacity="0.12"/>
-      <stop offset="1" stop-color="#22d3ee" stop-opacity="0"/>
+
+    <!-- Deep Ambient Glow -->
+    <radialGradient id="cyanAura" cx="45%" cy="42%" r="62%">
+      <stop offset="0%" stop-color="#00f2fe" stop-opacity="0.32"/>
+      <stop offset="35%" stop-color="#0ea5e9" stop-opacity="0.16"/>
+      <stop offset="70%" stop-color="#0284c7" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="ribbon" x1="0.1" y1="1" x2="0.9" y2="0">
-      <stop offset="0" stop-color="#38bdf8"/>
-      <stop offset="0.5" stop-color="#2dd4bf"/>
-      <stop offset="1" stop-color="#a7f3d0"/>
+
+    <radialGradient id="pinkAura" cx="76%" cy="32%" r="48%">
+      <stop offset="0%" stop-color="#fb7185" stop-opacity="0.28"/>
+      <stop offset="45%" stop-color="#f43f5e" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Arch Ribbon Gradients (Cyan to Electric Mint) -->
+    <linearGradient id="ribbonLeft" x1="0" y1="1" x2="0.6" y2="0">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="30%" stop-color="#00f2fe"/>
+      <stop offset="70%" stop-color="#2dd4bf"/>
+      <stop offset="100%" stop-color="#6ee7b7"/>
     </linearGradient>
-    <linearGradient id="wave" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="0.65" stop-color="#ffe4e6"/>
-      <stop offset="1" stop-color="#fb7185"/>
+
+    <linearGradient id="ribbonRight" x1="0.4" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6ee7b7"/>
+      <stop offset="35%" stop-color="#2dd4bf"/>
+      <stop offset="75%" stop-color="#0284c7"/>
+      <stop offset="100%" stop-color="#0369a1"/>
     </linearGradient>
-    <mask id="gap">
-      <rect width="512" height="512" fill="#fff"/>
-      <path d="M96 326 C160 270 212 356 266 314 C316 276 358 294 420 252" fill="none" stroke="#000" stroke-width="46" stroke-linecap="round"/>
-    </mask>
-    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="14"/>
+
+    <!-- Dynamic Flow Wave (Hot Coral to Luminous Amber) -->
+    <linearGradient id="waveFlow" x1="0" y1="0.5" x2="1" y2="0.2">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="25%" stop-color="#ffe4e6"/>
+      <stop offset="55%" stop-color="#fb7185"/>
+      <stop offset="85%" stop-color="#f43f5e"/>
+      <stop offset="100%" stop-color="#e11d48"/>
+    </linearGradient>
+
+    <linearGradient id="waveGlowGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#2dd4bf"/>
+      <stop offset="100%" stop-color="#fb7185"/>
+    </linearGradient>
+
+    <!-- Specular Highlight -->
+    <linearGradient id="specular" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Filters for Depth and Bloom -->
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="14" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
     </filter>
+
+    <filter id="bloom" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="22"/>
+    </filter>
+
+    <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000000" flood-opacity="0.55"/>
+    </filter>
+
+    <!-- Optical depth gap mask -->
+    <mask id="gap">
+      <rect width="512" height="512" fill="#ffffff"/>
+      <path d="M 100 332 C 162 272 216 354 268 312 C 320 270 358 288 418 248" fill="none" stroke="#000000" stroke-width="48" stroke-linecap="round"/>
+    </mask>
   </defs>
+
+  <!-- Base Plate -->
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <circle cx="256" cy="230" r="240" fill="url(#glow)"/>
-  <!-- the A: one ribbon rising and falling -->
-  <path d="M148 388 L256 142 L364 388" fill="none" stroke="url(#ribbon)" stroke-width="64" stroke-linecap="round" stroke-linejoin="round" filter="url(#soft)" opacity="0.55"/>
-  <path d="M148 388 L256 142 L364 388" fill="none" stroke="url(#ribbon)" stroke-width="58" stroke-linecap="round" stroke-linejoin="round" mask="url(#gap)"/>
-  <!-- the crossbar is a wave: the flow -->
-  <path d="M96 326 C160 270 212 356 266 314 C316 276 358 294 420 252" fill="none" stroke="url(#wave)" stroke-width="20" stroke-linecap="round"/>
-  <circle cx="404" cy="130" r="13" fill="#fb7185"/>
-  <circle cx="430" cy="168" r="6" fill="#a7f3d0" opacity="0.8"/>
+
+  <!-- High-Tech Orbit Grid -->
+  <g opacity="0.08" stroke="#ffffff" fill="none" stroke-width="1">
+    <circle cx="256" cy="256" r="216" stroke-dasharray="4 8"/>
+    <circle cx="256" cy="256" r="144" stroke-dasharray="2 6"/>
+    <line x1="256" y1="36" x2="256" y2="76"/>
+    <line x1="256" y1="436" x2="256" y2="476"/>
+    <line x1="36" y1="256" x2="76" y2="256"/>
+    <line x1="436" y1="256" x2="476" y2="256"/>
+  </g>
+
+  <!-- Ambient Glows -->
+  <circle cx="256" cy="240" r="240" fill="url(#cyanAura)"/>
+  <circle cx="340" cy="180" r="180" fill="url(#pinkAura)"/>
+
+  <!-- Underglow Bloom for Arch -->
+  <path d="M 152 390 L 256 138 L 360 390" fill="none" stroke="url(#ribbonLeft)" stroke-width="64" stroke-linecap="round" stroke-linejoin="round" filter="url(#bloom)" opacity="0.45"/>
+
+  <!-- Arch Ribbon Back Layer (with depth gap mask) -->
+  <path d="M 152 390 L 256 138 L 360 390" fill="none" stroke="url(#ribbonLeft)" stroke-width="54" stroke-linecap="round" stroke-linejoin="round" filter="url(#dropShadow)" mask="url(#gap)"/>
+
+  <!-- Dynamic Energy Flow Wave (The Crossbar Stream) -->
+  <path d="M 96 332 C 162 272 216 354 268 312 C 320 270 358 288 418 248" fill="none" stroke="url(#waveGlowGrad)" stroke-width="32" stroke-linecap="round" filter="url(#softGlow)" opacity="0.45"/>
+  <path d="M 96 332 C 162 272 216 354 268 312 C 320 270 358 288 418 248" fill="none" stroke="url(#waveFlow)" stroke-width="22" stroke-linecap="round" filter="url(#dropShadow)"/>
+  <path d="M 104 330 C 166 274 216 350 268 310 C 318 270 356 287 412 249" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" opacity="0.9"/>
+
+  <!-- Foreground Overlapping Arch Sections -->
+  <path d="M 152 390 L 195 288" fill="none" stroke="url(#ribbonLeft)" stroke-width="54" stroke-linecap="round"/>
+  <path d="M 317 288 L 360 390" fill="none" stroke="url(#ribbonRight)" stroke-width="54" stroke-linecap="round"/>
+
+  <!-- Specular Apex Highlight -->
+  <path d="M 226 210 L 256 138 L 286 210" fill="none" stroke="url(#specular)" stroke-width="5" stroke-linecap="round" opacity="0.95"/>
+
+  <!-- Luminous Nodes & Particles -->
+  <circle cx="418" cy="248" r="7" fill="#ffffff" filter="url(#softGlow)"/>
+  <circle cx="418" cy="248" r="4" fill="#fb7185"/>
+
+  <circle cx="406" cy="126" r="14" fill="url(#waveFlow)" filter="url(#softGlow)"/>
+  <circle cx="406" cy="126" r="6" fill="#ffffff"/>
+
+  <circle cx="438" cy="164" r="7" fill="#2dd4bf" opacity="0.9"/>
+  <circle cx="438" cy="164" r="3" fill="#ffffff"/>
+
+  <circle cx="86" cy="344" r="5" fill="#38bdf8" opacity="0.75"/>
 </svg>

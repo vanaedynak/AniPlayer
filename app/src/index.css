@@ -251,3 +251,59 @@ input[type="range"].slider::-webkit-slider-thumb { -webkit-appearance: none; wid
 :root[data-theme="grandline"] .theme-panel { overflow: hidden; }
 :root[data-theme="grandline"] .theme-panel::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 5px; pointer-events: none; background: repeating-linear-gradient(60deg, #a16207 0 5px, #fde047 5px 8px, #78350f 8px 11px); opacity: 0.8; }
 :root[data-theme="grandline"] [data-nav][aria-current="page"] { background: linear-gradient(100deg, #991b1b, #b91c1c 60%, #dc2626); color: #fff; border-color: #fde04766; box-shadow: inset 0 -3px 0 #fde047; }
+
+/* 86: Eighty-Six: tactical HUD panels, Para-RAID frequency glow, and Lycoris accents */
+:root[data-theme="eightysix"] .theme-art {
+  opacity: 0.75;
+  filter: saturate(1.12) contrast(1.05);
+}
+@media (max-width: 1023px) {
+  :root[data-theme="eightysix"] .theme-art {
+    opacity: 0.42;
+  }
+}
+:root[data-theme="eightysix"] .theme-panel {
+  border-radius: 14px;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-bottom-color: rgba(239, 68, 68, 0.35);
+  box-shadow: inset 0 0 32px -12px rgba(56, 189, 248, 0.12), 0 8px 30px -10px rgba(0, 0, 0, 0.7);
+  position: relative;
+}
+:root[data-theme="eightysix"] .theme-panel::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  right: 20px;
+  width: 38px;
+  height: 2px;
+  background: #38bdf8;
+  box-shadow: 0 0 10px #38bdf8;
+  pointer-events: none;
+}
+:root[data-theme="eightysix"] .theme-panel::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 20px;
+  width: 24px;
+  height: 2px;
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+  pointer-events: none;
+}
+:root[data-theme="eightysix"] [data-nav] {
+  border-radius: 12px;
+  transition: all 0.25s ease;
+}
+:root[data-theme="eightysix"] [data-nav][aria-current="page"] {
+  background: linear-gradient(95deg, rgba(2, 132, 199, 0.9) 0%, rgba(14, 165, 233, 0.75) 55%, rgba(239, 68, 68, 0.4) 100%);
+  color: #ffffff;
+  border-color: rgba(56, 189, 248, 0.65);
+  box-shadow: 0 0 22px -4px rgba(56, 189, 248, 0.45), inset 3px 0 0 #38bdf8, inset -2px 0 0 #ef4444;
+  letter-spacing: 0.02em;
+}
+:root[data-theme="eightysix"] h1,
+:root[data-theme="eightysix"] .theme-panel h2 {
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 20px rgba(56, 189, 248, 0.35);
+}
