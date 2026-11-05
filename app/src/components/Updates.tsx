@@ -102,7 +102,11 @@ export function UpdateSettings() {
             </span>
           )}
           {s.status === 'ready' && <span className="text-white">Версия {s.version} готова к установке</span>}
-          {s.status === 'error' && <span className="text-rose-400">Не удалось проверить: {s.message}</span>}
+          {s.status === 'error' && (
+            <span className="line-clamp-2 break-words text-rose-400" title={s.message}>
+              Не удалось проверить: {s.message}
+            </span>
+          )}
           {s.status === 'idle' && <span className="text-muted">Проверка запустится автоматически</span>}
         </div>
         {s.status === 'ready' ? (
