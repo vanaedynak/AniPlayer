@@ -116,18 +116,38 @@ export async function installUpdate() {
   window.aniplayer?.updates?.install()
 }
 
-/** iPad: the status bar (clock, battery) hides while any player is fullscreen, ours or Kodik's */
+/** iPad: the status bar (clock, battery) hides while any player is fullscreen, ours or Kodik's, and while a reader is open */
+let fullscreen = false
+let readers = 0
+const syncStatusBar = () => {
+  if (!isNative) return
+  void (fullscreen || readers > 0 ? StatusBar.hide() : StatusBar.show()).catch(() => {})
+}
+
 export function initStatusBar() {
   if (!isNative) return
   void StatusBar.setStyle({ style: Style.Dark }).catch(() => {})
   const doc = document as Document & { webkitFullscreenElement?: Element }
-  const sync = (full: boolean) => void (full ? StatusBar.hide() : StatusBar.show()).catch(() => {})
-  const onChange = () => sync(!!(doc.fullscreenElement || doc.webkitFullscreenElement))
+  const set = (full: boolean) => {
+    fullscreen = full
+    syncStatusBar()
+  }
+  const onChange = () => set(!!(doc.fullscreenElement || doc.webkitFullscreenElement))
   document.addEventListener('fullscreenchange', onChange)
   document.addEventListener('webkitfullscreenchange', onChange)
   // native video fullscreen (webkitEnterFullscreen) fires on the video element itself
-  document.addEventListener('webkitbeginfullscreen', () => sync(true), true)
-  document.addEventListener('webkitendfullscreen', () => sync(false), true)
+  document.addEventListener('webkitbeginfullscreen', () => set(true), true)
+  document.addEventListener('webkitendfullscreen', () => set(false), true)
+}
+
+/** a manga or ranobe reader keeps the iPad status bar out of the way while it is open; call the result on close */
+export function hideStatusBarWhileReading() {
+  readers++
+  syncStatusBar()
+  return () => {
+    readers = Math.max(0, readers - 1)
+    syncStatusBar()
+  }
 }
 
 export const SCALES = [0.75, 0.85, 0.9, 1, 1.1, 1.25]

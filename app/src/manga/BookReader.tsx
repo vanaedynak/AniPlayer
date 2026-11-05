@@ -13,7 +13,7 @@ import { isRussian, savedChapter, translateChapter } from './bookTranslate'
 import { DEFAULT_MODEL } from './translate'
 import { cn } from '../lib/format'
 import { Narrator } from './Narrator'
-import { isElectron } from '../lib/platform'
+import { isElectron, hideStatusBarWhileReading } from '../lib/platform'
 import { useReadingClock } from '../lib/activity'
 import { awayAfter, minutesLeft, usePresence, useTextPace, wordCount } from '../lib/reading'
 import { SelectionTranslate } from './SelectionTranslate'
@@ -26,6 +26,7 @@ export { FONTS }
 export default function BookReader() {
   const { id = '' } = useParams()
   useReadingClock()
+  useEffect(hideStatusBarWhileReading, [])
   const nav = useNavigate()
   const book = useBooks((s) => s.books[id])
   const position = useBooks((s) => s.position)

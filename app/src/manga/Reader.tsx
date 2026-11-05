@@ -12,7 +12,7 @@ import { useChapters, pickLang } from './useChapters'
 import { MdImg, PAPER } from './ui'
 import { useAsync } from '../lib/useAsync'
 import { cn } from '../lib/format'
-import { isElectron, isIOS } from '../lib/platform'
+import { isElectron, isIOS, hideStatusBarWhileReading } from '../lib/platform'
 import { useReadingClock } from '../lib/activity'
 import { awayAfter, minutesLeft, pagePace, usePagePace, usePresence } from '../lib/reading'
 import { PageCurl, type CurlHandle } from './PageCurl'
@@ -29,6 +29,7 @@ export default function MangaReader() {
   const { id = '', chapterId = '' } = useParams()
   const nav = useNavigate()
   useReadingClock()
+  useEffect(hideStatusBarWhileReading, [])
   // with no connection, the title and its chapter list come from what was downloaded
   const m = useAsync(() => manga(id).catch(async (e) => (await savedManga(id)) ?? Promise.reject(e)), [id])
   const entryLang = useManga((s) => s.entries[id]?.lang)
