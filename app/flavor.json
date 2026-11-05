@@ -1,9 +1,9 @@
 {
-  "name": "Anyflow",
-  "desktopName": "Anyflow Desktop",
-  "appId": "app.aniplayer",
-  "dataFolder": "aniplayer",
-  "scheme": "anyflow",
-  "repo": "vanaedynak/AniPlayer",
-  "lab": false
+  "name": "Anyflow Lab",
+  "desktopName": "Anyflow Lab",
+  "appId": "app.anyflowlab",
+  "dataFolder": "anyflow-lab",
+  "scheme": "anyflow-lab",
+  "repo": "vanaedynak/anyflow-lab",
+  "lab": true
 }
