@@ -12,7 +12,7 @@ import { Narrator } from '../manga/Narrator'
 import { isRussian, savedChapter, translateChapter } from '../manga/bookTranslate'
 import { DEFAULT_MODEL } from '../manga/translate'
 import { cn } from '../lib/format'
-import { isElectron } from '../lib/platform'
+import { isElectron, isNative, useReaderStatusBar } from '../lib/platform'
 import { useReadingClock } from '../lib/activity'
 import { awayAfter, minutesLeft, usePresence, useTextPace, wordCount } from '../lib/reading'
 import { SelectionTranslate } from '../manga/SelectionTranslate'
@@ -45,7 +45,8 @@ export default function NovelReader() {
   const [ui, setUi] = useState(true)
   const [panel, setPanel] = useState<null | 'toc' | 'type' | 'translate'>(null)
   const [narrate, setNarrate] = useState(false)
-  const [full, setFull] = useState(false)
+  const [full, setFull] = useState(() => isNative)
+  useReaderStatusBar(full)
   const [frac, setFrac] = useState(0)
   const [speaking, setSpeaking] = useState(false)
   const book = useRef<BookHandle>(null)
@@ -157,7 +158,12 @@ export default function NovelReader() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.closest?.('input, textarea, select')) return
-      if (e.key === 'Escape') return panel ? setPanel(null) : nav(novelPath(src, novelId))
+      if (e.key === 'Escape') {
+        if (panel) return setPanel(null)
+        if (isNative && full) return setFull(false)
+        return nav(novelPath(src, novelId))
+      }
+      if (e.code === 'KeyF') return toggleFull()
       // pages turn with the arrows and A / D (by key position, so the Russian layout works too)
       const fwd = ['ArrowDown', 'ArrowRight', 'PageDown', ' '].includes(e.key) || e.code === 'KeyD'
       const bwd = ['ArrowUp', 'ArrowLeft', 'PageUp'].includes(e.key) || e.code === 'KeyA'
@@ -174,9 +180,17 @@ export default function NovelReader() {
     const d = document as Doc
     const on = () => setFull(!!(d.fullscreenElement || d.webkitFullscreenElement))
     document.addEventListener('fullscreenchange', on)
-    return () => document.removeEventListener('fullscreenchange', on)
+    document.addEventListener('webkitfullscreenchange', on)
+    return () => {
+      document.removeEventListener('fullscreenchange', on)
+      document.removeEventListener('webkitfullscreenchange', on)
+    }
   }, [])
   const toggleFull = () => {
+    if (isNative) {
+      setFull((v) => !v)
+      return
+    }
     const d = document as Doc
     if (d.fullscreenElement || d.webkitFullscreenElement) void (d.exitFullscreen?.() ?? d.webkitExitFullscreen?.())
     else void document.documentElement.requestFullscreen?.().catch(() => {})
@@ -345,7 +359,7 @@ export default function NovelReader() {
           <IconBtn onClick={() => setPanel(panel === 'type' ? null : 'type')} title="Шрифт, тема, режим">
             <Type size={20} />
           </IconBtn>
-          <IconBtn onClick={toggleFull} title="Во весь экран">
+          <IconBtn onClick={toggleFull} title={full ? 'Обычный экран' : 'Во весь экран'}>
             {full ? <Minimize size={20} /> : <Maximize size={20} />}
           </IconBtn>
         </div>

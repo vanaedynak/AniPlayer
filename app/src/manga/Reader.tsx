@@ -12,7 +12,7 @@ import { useChapters, pickLang } from './useChapters'
 import { MdImg, PAPER } from './ui'
 import { useAsync } from '../lib/useAsync'
 import { cn } from '../lib/format'
-import { isElectron, isIOS } from '../lib/platform'
+import { isElectron, isIOS, isNative, useReaderStatusBar } from '../lib/platform'
 import { useReadingClock } from '../lib/activity'
 import { awayAfter, minutesLeft, pagePace, usePagePace, usePresence } from '../lib/reading'
 import { PageCurl, type CurlHandle } from './PageCurl'
@@ -96,7 +96,8 @@ function ReaderView({
   const [ui, setUi] = useState(true)
   const [panel, setPanel] = useState<null | 'settings' | 'chapters' | 'translate'>(null)
   const [failed, setFailed] = useState<Record<number, number>>({})
-  const [full, setFull] = useState(false)
+  const [full, setFull] = useState(() => isNative)
+  useReaderStatusBar(full)
   const [press, setPress] = useState<PressAt | null>(null)
   useAmbientSound()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -266,6 +267,10 @@ function ReaderView({
     }
   }, [])
   const toggleFull = () => {
+    if (isNative) {
+      setFull((v) => !v)
+      return
+    }
     const d = document as Doc
     const el = rootRef.current as El | null
     if (d.fullscreenElement || d.webkitFullscreenElement) void (d.exitFullscreen?.() ?? d.webkitExitFullscreen?.())
@@ -278,6 +283,7 @@ function ReaderView({
       if ((e.target as HTMLElement)?.tagName === 'INPUT') return
       if (e.key === 'Escape') {
         if (panel) setPanel(null)
+        else if (isNative && full) setFull(false)
         else if (!full) onExit()
         return
       }
@@ -424,7 +430,7 @@ function ReaderView({
             <IconBtn onClick={() => setPanel(panel === 'settings' ? null : 'settings')} title="Настройки чтения">
               <Settings2 size={20} />
             </IconBtn>
-            <IconBtn onClick={toggleFull} title="Во весь экран (F)">
+            <IconBtn onClick={toggleFull} title={full ? 'Обычный экран (F)' : 'Во весь экран (F)'}>
               {full ? <Minimize size={20} /> : <Maximize size={20} />}
             </IconBtn>
             {paged && <ZoomPill zoom={prefs.pageZoom ?? 1} set={(z) => setPrefs({ pageZoom: Math.round(Math.min(ZOOM_MAX, Math.max(1, z)) * 100) / 100 })} />}

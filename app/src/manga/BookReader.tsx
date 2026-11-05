@@ -13,7 +13,7 @@ import { isRussian, savedChapter, translateChapter } from './bookTranslate'
 import { DEFAULT_MODEL } from './translate'
 import { cn } from '../lib/format'
 import { Narrator } from './Narrator'
-import { isElectron } from '../lib/platform'
+import { isElectron, isNative, useReaderStatusBar } from '../lib/platform'
 import { useReadingClock } from '../lib/activity'
 import { awayAfter, minutesLeft, usePresence, useTextPace, wordCount } from '../lib/reading'
 import { SelectionTranslate } from './SelectionTranslate'
@@ -38,7 +38,8 @@ export default function BookReader() {
   const [chapter, setChapter] = useState(book?.chapter ?? 0)
   const [ui, setUi] = useState(true)
   const [panel, setPanel] = useState<null | 'toc' | 'type' | 'translate'>(null)
-  const [full, setFull] = useState(false)
+  const [full, setFull] = useState(() => isNative)
+  useReaderStatusBar(full)
   const [frac, setFrac] = useState(0)
   const scroller = useRef<HTMLDivElement>(null)
   const text = useRef<HTMLDivElement>(null)
@@ -135,7 +136,12 @@ export default function BookReader() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.closest?.('input, textarea, select')) return
-      if (e.key === 'Escape') return panel ? setPanel(null) : nav('/ranobe/files')
+      if (e.key === 'Escape') {
+        if (panel) return setPanel(null)
+        if (isNative && full) return setFull(false)
+        return nav('/ranobe/files')
+      }
+      if (e.code === 'KeyF') return toggleFull()
       const fwd = ['ArrowDown', 'ArrowRight', 'PageDown', ' '].includes(e.key) || e.code === 'KeyD'
       const bwd = ['ArrowUp', 'ArrowLeft', 'PageUp'].includes(e.key) || e.code === 'KeyA'
       if (paged && (fwd || bwd)) {
@@ -163,6 +169,10 @@ export default function BookReader() {
   const ch = parsed?.chapters[Math.min(chapter, count - 1)]
   const total = count ? Math.round(((chapter + frac) / count) * 100) : 0
   const toggleFull = () => {
+    if (isNative) {
+      setFull((v) => !v)
+      return
+    }
     const d = document as Doc
     const el = document.documentElement as El
     if (d.fullscreenElement || d.webkitFullscreenElement) void (d.exitFullscreen?.() ?? d.webkitExitFullscreen?.())
@@ -311,7 +321,7 @@ export default function BookReader() {
         <IconBtn onClick={() => setPanel(panel === 'type' ? null : 'type')} title="Шрифт и тема">
           <Type size={20} />
         </IconBtn>
-        <IconBtn onClick={toggleFull} title="Во весь экран">
+        <IconBtn onClick={toggleFull} title={full ? 'Обычный экран' : 'Во весь экран'}>
           {full ? <Minimize size={20} /> : <Maximize size={20} />}
         </IconBtn>
       </div>

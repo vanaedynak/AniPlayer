@@ -1,4 +1,5 @@
 // Runtime detection + app lifecycle hooks for Electron (Windows) and Capacitor (iPad)
+import { useEffect } from 'react'
 import { StatusBar, Style } from '@capacitor/status-bar'
 import { flushAll } from './sync'
 import { paletteById, paletteVars } from './palettes'
@@ -89,6 +90,8 @@ export function initLifecycle() {
     if (document.visibilityState === 'hidden') {
       saveAll()
       void flushAll()
+    } else {
+      syncStatusBar()
     }
   })
   window.addEventListener('pagehide', () => {
@@ -109,18 +112,49 @@ export async function installUpdate() {
   window.aniplayer?.updates?.install()
 }
 
-/** iPad: the status bar (clock, battery) hides while any player is fullscreen, ours or Kodik's */
+const hideReasons = new Set<string>()
+let syncScheduled = false
+const runMicrotask = typeof queueMicrotask === 'function' ? queueMicrotask : (fn: () => void) => setTimeout(fn, 0)
+
+export function syncStatusBar() {
+  if (!isNative) return
+  if (syncScheduled) return
+  syncScheduled = true
+  runMicrotask(() => {
+    syncScheduled = false
+    const doc = document as Document & { webkitFullscreenElement?: Element }
+    const docFull = !!(doc.fullscreenElement || doc.webkitFullscreenElement)
+    const shouldHide = docFull || hideReasons.size > 0
+    void (shouldHide ? StatusBar.hide() : StatusBar.show()).catch(() => {})
+  })
+}
+
+export function setStatusBarHidden(reason: string, hidden: boolean) {
+  if (hidden) hideReasons.add(reason)
+  else hideReasons.delete(reason)
+  syncStatusBar()
+}
+
+/** Hook for readers/immersive views: hides the status bar on iPad/native while mounted */
+export function useReaderStatusBar(enabled = true) {
+  useEffect(() => {
+    if (!isNative || !enabled) return
+    const id = 'reader_' + Math.random().toString(36).slice(2)
+    setStatusBarHidden(id, true)
+    return () => setStatusBarHidden(id, false)
+  }, [enabled])
+}
+
+/** iPad: the status bar (clock, battery) hides while any player is fullscreen or reader is open */
 export function initStatusBar() {
   if (!isNative) return
   void StatusBar.setStyle({ style: Style.Dark }).catch(() => {})
-  const doc = document as Document & { webkitFullscreenElement?: Element }
-  const sync = (full: boolean) => void (full ? StatusBar.hide() : StatusBar.show()).catch(() => {})
-  const onChange = () => sync(!!(doc.fullscreenElement || doc.webkitFullscreenElement))
+  const onChange = () => syncStatusBar()
   document.addEventListener('fullscreenchange', onChange)
   document.addEventListener('webkitfullscreenchange', onChange)
   // native video fullscreen (webkitEnterFullscreen) fires on the video element itself
-  document.addEventListener('webkitbeginfullscreen', () => sync(true), true)
-  document.addEventListener('webkitendfullscreen', () => sync(false), true)
+  document.addEventListener('webkitbeginfullscreen', () => setStatusBarHidden('video', true), true)
+  document.addEventListener('webkitendfullscreen', () => setStatusBarHidden('video', false), true)
 }
 
 export const SCALES = [0.75, 0.85, 0.9, 1, 1.1, 1.25]
