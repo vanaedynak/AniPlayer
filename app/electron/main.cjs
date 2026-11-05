@@ -130,10 +130,20 @@ function setUpdate(s) {
   if (win && !win.isDestroyed()) win.webContents.send('update-state', s)
 }
 
+// electron-updater's errors carry whole HTTP headers and a stack: the page gets one short line instead
+function updateError(e) {
+  const text = String(e?.message ?? e)
+  console.warn('[updates]', text)
+  if (/HttpError: 404|Cannot find channel/i.test(text)) return `на GitHub нет файла обновления (github.com/${flavor.repo} закрыт или сборка ещё идёт)`
+  if (/ENOTFOUND|ECONNREFUSED|ETIMEDOUT|ECONNRESET|net::ERR_/i.test(text)) return 'нет связи с GitHub'
+  const first = text.split('\n')[0]
+  return first.length > 160 ? first.slice(0, 160) + '…' : first
+}
+
 function checkForUpdates() {
   if (!app.isPackaged) return setUpdate({ status: 'error', message: 'Обновления работают только в установленной версии' })
   if (updateState.status === 'downloading' || updateState.status === 'ready') return
-  autoUpdater.checkForUpdates().catch((e) => setUpdate({ status: 'error', message: String(e?.message ?? e) }))
+  autoUpdater.checkForUpdates().catch((e) => setUpdate({ status: 'error', message: updateError(e) }))
 }
 
 function initUpdater() {
@@ -144,7 +154,7 @@ function initUpdater() {
   autoUpdater.on('update-available', (i) => setUpdate({ status: 'downloading', version: i.version, percent: 0 }))
   autoUpdater.on('download-progress', (p) => setUpdate({ ...updateState, status: 'downloading', percent: p.percent }))
   autoUpdater.on('update-downloaded', (i) => setUpdate({ status: 'ready', version: i.version }))
-  autoUpdater.on('error', (e) => setUpdate({ status: 'error', message: String(e?.message ?? e) }))
+  autoUpdater.on('error', (e) => setUpdate({ status: 'error', message: updateError(e) }))
   if (!app.isPackaged) return
   setTimeout(checkForUpdates, 5000)
   setInterval(checkForUpdates, 2 * 60 * 60 * 1000)
