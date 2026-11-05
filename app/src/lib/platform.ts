@@ -2,7 +2,7 @@
 import { StatusBar, Style } from '@capacitor/status-bar'
 import { flushAll } from './sync'
 import { paletteById, paletteVars } from './palettes'
-import type { TorrentInfo } from './torrent'
+import type { TorrentInfo, TorrentSave } from './torrent'
 
 export type UpdateState =
   | { status: 'idle' | 'checking' | 'latest' }
@@ -35,6 +35,13 @@ interface ElectronBridge {
     warm: (hash: string, index: number, from: number, to: number) => Promise<void>
     /** share of bytes [from, to] already downloaded, 0..1 */
     ready: (hash: string, index: number, from: number, to: number) => Promise<number>
+    /** asks for a folder and saves the whole torrent there; null if the user cancelled */
+    save?: (hash: string) => Promise<string | null>
+    saves?: () => Promise<TorrentSave[]>
+    pauseSave?: (hash: string, paused: boolean) => Promise<void>
+    removeSave?: (hash: string) => Promise<void>
+    openSaved?: (hash: string) => Promise<TorrentInfo>
+    showSave?: (hash: string) => Promise<void>
   }
   updates?: {
     get: () => Promise<UpdateState>

@@ -1,6 +1,7 @@
 // Torrents as a player source (desktop only). AniLibria's own: the same dub as the HLS stream at the full
 // WEBRip/BDRip bitrate. Or any magnet link / .torrent file the user opens, with its dubs and subtitles.
 // Electron downloads it in playback order.
+import { useEffect, useState } from 'react'
 import type { Torrent } from './api'
 
 export const torrentSupported = () => !!window.aniplayer?.torrent
@@ -107,6 +108,46 @@ export async function openUserTorrent(input: string | File): Promise<TorrentInfo
   if (!t) throw new Error('Свои торренты открываются в приложении для ПК')
   if (typeof input === 'string') return t.openMagnet(input.trim())
   return t.openFile(new Uint8Array(await input.arrayBuffer()))
+}
+
+/** a whole torrent saved into a folder on the PC */
+export type TorrentSave = {
+  hash: string
+  name: string
+  folder: string
+  size: number
+  progress: number
+  done: boolean
+  paused: boolean
+  down: number
+  peers: number
+  added: number
+}
+
+export const savesSupported = () => !!window.aniplayer?.torrent?.saves
+
+/** the saved torrents, refreshed every two seconds while something still downloads */
+export function useTorrentSaves() {
+  const [list, setList] = useState<TorrentSave[]>([])
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    const t = window.aniplayer?.torrent
+    if (!t?.saves) return
+    let alive = true
+    let timer = 0
+    const load = () =>
+      t.saves!().then((l) => {
+        if (!alive) return
+        setList(l)
+        if (l.some((s) => !s.done && !s.paused)) timer = window.setTimeout(load, 2000)
+      })
+    void load()
+    return () => {
+      alive = false
+      clearTimeout(timer)
+    }
+  }, [tick])
+  return { list, refresh: () => setTick((n) => n + 1) }
 }
 
 /** subtitle files lying next to the videos that belong to this one: same name, or the same episode number */

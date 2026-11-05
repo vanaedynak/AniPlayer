@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Magnet, Film, RotateCcw } from 'lucide-react'
 import Player from '../components/Player'
+import { useSearchParams } from 'react-router-dom'
 import { TorrentOpenForm } from '../components/TorrentOpen'
+import { SaveTorrentButton } from '../components/TorrentSaves'
 import { Empty, Panel } from '../components/ui'
 import { EXTRA, episodeOf, torrentSupported, userSource, type TorrentInfo } from '../lib/torrent'
 import type { Episode, Release } from '../lib/api'
@@ -39,6 +41,26 @@ export default function TorrentPlayer() {
   const episodes = useMemo(() => (info ? asEpisodes(info) : []), [info])
   const source = useMemo(() => (info ? userSource(info) : undefined), [info])
   const release = useMemo(() => (info ? ({ id: 0, name: { main: info.name, english: null, alternative: null }, alias: '', episodes } as unknown as Release) : null), [info, episodes])
+  // "Смотреть" on a saved torrent in the downloads: it plays from the folder it is saved in
+  const [params, setParams] = useSearchParams()
+  const saved = params.get('saved')
+  const [savedErr, setSavedErr] = useState('')
+  useEffect(() => {
+    const open = window.aniplayer?.torrent?.openSaved
+    if (!saved || !open) return
+    let alive = true
+    setSavedErr('')
+    open(saved)
+      .then((i) => {
+        if (!alive) return
+        setInfo(i)
+        setCur(asEpisodes(i)[0]?.id ?? '')
+      })
+      .catch((e) => alive && setSavedErr(String(e?.message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')))
+    return () => {
+      alive = false
+    }
+  }, [saved])
   useEffect(() => {
     document.title = info ? `${info.name} · Торрент` : 'Торрент-плеер'
     return () => {
@@ -59,6 +81,8 @@ export default function TorrentPlayer() {
             Magnet-ссылка или .torrent файл — серия начнёт играть, пока скачивается. Озвучки и субтитры внутри MKV выбираются в настройках плеера.
           </p>
         </div>
+        {saved && !savedErr && <div className="text-sm font-semibold text-muted">Открываю сохранённый торрент…</div>}
+        {savedErr && <div className="rounded-xl bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-300">Не открылся сохранённый торрент: {savedErr}</div>}
         <Panel>
           <TorrentOpenForm
             onOpen={(i) => {
@@ -82,9 +106,18 @@ export default function TorrentPlayer() {
           <h1 className="truncate text-2xl font-extrabold tracking-tight sm:text-3xl">{info.name}</h1>
           <div className="mt-1 truncate text-muted">{episode.name}</div>
         </div>
-        <button onClick={() => setInfo(null)} className="flex h-12 items-center gap-2 rounded-full bg-card-2 px-5 font-bold ring-1 ring-white/5 hover:bg-white/10">
-          <RotateCcw size={17} /> Другой торрент
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <SaveTorrentButton hash={info.infoHash} />
+          <button
+            onClick={() => {
+              setInfo(null)
+              if (params.has('saved')) setParams({}, { replace: true })
+            }}
+            className="flex h-12 items-center gap-2 rounded-full bg-card-2 px-5 font-bold ring-1 ring-white/5 hover:bg-white/10"
+          >
+            <RotateCcw size={17} /> Другой торрент
+          </button>
+        </div>
       </div>
       <Panel className="!p-4">
         <div className="mb-3 flex items-center gap-2 font-extrabold">

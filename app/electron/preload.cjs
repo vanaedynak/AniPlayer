@@ -48,6 +48,24 @@ contextBridge.exposeInMainWorld('aniplayer', {
     ready(hash, index, from, to) {
       return ipcRenderer.invoke('torrent-ready', hash, index, from, to)
     },
+    save(hash) {
+      return ipcRenderer.invoke('torrent-save', hash)
+    },
+    saves() {
+      return ipcRenderer.invoke('torrent-saves')
+    },
+    pauseSave(hash, paused) {
+      return ipcRenderer.invoke('torrent-save-pause', hash, paused)
+    },
+    removeSave(hash) {
+      return ipcRenderer.invoke('torrent-save-remove', hash)
+    },
+    openSaved(hash) {
+      return ipcRenderer.invoke('torrent-open-saved', hash)
+    },
+    showSave(hash) {
+      return ipcRenderer.invoke('torrent-save-show', hash)
+    },
   },
   discord: {
     setActivity(id, activity) {

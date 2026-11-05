@@ -7,12 +7,18 @@ import { freeSpace } from '../lib/offline'
 import { DownloadRow } from '../components/Downloads'
 import { Empty, Panel } from '../components/ui'
 import { SavedShelf } from '../manga/SavedShelf'
+import { TorrentSavesPanel } from '../components/TorrentSaves'
+import { savesSupported } from '../lib/torrent'
 import { useSaved } from '../manga/saved'
 
 export default function Downloads() {
   const items = useDownloads((s) => s.items)
   const releases = useDownloads((s) => s.releases)
   const chapters = useSaved((s) => Object.keys(s.items).length)
+  const [saves, setSaves] = useState(0)
+  useEffect(() => {
+    void window.aniplayer?.torrent?.saves?.().then((l) => setSaves(l.length))
+  }, [])
   const [free, setFree] = useState<number | null>(null)
   const [online, setOnline] = useState(navigator.onLine)
   useEffect(() => {
@@ -82,13 +88,14 @@ export default function Downloads() {
             </Panel>
           )
         })
-      ) : chapters ? null : (
+      ) : chapters || saves ? null : (
         <Empty
           icon={<HardDriveDownload />}
           title="Пока ничего не скачано"
-          text="Откройте аниме с AniLibria и нажмите «Скачать сезон» или «Скачать» у серии, а у манги и ранобэ — «Скачать» над главами: смотреть и читать можно будет без интернета."
+          text={`Откройте аниме с AniLibria и нажмите «Скачать сезон» или «Скачать» у серии, а у манги и ранобэ — «Скачать» над главами: смотреть и читать можно будет без интернета.${savesSupported() ? ' Любой свой торрент можно целиком сохранить на диск в «Торрент-плеере».' : ''}`}
         />
       )}
+      <TorrentSavesPanel />
       <SavedShelf />
     </div>
   )

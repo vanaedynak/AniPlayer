@@ -1,6 +1,6 @@
 // Electron shell for Windows. Serves the built app from app://aniplayer so the
 // page has a proper secure origin (IndexedDB, Firebase Auth and CORS all behave).
-const { app, BrowserWindow, protocol, net, ipcMain, shell, nativeTheme, Menu, session } = require('electron')
+const { app, BrowserWindow, protocol, net, ipcMain, shell, nativeTheme, Menu, session, dialog } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 const { pathToFileURL } = require('node:url')
@@ -190,6 +190,33 @@ ipcMain.handle('torrent-stats', (_e, hash, index) => tor().stats(hash, index))
 ipcMain.handle('torrent-drop', (_e, hash) => tor().drop(hash))
 ipcMain.handle('torrent-warm', (_e, hash, index, from, to) => tor().warm(hash, index, from, to))
 ipcMain.handle('torrent-ready', (_e, hash, index, from, to) => tor().ready(hash, index, from, to))
+// a whole torrent saved into a folder the user picks; it carries on after a restart
+const validHash = (h) => typeof h === 'string' && /^[0-9a-f]{40}$/.test(h)
+ipcMain.handle('torrent-save', async (_e, hash) => {
+  if (!validHash(hash)) return null
+  const r = await dialog.showOpenDialog(win, {
+    title: 'Куда сохранить торрент',
+    defaultPath: app.getPath('videos'),
+    buttonLabel: 'Сохранить сюда',
+    properties: ['openDirectory', 'createDirectory'],
+  })
+  if (r.canceled || !r.filePaths[0]) return null
+  await tor().save(hash, r.filePaths[0])
+  return r.filePaths[0]
+})
+ipcMain.handle('torrent-saves', () => tor().listSaves())
+ipcMain.handle('torrent-save-pause', (_e, hash, paused) => validHash(hash) && tor().pauseSave(hash, paused))
+ipcMain.handle('torrent-save-remove', (_e, hash) => validHash(hash) && tor().removeSave(hash))
+ipcMain.handle('torrent-open-saved', async (_e, hash) => tor().withUrls(await tor().openSaved(hash)))
+ipcMain.handle('torrent-save-show', (_e, hash) => {
+  const p = validHash(hash) && tor().savePath(hash)
+  if (p) void shell.openPath(p)
+})
+// unfinished saves go on a few seconds after start, once the window is up
+app.whenReady().then(() => {
+  if (fs.existsSync(path.join(app.getPath('userData'), 'torrent-saves.json')))
+    setTimeout(() => tor().resumeSaves().catch((e) => console.warn('[torrent] resume', e?.message ?? e)), 5000)
+})
 app.on('will-quit', () => torrent?.shutdown())
 
 // Voice module: F5-TTS on the GPU, installed apart from the app (several GB) in %USERPROFILE%\AniPlayer-voice.

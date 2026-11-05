@@ -18,6 +18,7 @@ const SUBS = /\.(ass|ssa|srt|vtt)$/i
 const METADATA_TIMEOUT = 90_000
 
 let client = null
+let saver = null // a second client for whole torrents saved to a folder: its files stay after the app quits
 let server = null
 let port = 0
 const token = crypto.randomBytes(12).toString('hex')
@@ -135,8 +136,9 @@ function withUrls(i) {
   }
 }
 
+/** the torrent to stream from: the player's own while it has one, else a whole torrent being saved to disk */
 async function find(infoHash) {
-  return client ? await client.get(infoHash) : null
+  return (client ? await client.get(infoHash) : null) ?? (saver ? await saver.get(infoHash) : null)
 }
 
 async function stats(infoHash, index) {
@@ -148,7 +150,8 @@ async function stats(infoHash, index) {
 }
 
 async function drop(infoHash) {
-  const t = await find(infoHash)
+  // only the player's temporary copy: a torrent saved to disk keeps its files
+  const t = client ? await client.get(infoHash) : null
   lastUse.delete(infoHash)
   for (const k of [...embedded.keys()]) if (k.startsWith(infoHash)) embedded.delete(k)
   if (t) t.destroy({ destroyStore: true })
@@ -356,7 +359,150 @@ async function serve(req, res) {
   else stream.pipe(res)
 }
 
+// ---------- whole torrents saved to a folder ----------
+// The player's client keeps only what was watched, in a temp folder. "Сохранить на диск" hands the torrent to a
+// second client that downloads every file into a folder the user picked; the list lives in userData, so a save
+// goes on after a restart and a finished one plays from disk.
+const saves = new Map() // infoHash -> { hash, name, folder, torrent (base64), size, progress, done, paused, added }
+let savesFile = null
+const savesPath = () => (savesFile ??= path.join(require('electron').app.getPath('userData'), 'torrent-saves.json'))
+let writeTimer = null
+function writeSaves() {
+  // at most one write in flight every couple of seconds, however often progress moves
+  if (writeTimer) return
+  writeTimer = setTimeout(() => {
+    writeTimer = null
+    try {
+      fs.writeFileSync(savesPath(), JSON.stringify([...saves.values()]))
+    } catch (e) {
+      console.warn('[torrent] saves', e?.message ?? e)
+    }
+  }, 2000)
+}
+function loadSaves() {
+  if (saves.size) return
+  try {
+    for (const s of JSON.parse(fs.readFileSync(savesPath(), 'utf8'))) if (s?.hash && s.torrent && s.folder) saves.set(s.hash, s)
+  } catch {}
+}
+
+async function getSaver() {
+  if (saver) return saver
+  const { default: WebTorrent } = await import('webtorrent')
+  saver = new WebTorrent({ maxConns: 60 })
+  saver.on('error', (e) => console.warn('[torrent] saver', e?.message ?? e))
+  return saver
+}
+
+/** starts (or reopens) a save; a finished one skips re-hashing gigabytes it already checked */
+async function startSave(s) {
+  const c = await getSaver()
+  const have = await c.get(s.hash)
+  if (have) return have
+  const t = c.add(Buffer.from(s.torrent, 'base64'), { path: s.folder, skipVerify: !!s.done })
+  t.on('error', (e) => console.warn('[torrent] save', s.name, e?.message ?? e))
+  t.on('download', () => {
+    const p = Math.round(t.progress * 1000) / 1000
+    if (p !== s.progress) {
+      s.progress = p
+      writeSaves()
+    }
+  })
+  t.once('done', () => {
+    s.done = true
+    s.progress = 1
+    writeSaves()
+  })
+  return t
+}
+
+/** at app start: unfinished saves carry on */
+async function resumeSaves() {
+  loadSaves()
+  for (const s of saves.values()) if (!s.done && !s.paused) await startSave(s)
+}
+
+/** saves every file of an open torrent into `folder` */
+async function save(infoHash, folder) {
+  loadSaves()
+  if (saves.has(infoHash)) return
+  const t = client ? await client.get(infoHash) : null
+  if (!t?.torrentFile) throw new Error('торрент ещё не открылся')
+  const s = { hash: infoHash, name: t.name, folder, torrent: Buffer.from(t.torrentFile).toString('base64'), size: t.length, progress: 0, done: false, paused: false, added: Date.now() }
+  saves.set(infoHash, s)
+  writeSaves()
+  await startSave(s)
+}
+
+async function listSaves() {
+  loadSaves()
+  const out = []
+  for (const s of saves.values()) {
+    const t = saver ? await saver.get(s.hash) : null
+    out.push({
+      hash: s.hash,
+      name: s.name,
+      folder: s.folder,
+      size: s.size,
+      progress: s.done ? 1 : t ? t.progress : s.progress,
+      done: !!s.done,
+      paused: !!s.paused,
+      down: t && !s.done ? t.downloadSpeed : 0,
+      peers: t ? t.numPeers : 0,
+      added: s.added,
+    })
+  }
+  return out.sort((a, b) => b.added - a.added)
+}
+
+/** pausing lets go of the torrent; the files stay where they are */
+async function pauseSave(infoHash, paused) {
+  const s = saves.get(infoHash)
+  if (!s) return
+  s.paused = !!paused
+  writeSaves()
+  if (paused) {
+    const t = saver ? await saver.get(infoHash) : null
+    if (t) await new Promise((ok) => t.destroy({ destroyStore: false }, ok))
+  } else await startSave(s)
+}
+
+/** off the list; the downloaded files stay in the folder */
+async function removeSave(infoHash) {
+  const t = saver ? await saver.get(infoHash) : null
+  if (t) await new Promise((ok) => t.destroy({ destroyStore: false }, ok))
+  saves.delete(infoHash)
+  writeSaves()
+}
+
+/** a saved torrent for the player: streamed from disk, the missing pieces first */
+async function openSaved(infoHash) {
+  loadSaves()
+  const s = saves.get(infoHash)
+  if (!s) throw new Error('этого торрента нет в загрузках')
+  await getClient() // the local server the player streams from
+  if (s.paused) {
+    s.paused = false
+    writeSaves()
+  }
+  return whenReady(await startSave(s))
+}
+
+/** where a save's files are: the torrent's own folder inside the picked one */
+function savePath(infoHash) {
+  loadSaves()
+  const s = saves.get(infoHash)
+  if (!s) return null
+  const inner = path.join(s.folder, s.name)
+  return fs.existsSync(inner) ? inner : s.folder
+}
+
 function shutdown() {
+  try {
+    clearTimeout(writeTimer)
+    if (saves.size) fs.writeFileSync(savesPath(), JSON.stringify([...saves.values()]))
+  } catch {}
+  saver?.destroy()
   if (!client) return
   try {
     client.destroy()
@@ -365,4 +511,4 @@ function shutdown() {
   } catch {}
 }
 
-module.exports = { open, openMagnet, openFile, withUrls, streamUrl, stats, drop, warm, ready, shutdown }
+module.exports = { open, openMagnet, openFile, withUrls, streamUrl, stats, drop, warm, ready, shutdown, save, listSaves, pauseSave, removeSave, openSaved, savePath, resumeSaves, savesPath }
