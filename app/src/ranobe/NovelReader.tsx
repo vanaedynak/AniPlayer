@@ -1,10 +1,13 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ChevronLeft, ChevronRight, List, Type, Loader2, AlertCircle, Languages, Headphones, Maximize, Minimize } from 'lucide-react'
 import { useManga } from '../manga/store'
 import { PAPER } from '../manga/ui'
 import { Sheet, IconBtn, TranslatorSetup } from '../manga/Reader'
-import { FONTS, TypeSheet } from '../manga/BookReader'
+import { FONTS } from '../read/bookLook'
+import { BookSheet } from '../read/ReadingSheet'
+import { BookPages, type BookHandle } from '../read/BookPages'
+import { AmbienceLayer, useAmbientSound } from '../read/Ambience'
 import { Narrator } from '../manga/Narrator'
 import { isRussian, savedChapter, translateChapter } from '../manga/bookTranslate'
 import { DEFAULT_MODEL } from '../manga/translate'
@@ -12,7 +15,6 @@ import { cn } from '../lib/format'
 import { isElectron } from '../lib/platform'
 import { useReadingClock } from '../lib/activity'
 import { awayAfter, minutesLeft, usePresence, useTextPace, wordCount } from '../lib/reading'
-import { PageCurl, type CurlHandle } from '../manga/PageCurl'
 import { SelectionTranslate } from '../manga/SelectionTranslate'
 import { sourceById } from './registry'
 import { loadChapter, loadNovel } from './cache'
@@ -46,14 +48,17 @@ export default function NovelReader() {
   const [full, setFull] = useState(false)
   const [frac, setFrac] = useState(0)
   const [speaking, setSpeaking] = useState(false)
-  const curl = useRef<CurlHandle>(null)
-  const lastWheel = useRef(0)
+  const book = useRef<BookHandle>(null)
+  const [pageInfo, setPageInfo] = useState<{ page: number; count: number } | null>(null)
+  useAmbientSound()
   const scroller = useRef<HTMLDivElement>(null)
   const text = useRef<HTMLDivElement>(null)
   const lastY = useRef(0)
   const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   // back to the saved spot in the chapter the reader stopped at; other chapters start at the top
   const restore = useRef(saved?.lastChapterId === chapterId ? (saved.lastPage ?? 0) / (saved.lastPages || 100) : 0)
+  // where a chapter opens in page mode: the saved spot, or its last page when coming back from the next one
+  const [start, setStart] = useState(restore.current)
 
   useEffect(() => {
     let alive = true
@@ -133,10 +138,11 @@ export default function NovelReader() {
     restore.current = 0
   }, [html])
 
-  const go = (c?: { id: string }) => {
+  const go = (c?: { id: string }, fromEnd = false) => {
     if (!c) return
     scroller.current?.scrollTo({ top: 0 })
-    setFrac(0)
+    setFrac(fromEnd ? 1 : 0)
+    setStart(fromEnd ? 1 : 0)
     nav(chapterPath(src, novelId, c.id), { replace: true })
   }
 
@@ -145,25 +151,8 @@ export default function NovelReader() {
     useManga.getState().progress(eid, { chapterId, label: chapter.title, page: Math.round(f * 100), pages: 100, key: chapterId, done: f > 0.95 })
   }
 
-  // page mode: a tap on the left or right third, the arrows or the space bar turn one screen
-  /** where the text stands one screen further (or back) */
-  const screenAt = (dir: 1 | -1) => {
-    const el = scroller.current
-    if (!el) return 0
-    return Math.max(0, Math.min(el.scrollHeight - el.clientHeight, el.scrollTop + dir * (el.clientHeight - 48)))
-  }
-  const turn = (dir: 1 | -1) => {
-    const el = scroller.current
-    if (!el) return
-    const atEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 4
-    if (dir > 0 && atEnd) return go(next)
-    if (dir < 0 && el.scrollTop <= 0) return go(prev)
-    if (curl.current?.turn(dir)) return
-    el.scrollBy({ top: dir * (el.clientHeight - 48), behavior: 'smooth' })
-  }
-  const jump = (dir: 1 | -1) => {
-    if (scroller.current) scroller.current.scrollTop = screenAt(dir)
-  }
+  const paged = prefs.paged !== false
+  const turn = (dir: 1 | -1) => book.current?.turn(dir)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -172,8 +161,8 @@ export default function NovelReader() {
       // pages turn with the arrows and A / D (by key position, so the Russian layout works too)
       const fwd = ['ArrowDown', 'ArrowRight', 'PageDown', ' '].includes(e.key) || e.code === 'KeyD'
       const bwd = ['ArrowUp', 'ArrowLeft', 'PageUp'].includes(e.key) || e.code === 'KeyA'
-      if (prefs.paged && fwd) (e.preventDefault(), turn(1))
-      else if (prefs.paged && bwd) (e.preventDefault(), turn(-1))
+      if (paged && fwd) (e.preventDefault(), turn(1))
+      else if (paged && bwd) (e.preventDefault(), turn(-1))
       else if (e.key === 'ArrowRight') go(next)
       else if (e.key === 'ArrowLeft') go(prev)
     }
@@ -196,18 +185,20 @@ export default function NovelReader() {
   if (!source) return null
   const pct = novel?.chapters.length ? Math.round(((Math.max(0, idx) + frac) / novel.chapters.length) * 100) : 0
 
-  /** the chapter's text; copies of it (the pages being turned) carry no refs */
-  const article = (live: boolean) => (
+  /** the chapter's text as one long column (the ribbon mode) */
+  const article = () => (
     <article
       className="book mx-auto px-5 sm:px-8"
       style={{
         maxWidth: prefs.width,
-        fontFamily: FONTS[prefs.font].css,
+        fontFamily: (FONTS[prefs.font] ?? FONTS.literata).css,
+        fontWeight: prefs.weight ?? 400,
         fontSize: prefs.size,
         lineHeight: prefs.leading,
         textAlign: prefs.justify ? 'justify' : 'left',
         paddingTop: 'calc(var(--safe-top) + 84px)',
-        paddingBottom: prefs.paged ? '60vh' : 'calc(var(--safe-bottom) + 40px)',
+        paddingBottom: 'calc(var(--safe-bottom) + 40px)',
+        ['--para' as string]: `${prefs.para ?? 0.3}em`,
         ['--indent' as string]: prefs.indent ? '1.5em' : '0',
         ['--sub' as string]: paper.sub,
       }}
@@ -215,7 +206,7 @@ export default function NovelReader() {
       <div className="mb-8 text-center text-sm font-bold tracking-wide uppercase" style={{ color: paper.sub, fontFamily: FONTS.sans.css }}>
         {chapter?.title}
       </div>
-      <div ref={live ? text : undefined} dangerouslySetInnerHTML={{ __html: shownHtml }} />
+      <div ref={text} dangerouslySetInnerHTML={{ __html: shownHtml }} />
       <div className="mt-14 flex flex-col items-center gap-3" style={{ fontFamily: FONTS.sans.css }}>
         {next ? (
           <button onClick={() => go(next)} className="flex items-center gap-2 rounded-full bg-accent px-7 py-3.5 font-bold text-white shadow-xl">
@@ -232,7 +223,7 @@ export default function NovelReader() {
   const liveScreen = (
   <div
     ref={scroller}
-    className={cn('flex-1 overscroll-contain', prefs.paged ? 'overflow-hidden' : 'overflow-y-auto')}
+    className="flex-1 overflow-y-auto overscroll-contain"
     onScroll={(e) => {
       const el = e.currentTarget
       const f = el.scrollHeight > el.clientHeight ? el.scrollTop / (el.scrollHeight - el.clientHeight) : 1
@@ -242,26 +233,23 @@ export default function NovelReader() {
       if (el.scrollTop > lastY.current + 40) setUi(false)
       lastY.current = el.scrollTop
     }}
-    onWheel={(e) => {
-      // a touchpad sends a stream of wheel events for one swipe: one turn per swipe
-      if (!prefs.paged || Math.abs(e.deltaY) < 20 || Date.now() - lastWheel.current < 450) return
-      lastWheel.current = Date.now()
-      turn(e.deltaY > 0 ? 1 : -1)
-    }}
     onClick={(e) => {
       if ((e.target as HTMLElement).closest('button, a')) return
       if (window.getSelection()?.toString()) return
-      if (prefs.paged) {
-        const x = e.clientX / window.innerWidth
-        if (x < 0.33) return turn(-1)
-        if (x > 0.67) return turn(1)
-      }
       setUi((v) => !v)
     }}
   >
-      {article(true)}
+      {article()}
     </div>
   )
+  const nextButton = next ? (
+    <button onClick={() => go(next)} className="flex items-center gap-2 rounded-full bg-accent px-7 py-3.5 font-bold text-white shadow-xl">
+      Следующая глава <ChevronRight size={18} />
+    </button>
+  ) : (
+    <div className="font-bold">Это последняя глава</div>
+  )
+  const count = novel?.chapters.length || 1
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col" style={{ background: paper.bg, color: paper.fg }}>
@@ -279,23 +267,43 @@ export default function NovelReader() {
           <Loader2 size={34} className="animate-spin opacity-60" />
         </div>
       ) : (
-        prefs.paged ? (
-          <PageCurl
-            ref={curl}
-            enabled={prefs.curl !== false}
-            sound={prefs.flipSound !== false}
-            paper={paper.bg}
-            canNext={frac < 0.999}
-            canPrev={frac > 0.001}
-            onNext={() => jump(1)}
-            onPrev={() => jump(-1)}
-            className="relative min-h-0 flex-1 overflow-hidden"
-            render={(at) => (at === 0 ? liveScreen : <ScreenAt top={screenAt(at)}>{article(false)}</ScreenAt>)}
-          />
+        paged ? (
+          <div className="relative flex min-h-0 flex-1 flex-col" style={{ paddingTop: 'var(--safe-top)', paddingBottom: 'var(--safe-bottom)' }}>
+            <BookPages
+              ref={book}
+              html={shownHtml}
+              chapterTitle={chapter?.title ?? ''}
+              bookTitle={novel?.title ?? ''}
+              prefs={prefs}
+              paper={paper}
+              chapterKey={`${chapterId}:${shownRu ? 'ru' : 'src'}`}
+              start={start}
+              bookBefore={Math.max(0, idx) / count}
+              bookShare={1 / count}
+              hasNext={!!next}
+              hasPrev={!!prev}
+              onNext={() => go(next)}
+              onPrev={() => go(prev, true)}
+              onPage={(pg, n) => {
+                const f = n > 1 ? pg / (n - 1) : 1
+                setPageInfo({ page: pg, count: n })
+                setFrac(f)
+                setStart(f)
+                clearTimeout(saveTimer.current)
+                saveTimer.current = setTimeout(() => save(f), 700)
+                if (pg > 0) setUi(false)
+              }}
+              onTap={() => setUi((v) => !v)}
+              textRef={text}
+              end={nextButton}
+            />
+          </div>
         ) : (
           liveScreen
         )
       )}
+
+      <AmbienceLayer dark={paper.dark} />
 
       <div
         className={cn('absolute inset-x-0 top-0 z-10 flex items-center gap-2 bg-gradient-to-b from-black/80 to-black/0 px-3 pb-8 text-white transition duration-300 sm:px-5', isElectron && !full && 'sm:pr-[150px]', !ui && !panel && '-translate-y-full opacity-0')}
@@ -345,12 +353,15 @@ export default function NovelReader() {
           <IconBtn onClick={() => go(prev)} disabled={!prev} title="Предыдущая глава">
             <ChevronLeft size={22} />
           </IconBtn>
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/20">
-            <div className="h-full rounded-full bg-accent-2" style={{ width: `${Math.round(frac * 100)}%` }} />
+          <div className="min-w-0 flex-1">
+            <div className="h-1.5 overflow-hidden rounded-full bg-white/20">
+              <div className="h-full rounded-full bg-accent-2" style={{ width: `${Math.round(frac * 100)}%` }} />
+            </div>
+            <div className="mt-1.5 flex justify-between text-[11px] font-bold text-white/60 tabular-nums">
+              <span>{paged && pageInfo ? `стр. ${pageInfo.page + 1} из ${pageInfo.count}` : `${Math.round(frac * 100)}%`}</span>
+              <span>глава {idx + 1} из {novel?.chapters.length ?? '…'}</span>
+            </div>
           </div>
-          <span className="shrink-0 text-sm font-bold tabular-nums">
-            {idx + 1} / {novel?.chapters.length ?? '…'}
-          </span>
           <IconBtn onClick={() => go(next)} disabled={!next} title="Следующая глава">
             <ChevronRight size={22} />
           </IconBtn>
@@ -386,7 +397,7 @@ export default function NovelReader() {
           </div>
         </Sheet>
       )}
-      {panel === 'type' && <TypeSheet paged prefs={prefs} set={setBook} close={() => setPanel(null)} onTranslator={() => setPanel('translate')} />}
+      {panel === 'type' && <BookSheet prefs={prefs} set={setBook} close={() => setPanel(null)} onTranslator={() => setPanel('translate')} />}
       <SelectionTranslate root={text} enabled={foreign && !shownRu} title={novel?.title ?? ''} keys={tr.geminiKeys} model={tr.geminiModel} />
       {panel === 'translate' && (
         <Sheet title="Переводчик" close={() => setPanel(null)}>
@@ -418,19 +429,6 @@ export default function NovelReader() {
           )}
         </button>
       )}
-    </div>
-  )
-}
-
-/** a screen of the chapter at a given scroll position: the page under the one being turned */
-function ScreenAt({ top, children }: { top: number; children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null)
-  useLayoutEffect(() => {
-    if (ref.current) ref.current.scrollTop = top
-  }, [top])
-  return (
-    <div ref={ref} className="flex-1 overflow-hidden">
-      {children}
     </div>
   )
 }

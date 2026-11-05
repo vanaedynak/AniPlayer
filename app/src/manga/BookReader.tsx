@@ -2,9 +2,13 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ChevronLeft, ChevronRight, List, Type, Maximize, Minimize, Loader2, AlertCircle, Languages, Headphones } from 'lucide-react'
 import { openBook, useBooks, type Parsed } from './books'
-import { useManga, type BookPrefs } from './store'
+import { useManga } from './store'
 import { PAPER } from './ui'
-import { Sheet, Field, Seg, Toggle, IconBtn, TranslatorSetup } from './Reader'
+import { Sheet, IconBtn, TranslatorSetup } from './Reader'
+import { FONTS } from '../read/bookLook'
+import { BookSheet } from '../read/ReadingSheet'
+import { BookPages, type BookHandle } from '../read/BookPages'
+import { AmbienceLayer, useAmbientSound } from '../read/Ambience'
 import { isRussian, savedChapter, translateChapter } from './bookTranslate'
 import { DEFAULT_MODEL } from './translate'
 import { cn } from '../lib/format'
@@ -17,11 +21,7 @@ import { SelectionTranslate } from './SelectionTranslate'
 type Doc = Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void }
 type El = HTMLElement & { webkitRequestFullscreen?: () => void }
 
-export const FONTS = {
-  serif: { css: 'Georgia, "PT Serif", "Times New Roman", serif', label: 'С засечками' },
-  sans: { css: '"Manrope Variable", system-ui, sans-serif', label: 'Без засечек' },
-  mono: { css: 'ui-monospace, "Cascadia Mono", Consolas, monospace', label: 'Моно' },
-}
+export { FONTS }
 
 export default function BookReader() {
   const { id = '' } = useParams()
@@ -47,7 +47,12 @@ export default function BookReader() {
   const restore = useRef(book?.frac ?? 0)
   const lastY = useRef(0)
   const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  const paper = PAPER[prefs.paper]
+  const paper = PAPER[prefs.paper] ?? PAPER.dark
+  const paged = prefs.paged !== false
+  const bookRef = useRef<BookHandle>(null)
+  const [start, setStart] = useState(book?.frac ?? 0)
+  const [pageInfo, setPageInfo] = useState<{ page: number; count: number } | null>(null)
+  useAmbientSound()
 
   useEffect(() => {
     if (!book) return
@@ -118,17 +123,26 @@ export default function BookReader() {
   const words = useMemo(() => wordCount(shownHtml.replace(/<[^>]+>/g, ' ')), [shownHtml])
   const wpm = useTextPace(words, frac, present)
   const left = minutesLeft(((words * (1 - frac)) / wpm) * 60)
-  const goChapter = (i: number) => {
+  const goChapter = (i: number, fromEnd = false) => {
     if (i < 0 || i >= count) return
     setChapter(i)
-    setFrac(0)
-    position(id, i, 0)
+    setFrac(fromEnd ? 1 : 0)
+    setStart(fromEnd ? 1 : 0)
+    position(id, i, fromEnd ? 1 : 0)
     scroller.current?.scrollTo({ top: 0 })
   }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement)?.closest?.('input, textarea, select')) return
       if (e.key === 'Escape') return panel ? setPanel(null) : nav('/ranobe/files')
+      const fwd = ['ArrowDown', 'ArrowRight', 'PageDown', ' '].includes(e.key) || e.code === 'KeyD'
+      const bwd = ['ArrowUp', 'ArrowLeft', 'PageUp'].includes(e.key) || e.code === 'KeyA'
+      if (paged && (fwd || bwd)) {
+        e.preventDefault()
+        bookRef.current?.turn(fwd ? 1 : -1)
+        return
+      }
       if (e.key === 'ArrowRight') goChapter(chapter + 1)
       if (e.key === 'ArrowLeft') goChapter(chapter - 1)
     }
@@ -167,6 +181,45 @@ export default function BookReader() {
         <div className="flex flex-1 items-center justify-center">
           <Loader2 size={34} className="animate-spin opacity-60" />
         </div>
+      ) : paged ? (
+        <div className="relative flex min-h-0 flex-1 flex-col" style={{ paddingTop: 'var(--safe-top)', paddingBottom: 'var(--safe-bottom)' }}>
+          <BookPages
+            ref={bookRef}
+            html={shownRu?.html || ch.html}
+            chapterTitle={ch.title}
+            bookTitle={parsed?.title || book.title}
+            prefs={prefs}
+            paper={paper}
+            chapterKey={`${chapter}:${shownRu ? 'ru' : 'src'}`}
+            start={start}
+            bookBefore={chapter / Math.max(1, count)}
+            bookShare={1 / Math.max(1, count)}
+            hasNext={chapter < count - 1}
+            hasPrev={chapter > 0}
+            onNext={() => goChapter(chapter + 1)}
+            onPrev={() => goChapter(chapter - 1, true)}
+            onPage={(pg, n) => {
+              const f = n > 1 ? pg / (n - 1) : 1
+              setPageInfo({ page: pg, count: n })
+              setFrac(f)
+              setStart(f)
+              clearTimeout(saveTimer.current)
+              saveTimer.current = setTimeout(() => position(id, chapter, f), 600)
+              if (pg > 0) setUi(false)
+            }}
+            onTap={() => setUi((v) => !v)}
+            textRef={text}
+            end={
+              chapter < count - 1 ? (
+                <button onClick={() => goChapter(chapter + 1)} className="flex items-center gap-2 rounded-full bg-accent px-7 py-3.5 font-bold text-white shadow-xl">
+                  Следующая глава <ChevronRight size={18} />
+                </button>
+              ) : (
+                <div className="font-bold">Конец книги</div>
+              )
+            }
+          />
+        </div>
       ) : (
         <div
           ref={scroller}
@@ -190,7 +243,9 @@ export default function BookReader() {
             className="book mx-auto px-5 sm:px-8"
             style={{
               maxWidth: prefs.width,
-              fontFamily: FONTS[prefs.font].css,
+              fontFamily: (FONTS[prefs.font] ?? FONTS.literata).css,
+              fontWeight: prefs.weight ?? 400,
+              ['--para' as string]: `${prefs.para ?? 0.3}em`,
               fontSize: prefs.size,
               lineHeight: prefs.leading,
               textAlign: prefs.justify ? 'justify' : 'left',
@@ -218,6 +273,8 @@ export default function BookReader() {
           </article>
         </div>
       )}
+
+      <AmbienceLayer dark={paper.dark} />
 
       <div
         className={cn('absolute inset-x-0 top-0 z-10 flex items-center gap-2 bg-gradient-to-b from-black/80 to-black/0 px-3 pb-8 text-white transition duration-300 sm:px-5', isElectron && !full && 'sm:pr-[150px]', !ui && !panel && '-translate-y-full opacity-0')}
@@ -266,12 +323,17 @@ export default function BookReader() {
         <IconBtn onClick={() => goChapter(chapter - 1)} disabled={chapter <= 0} title="Предыдущая глава">
           <ChevronLeft size={22} />
         </IconBtn>
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/20">
-          <div className="h-full rounded-full bg-accent-2" style={{ width: `${total}%` }} />
+        <div className="min-w-0 flex-1">
+          <div className="h-1.5 overflow-hidden rounded-full bg-white/20">
+            <div className="h-full rounded-full bg-accent-2" style={{ width: `${total}%` }} />
+          </div>
+          <div className="mt-1.5 flex justify-between text-[11px] font-bold text-white/60 tabular-nums">
+            <span>{paged && pageInfo ? `стр. ${pageInfo.page + 1} из ${pageInfo.count}` : `${total}%`}</span>
+            <span>
+              глава {Math.min(chapter + 1, count)} из {count}
+            </span>
+          </div>
         </div>
-        <span className="shrink-0 text-sm font-bold tabular-nums">
-          {Math.min(chapter + 1, count)} / {count}
-        </span>
         <IconBtn onClick={() => goChapter(chapter + 1)} disabled={chapter >= count - 1} title="Следующая глава">
           <ChevronRight size={22} />
         </IconBtn>
@@ -304,7 +366,7 @@ export default function BookReader() {
           </div>
         </Sheet>
       )}
-      {panel === 'type' && <TypeSheet prefs={prefs} set={setBook} close={() => setPanel(null)} onTranslator={() => setPanel('translate')} />}
+      {panel === 'type' && <BookSheet prefs={prefs} set={setBook} close={() => setPanel(null)} onTranslator={() => setPanel('translate')} />}
       <SelectionTranslate root={text} enabled={foreign && !shownRu} title={parsed?.title || book.title || ''} keys={tr.geminiKeys} model={tr.geminiModel} />
       {panel === 'translate' && (
         <Sheet title="Переводчик" close={() => setPanel(null)}>
@@ -340,73 +402,5 @@ export default function BookReader() {
         </button>
       )}
     </div>
-  )
-}
-
-export function TypeSheet({
-  prefs,
-  set,
-  close,
-  paged,
-  onTranslator,
-}: {
-  prefs: BookPrefs
-  set: (p: Partial<BookPrefs>) => void
-  close: () => void
-  paged?: boolean
-  /** opens the translator's sheet (keys and the names list) */
-  onTranslator?: () => void
-}) {
-  return (
-    <Sheet title="Шрифт и тема" close={close}>
-      <div className="flex flex-col gap-6">
-        <Field label={`Размер шрифта · ${prefs.size}px`}>
-          <div className="flex items-center gap-3">
-            <button onClick={() => set({ size: Math.max(13, prefs.size - 1) })} className="h-10 w-10 rounded-full bg-white/10 text-sm font-extrabold">
-              A−
-            </button>
-            <input type="range" min={13} max={32} value={prefs.size} onChange={(e) => set({ size: Number(e.target.value) })} className="flex-1 accent-accent-2" />
-            <button onClick={() => set({ size: Math.min(32, prefs.size + 1) })} className="h-10 w-10 rounded-full bg-white/10 text-lg font-extrabold">
-              A+
-            </button>
-          </div>
-        </Field>
-        <Field label="Шрифт">
-          <Seg value={prefs.font} onChange={(font) => set({ font })} options={(Object.keys(FONTS) as BookPrefs['font'][]).map((k) => ({ v: k, l: FONTS[k].label }))} />
-        </Field>
-        <Field label={`Межстрочный интервал · ${prefs.leading.toFixed(1)}`}>
-          <input type="range" min={1.2} max={2.2} step={0.1} value={prefs.leading} onChange={(e) => set({ leading: Number(e.target.value) })} className="w-full accent-accent-2" />
-        </Field>
-        <Field label={`Ширина текста · ${prefs.width}px`}>
-          <input type="range" min={480} max={1200} step={20} value={prefs.width} onChange={(e) => set({ width: Number(e.target.value) })} className="w-full accent-accent-2" />
-        </Field>
-        <Field label="Тема">
-          <div className="grid grid-cols-4 gap-2">
-            {(Object.keys(PAPER) as (keyof typeof PAPER)[]).map((k) => (
-              <button
-                key={k}
-                onClick={() => set({ paper: k })}
-                className={cn('flex flex-col items-center gap-1.5 rounded-xl p-2 text-xs font-bold ring-1', prefs.paper === k ? 'ring-accent-2' : 'ring-white/10 hover:ring-white/30')}
-              >
-                <span className="flex h-9 w-full items-center justify-center rounded-lg font-serif text-base ring-1 ring-white/10" style={{ background: PAPER[k].bg, color: PAPER[k].fg }}>
-                  Аа
-                </span>
-                {PAPER[k].label}
-              </button>
-            ))}
-          </div>
-        </Field>
-        <Toggle label="Выравнивание по ширине" value={prefs.justify} onChange={(justify) => set({ justify })} />
-        <Toggle label="Красная строка" value={prefs.indent} onChange={(indent) => set({ indent })} />
-        {paged && <Toggle label="Постранично (касание слева / справа листает)" value={!!prefs.paged} onChange={(p) => set({ paged: p })} />}
-        {paged && prefs.paged && <Toggle label="Перелистывание как у бумажной книги" value={prefs.curl !== false} onChange={(curl) => set({ curl })} />}
-        {paged && prefs.paged && prefs.curl !== false && <Toggle label="Звук перелистывания" value={prefs.flipSound !== false} onChange={(flipSound) => set({ flipSound })} />}
-        {onTranslator && (
-          <button onClick={onTranslator} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-white/10 text-sm font-bold hover:bg-white/15">
-            Переводчик и словарик имён
-          </button>
-        )}
-      </div>
-    </Sheet>
   )
 }

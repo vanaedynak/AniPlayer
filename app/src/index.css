@@ -134,7 +134,7 @@ input[type="range"].slider::-webkit-slider-thumb { -webkit-appearance: none; wid
   transition: background 0.3s;
 }
 .book p {
-  margin: 0 0 0.6em;
+  margin: 0 0 var(--para, 0.6em);
   text-indent: var(--indent);
   hyphens: auto;
 }
@@ -170,6 +170,29 @@ input[type="range"].slider::-webkit-slider-thumb { -webkit-appearance: none; wid
   border: 0;
   border-top: 1px solid var(--sub);
 }
+.book .dropcap { text-indent: 0; }
+.book .dropcap::first-letter {
+  float: left;
+  font-size: 3.3em;
+  line-height: 0.82;
+  margin: 0.06em 0.09em 0 0;
+  font-weight: 700;
+}
+/* a chapter laid out as book pages (see BookPages.tsx) */
+.book-flow {
+  overflow-wrap: break-word;
+  font-kerning: normal;
+  font-variant-ligatures: common-ligatures;
+  text-rendering: optimizeLegibility;
+}
+.book-flow p { orphans: 2; widows: 2; -webkit-hyphens: auto; hyphens: auto; hyphenate-limit-chars: 6 3 2; }
+.book-flow h1, .book-flow h2, .book-flow h3, .book-flow h4 { break-after: avoid; }
+.book-flow img { max-height: calc(var(--ch) - 2em); object-fit: contain; break-inside: avoid; }
+.book-opening { text-align: center; margin-bottom: 2.2em; break-inside: avoid; text-indent: 0; }
+.book-opening-title { font-size: 1.45em; font-weight: 700; line-height: 1.25; text-wrap: balance; }
+.book-opening-rule { width: 3.2em; height: 1px; margin: 1em auto 0; opacity: 0.6; }
+.book-end { display: flex; flex-direction: column; align-items: center; gap: 1.1em; margin-top: 2.4em; break-inside: avoid; text-indent: 0; text-align: center; font-family: "Manrope Variable", system-ui, sans-serif; font-size: 15px; }
+.book-end-mark { font-size: 26px; opacity: 0.7; font-family: Georgia, serif; }
 .book table { margin: 1em auto; border-collapse: collapse; }
 .book td, .book th { padding: 0.3em 0.6em; border: 1px solid var(--sub); }
 

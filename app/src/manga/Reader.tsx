@@ -17,6 +17,9 @@ import { useReadingClock } from '../lib/activity'
 import { awayAfter, minutesLeft, pagePace, usePagePace, usePresence } from '../lib/reading'
 import { PageCurl, type CurlHandle } from './PageCurl'
 import { GlossaryEditor } from './GlossaryEditor'
+import { PageLookup, PressCtx, justPressed, longPress, type PressAt } from './PageLookup'
+import { AmbienceLayer, useAmbientSound } from '../read/Ambience'
+import { AmbienceControls, PaperPicker } from '../read/ReadingSheet'
 import { savedChapter, savedManga, savedPages, useSaved } from './saved'
 
 type Doc = Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void }
@@ -94,6 +97,8 @@ function ReaderView({
   const [panel, setPanel] = useState<null | 'settings' | 'chapters' | 'translate'>(null)
   const [failed, setFailed] = useState<Record<number, number>>({})
   const [full, setFull] = useState(false)
+  const [press, setPress] = useState<PressAt | null>(null)
+  useAmbientSound()
   const rootRef = useRef<HTMLDivElement>(null)
   const paper = PAPER[prefs.paper]
 
@@ -149,6 +154,13 @@ function ReaderView({
   const nextOf = useCallback((p: number) => (p >= last ? null : (slots[slotOf(p) + 1]?.[0] ?? last)), [last, slots, slotOf])
   const prevOf = useCallback((p: number) => (p >= last ? (slots.at(-1)?.[0] ?? null) : slotOf(p) > 0 ? slots[slotOf(p) - 1][0] : null), [last, slots, slotOf])
   const curl = useRef<CurlHandle>(null)
+
+  // pages read today grow with every page forward
+  const seen = useRef(page)
+  useEffect(() => {
+    if (page > seen.current && page < n) useManga.getState().countPage()
+    seen.current = page
+  }, [page, n])
 
   // progress: saved on every page, the chapter counts as read on its last page
   useEffect(() => {
@@ -289,6 +301,8 @@ function ReaderView({
   })
 
   const title = m ? mangaName(m) : ''
+  // a long press on a line of a page that isn't in Russian translates it (see PageLookup)
+  const onPress = useCallback((p: PressAt) => setPress({ ...p, url: urls[p.i], alt: src.data?.fallback[p.i] }), [urls, src.data])
   const shownPage = Math.min(page, Math.max(0, n - 1))
 
   return (
@@ -316,7 +330,7 @@ function ReaderView({
           )}
         </Center>
       ) : paged ? (
-        <BubblesCtx.Provider value={bubblesFor}>
+        <PressCtx.Provider value={canTranslate ? onPress : null}><BubblesCtx.Provider value={bubblesFor}>
         <Paged
           urls={urls}
           urlFor={urlFor}
@@ -335,9 +349,9 @@ function ReaderView({
           toggleUi={() => setUi((v) => !v)}
           end={<ChapterEnd chapter={chapter} next={next} onNext={() => next && onChapter(next)} onExit={onExit} fg={paper.fg} />}
         />
-        </BubblesCtx.Provider>
+        </BubblesCtx.Provider></PressCtx.Provider>
       ) : (
-        <BubblesCtx.Provider value={bubblesFor}>
+        <PressCtx.Provider value={canTranslate ? onPress : null}><BubblesCtx.Provider value={bubblesFor}>
         <Strip
           urls={urls}
           urlFor={urlFor}
@@ -349,8 +363,10 @@ function ReaderView({
           hideUi={() => setUi(false)}
           end={<ChapterEnd chapter={chapter} next={next} onNext={() => next && onChapter(next)} onExit={onExit} fg={paper.fg} />}
         />
-        </BubblesCtx.Provider>
+        </BubblesCtx.Provider></PressCtx.Provider>
       )}
+
+      <AmbienceLayer dark={paper.dark} />
 
       {/* top bar */}
       <div
@@ -460,6 +476,17 @@ function ReaderView({
             'Перевожу страницу…'
           )}
         </div>
+      )}
+      {press && (
+        <PageLookup
+          at={press}
+          close={() => setPress(null)}
+          title={m?.title ?? ''}
+          keys={prefs.geminiKeys}
+          model={prefs.geminiModel}
+          glossary={mangaId}
+          onSetup={() => (setPress(null), setPanel('translate'))}
+        />
       )}
       {panel && <div className="absolute inset-0 z-20 bg-black/40" onClick={() => setPanel(null)} />}
       {panel === 'translate' && (
@@ -571,6 +598,7 @@ function Strip({
       onPointerDown={(e) => (down.current = { x: e.clientX, y: e.clientY })}
       onPointerUp={(e) => {
         const d = down.current
+        if (justPressed()) return
         if (d && Math.abs(e.clientX - d.x) < 8 && Math.abs(e.clientY - d.y) < 8) toggleUi()
       }}
     >
@@ -742,7 +770,7 @@ function Paged({
     return (
       <div
         className={cn(
-          'flex min-h-full justify-center',
+          'relative flex min-h-full justify-center',
           fit === 'height' ? cn('items-center', !zoomed && 'h-full') : 'items-start',
           rtl && 'flex-row-reverse',
           zoomed && 'mx-auto min-w-full',
@@ -753,6 +781,12 @@ function Paged({
         {shown.map((i) => (
           <Page key={i} i={i} src={urlFor(i)} onError={onError} eager className={imgCls(two)} wrap={fit === 'height' ? 'flex h-full items-center' : undefined} />
         ))}
+        {two && (
+          <div
+            className="pointer-events-none absolute inset-y-0 left-1/2 w-[9%] -translate-x-1/2"
+            style={{ background: 'linear-gradient(to right, transparent, rgba(0,0,0,.16) 42%, rgba(0,0,0,.28) 50%, rgba(0,0,0,.16) 58%, transparent)' }}
+          />
+        )}
       </div>
     )
   }
@@ -768,7 +802,7 @@ function Paged({
   const onUp = (e: React.PointerEvent) => {
     const d = down.current
     down.current = null
-    if (!d) return
+    if (!d || justPressed()) return
     const dx = e.clientX - d.x
     const dy = e.clientY - d.y
     // a swipe (the paper turn takes the drag itself when it is on)
@@ -870,7 +904,19 @@ function Page({
   // the address that last failed: when the reader has nothing else to try, the page says so instead of spinning
   const [broken, setBroken] = useState('')
   const bubbles = useContext(BubblesCtx)(i)
+  const press = useContext(PressCtx)
   const img = useRef<HTMLImageElement>(null)
+  const hold = press
+    ? longPress((e) => {
+        const el = img.current
+        if (!el) return
+        const r = el.getBoundingClientRect()
+        const fx = (e.clientX - r.left) / r.width
+        const fy = (e.clientY - r.top) / r.height
+        if (fx < 0 || fx > 1 || fy < 0 || fy > 1) return
+        press({ i, url: src, fx, fy, rect: { left: r.left, top: r.top, width: r.width, height: r.height } })
+      })
+    : null
   const [box, setBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null)
   // the translation layer sits exactly over the drawn image, however it is scaled
   useEffect(() => {
@@ -883,7 +929,7 @@ function Page({
     return () => ro.disconnect()
   }, [bubbles, loaded])
   return (
-    <div id={`mp-${i}`} data-i={i} className={cn('relative', wrap, !loaded && 'aspect-[5/7] max-h-[90vh] w-full')}>
+    <div id={`mp-${i}`} data-i={i} className={cn('relative', wrap, !loaded && 'aspect-[5/7] max-h-[90vh] w-full')} {...(loaded ? hold : null)}>
       {!loaded && broken !== src && (
         <div className="absolute inset-0 flex items-center justify-center opacity-40">
           <Loader2 className="animate-spin" />
@@ -915,7 +961,7 @@ function Page({
           setBroken(src)
           onError(i)
         }}
-        className={cn('mx-auto block', className)}
+        className={cn('mx-auto block [-webkit-touch-callout:none]', className)}
       />
       {loaded && bubbles && box && (
         <div className="pointer-events-none absolute" style={box}>
@@ -1293,22 +1339,13 @@ function SettingsSheet({ prefs, set, close, onSaved, glossary }: { prefs: Reader
           </>
         )}
         <Field label="Фон">
-          <div className="grid grid-cols-4 gap-2">
-            {(Object.keys(PAPER) as (keyof typeof PAPER)[]).map((k) => (
-              <button
-                key={k}
-                onClick={() => set({ paper: k })}
-                className={cn('flex flex-col items-center gap-1.5 rounded-xl p-2 text-xs font-bold ring-1', prefs.paper === k ? 'ring-accent-2' : 'ring-white/10 hover:ring-white/30')}
-              >
-                <span className="h-8 w-full rounded-lg ring-1 ring-white/10" style={{ background: PAPER[k].bg }} />
-                {PAPER[k].label}
-              </button>
-            ))}
-          </div>
+          <PaperPicker value={prefs.paper} set={(paper) => set({ paper })} />
         </Field>
         <Field label={`Яркость · ${Math.round(prefs.brightness * 100)}%`}>
           <input type="range" min={0.3} max={1} step={0.05} value={prefs.brightness} onChange={(e) => set({ brightness: Number(e.target.value) })} className="w-full accent-accent-2" />
         </Field>
+        <div className="-mb-2 border-t border-white/10 pt-5 text-xs font-extrabold tracking-wide text-white/50 uppercase">Атмосфера</div>
+        <AmbienceControls />
         <Toggle label="Экономия трафика (сжатые страницы)" value={prefs.saver} onChange={(saver) => set({ saver })} />
         <div className="mt-2 border-t border-white/10 pt-5">
           <div className="mb-3 text-xs font-extrabold tracking-wide text-white/50 uppercase">Переводчик</div>

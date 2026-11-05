@@ -109,8 +109,14 @@ export function ReadTabs() {
 
 /** colors for the reader backgrounds */
 export const PAPER = {
-  dark: { bg: '#101016', fg: '#e8e8ee', sub: '#9b9bab', label: 'Тёмная' },
-  black: { bg: '#000000', fg: '#d6d6dc', sub: '#8a8a96', label: 'Чёрная' },
-  sepia: { bg: '#f4ecd8', fg: '#433422', sub: '#8a7558', label: 'Сепия' },
-  light: { bg: '#ffffff', fg: '#1a1a1f', sub: '#6b6b7b', label: 'Светлая' },
+  dark: { bg: '#101016', fg: '#e8e8ee', sub: '#9b9bab', label: 'Тёмная', dark: true },
+  black: { bg: '#000000', fg: '#d6d6dc', sub: '#8a8a96', label: 'Чёрная', dark: true },
+  sepia: { bg: '#f4ecd8', fg: '#433422', sub: '#8a7558', label: 'Сепия', dark: false },
+  light: { bg: '#ffffff', fg: '#1a1a1f', sub: '#6b6b7b', label: 'Светлая', dark: false },
+  cream: { bg: '#f6efe0', fg: '#2e271d', sub: '#8c7c62', label: 'Бумага', dark: false },
+  old: { bg: '#e9dcbc', fg: '#3a2e1c', sub: '#86714d', label: 'Старая книга', dark: false },
+  eink: { bg: '#e4e3dd', fg: '#232322', sub: '#76756f', label: 'E-ink', dark: false },
+  mint: { bg: '#dde9d6', fg: '#1f2c1d', sub: '#6a7d64', label: 'Мятная', dark: false },
+  night: { bg: '#1a1611', fg: '#d9c9a8', sub: '#8f7f62', label: 'Ночная', dark: true },
+  dusk: { bg: '#20232c', fg: '#c9ccd6', sub: '#7f8494', label: 'Сумерки', dark: true },
 } as const

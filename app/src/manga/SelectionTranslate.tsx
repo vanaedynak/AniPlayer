@@ -69,6 +69,30 @@ async function viaMyMemory(text: string): Promise<Result> {
   return { translation: t }
 }
 
+/** a word or a phrase translated in the sense of the sentence around it; asked once, then remembered */
+export function lookup(text: string, context: string, title: string, keys: string[], model: string): Promise<LookupResult> {
+  const hasKey = keys.some((k) => k.trim())
+  const k = `${hasKey ? 'g' : 'm'}|${text}|${context.slice(0, 200)}`
+  let p = cache.get(k)
+  if (!p) {
+    p = hasKey ? viaGemini(text, context, title, keys, model || DEFAULT_MODEL).catch(() => viaMyMemory(text)) : viaMyMemory(text)
+    cache.set(k, p)
+    p.catch(() => cache.delete(k))
+  }
+  return p
+}
+
+export type LookupResult = Result
+
+/** says the text aloud in its own language */
+export function say(text: string) {
+  speechSynthesis.cancel()
+  const u = new SpeechSynthesisUtterance(text)
+  u.lang = langOf(text).voice
+  u.rate = 0.9
+  speechSynthesis.speak(u)
+}
+
 /**
  * Select a word or a phrase in the text (a long press on the iPad, a double click or a drag on the PC)
  * and its translation shows up under it: in the sense of that very sentence, with the transcription and
@@ -107,14 +131,14 @@ export function SelectionTranslate({
       clearTimeout(t)
       t = setTimeout(() => {
         const s = window.getSelection()
-        const text = s?.toString().replace(/\s+/g, ' ').trim() ?? ''
+        const text = s?.toString().replace(/\u00AD/g, '').replace(/\s+/g, ' ').trim() ?? ''
         if (!s || s.isCollapsed || !text || text.length > 500 || !root.current?.contains(s.anchorNode)) {
           // a tap on the popup itself leaves the selection alone
           if (!box.current?.matches(':hover')) setSel(null)
           return
         }
         const r = s.getRangeAt(0).getBoundingClientRect()
-        const block = (s.anchorNode?.parentElement?.closest('p, li, blockquote, h1, h2, h3, h4, dd, div') as HTMLElement | null)?.textContent ?? text
+        const block = (s.anchorNode?.parentElement?.closest('p, li, blockquote, h1, h2, h3, h4, dd, div') as HTMLElement | null)?.textContent?.replace(/\u00AD/g, '') ?? text
         setSel((cur) =>
           cur?.text === text
             ? cur
@@ -140,15 +164,7 @@ export function SelectionTranslate({
     let alive = true
     setRes(null)
     setErr('')
-    const hasKey = keys.some((k) => k.trim())
-    const k = `${hasKey ? 'g' : 'm'}|${sel.text}|${sel.context.slice(0, 200)}`
-    let p = cache.get(k)
-    if (!p) {
-      p = hasKey ? viaGemini(sel.text, sel.context, title, keys, model || DEFAULT_MODEL).catch(() => viaMyMemory(sel.text)) : viaMyMemory(sel.text)
-      cache.set(k, p)
-      p.catch(() => cache.delete(k))
-    }
-    p.then((r) => alive && setRes(r)).catch((e) => alive && setErr(String(e?.message ?? e)))
+    lookup(sel.text, sel.context, title, keys, model).then((r) => alive && setRes(r)).catch((e) => alive && setErr(String(e?.message ?? e)))
     return () => {
       alive = false
     }
@@ -164,13 +180,7 @@ export function SelectionTranslate({
   // under the selection (the iPad puts its own menu above it), above when there is no room below
   const below = sel.bottom + 14 + (h || 160) < window.innerHeight - 20
   const top = below ? sel.bottom + 14 : Math.max(12, sel.top - 14 - (h || 160))
-  const speak = () => {
-    speechSynthesis.cancel()
-    const u = new SpeechSynthesisUtterance(sel.text)
-    u.lang = langOf(sel.text).voice
-    u.rate = 0.9
-    speechSynthesis.speak(u)
-  }
+  const speak = () => say(sel.text)
 
   return (
     <div

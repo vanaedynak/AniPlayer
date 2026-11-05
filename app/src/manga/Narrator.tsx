@@ -100,7 +100,7 @@ export function Narrator({
     for (const u of cache.current.values()) void u.then(URL.revokeObjectURL).catch(() => {})
     cache.current.clear()
     blocks.current = blocksOf(content.current)
-    lines.current = linesOf(blocks.current.map((b) => b.textContent ?? ''))
+    lines.current = linesOf(blocks.current.map((b) => (b.textContent ?? '').replace(/\u00AD/g, '')))
     const cast = voiceCaster()
     voices.current = lines.current.map((line) => ({ line, voice: cast(line.role, line.who) }))
     // every voice of the chapter downloads now, not in the middle of a dialogue

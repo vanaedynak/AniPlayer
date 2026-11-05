@@ -37,7 +37,7 @@ export interface MangaEntry {
 
 export type ReaderMode = 'scroll' | 'rtl' | 'ltr'
 export type ReaderFit = 'width' | 'height' | 'original'
-export type Paper = 'dark' | 'black' | 'sepia' | 'light'
+export type Paper = keyof typeof import('./ui').PAPER
 
 export interface ReaderPrefs {
   mode: ReaderMode
@@ -70,7 +70,7 @@ export interface ReaderPrefs {
 export interface BookPrefs {
   size: number
   leading: number
-  font: 'serif' | 'sans' | 'mono'
+  font: import('../read/bookLook').BookFont
   paper: Paper
   width: number
   justify: boolean
@@ -82,12 +82,43 @@ export interface BookPrefs {
   /** page mode: pages turn like paper */
   curl?: boolean
   flipSound?: boolean
+  /** page mode: one page or a two-page spread (auto: two on a wide screen) */
+  spread?: 'auto' | 'one' | 'two'
+  /** space around the text on a page */
+  margins?: 'narrow' | 'normal' | 'wide'
+  /** text weight, 300…600 */
+  weight?: number
+  /** extra space between paragraphs, in em */
+  para?: number
+  /** a large first letter at the start of a chapter */
+  dropCap?: boolean
+  /** the book's and the chapter's names at the top of the pages */
+  runningHead?: boolean
+  /** text a little softer than full black (or white) */
+  softText?: boolean
+}
+
+/** the room around the page: paper texture, light, warmth and a quiet sound, shared by every reader */
+export interface Ambience {
+  texture: 'none' | 'paper' | 'old' | 'linen'
+  /** a warm evening light over the page, 0…1 (less blue for the eyes) */
+  warmth: number
+  /** a dimmer on top of the screen's own, 0…0.7 */
+  dim: number
+  light: 'none' | 'lamp' | 'window'
+  sound: 'off' | 'rain' | 'fire' | 'night'
+  volume: number
 }
 
 interface MangaState {
   entries: Record<string, MangaEntry>
   prefs: ReaderPrefs
   book: BookPrefs
+  amb: Ambience
+  /** pages turned per day, for the reader's own progress */
+  pagesRead: { day: string; today: number; total: number }
+  countPage: () => number
+  setAmb: (p: Partial<Ambience>) => void
   touch: (m: Pick<Manga, 'id' | 'title' | 'cover' | 'lang'> & { ruTitle?: string }, patch: Partial<MangaEntry>) => void
   progress: (mangaId: string, p: { chapterId: string; label: string; page: number; pages: number; key: string; done: boolean }) => void
   toggleRead: (mangaId: string, keys: string[], read: boolean) => void
@@ -103,7 +134,17 @@ export const useManga = create<MangaState>()(
     (set, get) => ({
       entries: {},
       prefs: { mode: 'scroll', fit: 'height', gap: false, width: 760, paper: 'dark', saver: false, brightness: 1, lang: 'ru', adult: false, spread: false, translate: true, geminiKeys: [], geminiModel: 'gemini-3.8-flash' },
-      book: { size: 19, leading: 1.7, font: 'serif', paper: 'dark', width: 720, justify: true, indent: true, translate: false },
+      book: { size: 19, leading: 1.7, font: 'literata', paper: 'dark', width: 720, justify: true, indent: true, translate: false, paged: true, spread: 'auto', margins: 'normal', weight: 400, para: 0.3, dropCap: true, runningHead: true },
+      amb: { texture: 'none', warmth: 0, dim: 0, light: 'none', sound: 'off', volume: 0.5 },
+      pagesRead: { day: '', today: 0, total: 0 },
+      countPage: () => {
+        const day = new Date().toDateString()
+        const cur = get().pagesRead
+        const next = { day, today: (cur.day === day ? cur.today : 0) + 1, total: cur.total + 1 }
+        set({ pagesRead: next })
+        return next.today
+      },
+      setAmb: (p) => set({ amb: { ...get().amb, ...p } }),
 
       touch: (m, patch) => {
         if ('status' in patch || 'favorite' in patch ? !needAccount('Полка: «Читаю», «В планах» и избранное') : !isSignedIn()) return
@@ -191,7 +232,7 @@ export const useManga = create<MangaState>()(
         const prefs = { ...cur.prefs, ...saved.prefs }
         // model names Google has since retired
         if (/-latest$/.test(prefs.geminiModel)) prefs.geminiModel = cur.prefs.geminiModel
-        return { ...cur, ...saved, prefs, book: { ...cur.book, ...saved.book } }
+        return { ...cur, ...saved, prefs, book: { ...cur.book, ...saved.book }, amb: { ...cur.amb, ...saved.amb }, pagesRead: { ...cur.pagesRead, ...saved.pagesRead } }
       },
       onRehydrateStorage: () => (s) => s && setAdult(s.prefs.adult),
     },
