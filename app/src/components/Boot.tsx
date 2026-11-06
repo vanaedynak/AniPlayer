@@ -24,13 +24,32 @@ export function Boot({ children }: { children: ReactNode }) {
   const [step, setStep] = useState(0)
   const [leaving, setLeaving] = useState(false)
 
+  // no internet at the start: no sign-in card and no loader waiting on servers. The app opens on what is
+  // downloaded, with the account (if one was signed in on this device) kept as it was until the network returns.
+  useEffect(() => {
+    if (phase !== 'auth' || navigator.onLine) return
+    if (!location.hash || location.hash === '#/' || location.hash === '#') location.hash = '#/downloads'
+    setPhase('done')
+  }, [phase])
+
   // step 1: the saved session, or the account from the device keychain
   useEffect(() => {
     if (phase !== 'auth') return
-    if (ready) return setPhase(user ? 'load' : 'gate')
-    const t = setTimeout(() => setPhase(useSync.getState().user ? 'load' : 'gate'), 6000)
+    if (ready) return setPhase(user ? 'load' : navigator.onLine ? 'gate' : 'done')
+    const t = setTimeout(() => setPhase(useSync.getState().user ? 'load' : navigator.onLine ? 'gate' : 'done'), 6000)
     return () => clearTimeout(t)
   }, [phase, ready, user])
+
+  // the network went away while the sign-in card was up: let the person in to their downloads
+  useEffect(() => {
+    if (phase !== 'gate') return
+    const off = () => {
+      location.hash = '#/downloads'
+      setPhase('done')
+    }
+    window.addEventListener('offline', off)
+    return () => window.removeEventListener('offline', off)
+  }, [phase])
 
   // signing in on the card goes straight on to loading
   useEffect(() => {

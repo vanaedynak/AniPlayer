@@ -3,7 +3,7 @@
 // episode is grabbed once. Where that cannot work (no MSE, the stream refuses), Shikimori's
 // screenshots of the anime stand in.
 import Hls from 'hls.js'
-import { storage } from './offline'
+import { cacheStorage as storage } from './offline'
 import { shikiScreens } from './shikimori'
 import type { Episode } from './api'
 

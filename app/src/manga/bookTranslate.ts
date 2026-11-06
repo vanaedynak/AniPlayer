@@ -2,7 +2,7 @@
 // one paragraph for one paragraph, so the chapter keeps its shape. Finished chapters are kept
 // next to the book file, so re-reading costs no quota.
 import { askGemini, type GeminiOpts } from './translate'
-import { storage } from '../lib/offline'
+import { cacheStorage as storage } from '../lib/offline'
 import { glossaryPrompt, NAMES_SCHEMA, useGlossary } from './glossary'
 
 const BLOCKS = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, dt, dd, figcaption, td, th, pre'

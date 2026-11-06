@@ -11,6 +11,7 @@ import { skChapters } from './sk'
 import { isNovelEntry, parseEntry, novelPath, chapterPath } from '../ranobe/shelf'
 import { sourceById } from '../ranobe/registry'
 import { isElectron } from '../lib/platform'
+import { powerSaving } from '../lib/power'
 
 export interface Fresh {
   chapters: { id: string; key: string; label: string }[]
@@ -119,7 +120,7 @@ export async function checkUpdates(force = false) {
 
 export function initUpdates() {
   setTimeout(() => void checkUpdates(), 20_000)
-  setInterval(() => void checkUpdates(), 3 * 3600_000)
+  setInterval(() => !powerSaving() && void checkUpdates(), 3 * 3600_000)
 }
 
 /** where a title's page is */

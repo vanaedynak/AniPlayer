@@ -9,12 +9,14 @@ import { useStore } from './lib/store'
 import { initMangaSync } from './manga/store'
 import { initUpdates } from './manga/updates'
 import { initVault } from './lib/vault'
+import { initLibrary } from './lib/library'
 
 // keys and the account come back from the device's keychain first (a fresh install on the iPad)
 void initVault().finally(initSync)
 initLibriaIndex()
 initMangaSync()
 initUpdates()
+initLibrary()
 initLifecycle()
 initStatusBar()
 initScale(

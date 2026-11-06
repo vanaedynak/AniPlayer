@@ -1,6 +1,7 @@
 import { useEffect, type CSSProperties } from 'react'
 import { useManga, type Ambience as Amb } from '../manga/store'
 import { setAmbient } from '../lib/ambientSound'
+import { usePowerSave } from '../lib/power'
 
 // Paper textures, drawn by the browser from SVG noise (nothing to download). Light paper takes a brown
 // grain multiplied in; dark paper a faint light one.
@@ -43,17 +44,19 @@ function textureLayers(t: Amb['texture'], dark: boolean): CSSProperties | null {
 /** the layers laid over a reader's page: texture, light, warmth, dimming. They never catch a tap. */
 export function AmbienceLayer({ dark, className }: { dark: boolean; className?: string }) {
   const a = useManga((s) => s.amb)
-  const tex = textureLayers(a.texture, dark)
+  // power saving keeps only what the eyes need at night: warmth and dimming; texture and light are blended layers
+  const power = usePowerSave()
+  const tex = power ? null : textureLayers(a.texture, dark)
   return (
     <div className={className ?? 'pointer-events-none absolute inset-0 z-[5]'} aria-hidden>
       {tex && <div className="absolute inset-0" style={{ ...tex, mixBlendMode: dark ? 'screen' : 'multiply' }} />}
-      {a.light === 'lamp' && (
+      {!power && a.light === 'lamp' && (
         <>
           <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 75% 65% at 50% 30%, rgba(255,205,130,.28), transparent 72%)', mixBlendMode: dark ? 'screen' : 'soft-light' }} />
           <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 90% 85% at 50% 35%, transparent 58%, rgba(20,10,0,.26) 100%)' }} />
         </>
       )}
-      {a.light === 'window' && (
+      {!power && a.light === 'window' && (
         <div
           className="absolute inset-0"
           style={{ background: 'linear-gradient(105deg, rgba(215,232,255,.22) 0%, rgba(215,232,255,.06) 35%, transparent 55%, rgba(0,0,0,.2) 100%)', mixBlendMode: dark ? 'screen' : 'normal' }}
@@ -67,8 +70,10 @@ export function AmbienceLayer({ dark, className }: { dark: boolean; className?: 
 
 /** keeps the chosen room sound playing while a reader is open; the browser lets it start on the first tap */
 export function useAmbientSound() {
-  const sound = useManga((s) => s.amb.sound)
+  const chosen = useManga((s) => s.amb.sound)
   const volume = useManga((s) => s.amb.volume)
+  const power = usePowerSave()
+  const sound = power ? 'off' : chosen
   useEffect(() => {
     if (sound === 'off') return setAmbient('off', 0)
     const start = () => setAmbient(sound, volume)

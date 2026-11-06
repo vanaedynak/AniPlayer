@@ -251,3 +251,14 @@ input[type="range"].slider::-webkit-slider-thumb { -webkit-appearance: none; wid
 :root[data-theme="grandline"] .theme-panel { overflow: hidden; }
 :root[data-theme="grandline"] .theme-panel::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 5px; pointer-events: none; background: repeating-linear-gradient(60deg, #a16207 0 5px, #fde047 5px 8px, #78350f 8px 11px); opacity: 0.8; }
 :root[data-theme="grandline"] [data-nav][aria-current="page"] { background: linear-gradient(100deg, #991b1b, #b91c1c 60%, #dc2626); color: #fff; border-color: #fde04766; box-shadow: inset 0 -3px 0 #fde047; }
+
+/* power saving while reading (lib/power.ts): nothing moves or blurs, so the screen redraws only on a page turn */
+html.power-save *,
+html.power-save *::before,
+html.power-save *::after {
+  animation: none !important;
+  transition: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  scroll-behavior: auto !important;
+}

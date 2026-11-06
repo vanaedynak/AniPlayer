@@ -5,6 +5,7 @@ import { persist } from 'zustand/middleware'
 import Hls from 'hls.js'
 import type { Episode, Release } from './api'
 import { storage, keepStorage } from './offline'
+import { onPowerSaving, powerSaving } from './power'
 
 export type DlQuality = '480' | '720' | '1080'
 export type DlStatus = 'queued' | 'downloading' | 'done' | 'error' | 'paused'
@@ -108,8 +109,11 @@ function cleanupReleases() {
 const active = new Map<string, AbortController>()
 const PARALLEL = 4
 
+// power saving: the one in progress finishes, the rest wait until the reader is closed
+onPowerSaving((on) => !on && pump())
+
 function pump() {
-  if (active.size) return
+  if (active.size || powerSaving()) return
   const next = Object.values(useDownloads.getState().items)
     .filter((i) => i.status === 'queued')
     .sort((a, b) => a.addedAt - b.addedAt || a.ordinal - b.ordinal)[0]

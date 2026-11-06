@@ -1,0 +1,11 @@
+{
+  "name": "anyflow-folder",
+  "version": "1.0.0",
+  "private": true,
+  "description": "iPad: keeps downloads in a folder the person picks in Files, so they outlive the app",
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    }
+  }
+}

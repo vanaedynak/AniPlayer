@@ -1,10 +1,11 @@
-import { BookOpen, Eye, Moon, Monitor, RotateCcw, Sparkles } from 'lucide-react'
+import { BatteryLow, BookOpen, Eye, Moon, Monitor, RotateCcw, Sparkles } from 'lucide-react'
 import { useManga, type Ambience, type BookPrefs, type Paper } from '../manga/store'
 import { PAPER } from '../manga/ui'
 import { Sheet, Field, Seg, Toggle } from '../manga/Reader'
 import { cn } from '../lib/format'
 import { FONTS, MARGINS, type BookFont } from './bookLook'
 import { LIGHTS, SOUNDS, TEXTURES } from './Ambience'
+import { usePower } from '../lib/power'
 
 /** the paper colours, each shown as a little page */
 export function PaperPicker({ value, set }: { value: Paper; set: (p: Paper) => void }) {
@@ -100,6 +101,30 @@ const PRESETS: Preset[] = [
   },
 ]
 
+/** power saving for long reading on battery; it applies only while a reader is open */
+export function PowerSaveCard() {
+  const { save, setSave } = usePower()
+  return (
+    <div className={cn('rounded-2xl px-4 py-3 ring-1', save ? 'bg-emerald-400/10 ring-emerald-300/30' : 'bg-white/5 ring-white/10')}>
+      <button onClick={() => setSave(!save)} className="flex w-full items-center gap-3 text-left">
+        <BatteryLow size={22} className={cn('shrink-0', save ? 'text-emerald-300' : 'text-white/60')} />
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-extrabold">Экономия энергии</span>
+          <span className="block text-xs text-white/55">Без анимаций, звуков, текстур и загрузок в фоне, страницы листаются сразу</span>
+        </span>
+        <span className={cn('relative h-7 w-12 shrink-0 rounded-full', save ? 'bg-emerald-400' : 'bg-white/15')}>
+          <span className={cn('absolute top-1 h-5 w-5 rounded-full bg-white', save ? 'left-6' : 'left-1')} />
+        </span>
+      </button>
+      {save && (
+        <div className="mt-2 text-xs leading-snug text-white/55">
+          Больше всего батареи тратит экран: убавьте яркость в Пункте управления и включите авто-блокировку. Тёмная бумага помогает только на iPad с OLED-экраном.
+        </div>
+      )}
+    </div>
+  )
+}
+
 /** everything about how a book reads: ready looks, text, pages, paper, light and sound */
 export function BookSheet({
   prefs,
@@ -128,6 +153,8 @@ export function BookSheet({
             <div className="text-xs text-white/55">Всего перевёрнуто {stats.total} страниц</div>
           </div>
         </div>
+
+        <PowerSaveCard />
 
         <Field label="Готовые настройки">
           <div className="grid grid-cols-1 gap-2">

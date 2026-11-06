@@ -3,6 +3,7 @@ import { PageCurl, type CurlHandle } from '../manga/PageCurl'
 import { useManga, type BookPrefs } from '../manga/store'
 import type { PAPER } from '../manga/ui'
 import { turnSound, wakeAudio } from '../lib/paperSound'
+import { usePowerSave } from '../lib/power'
 import { justPressed } from '../manga/PageLookup'
 import { FONTS, MARGINS, softFg } from './bookLook'
 
@@ -199,8 +200,10 @@ export const BookPages = forwardRef<
   const tNow = useRef(0)
   const drag = useRef<{ x: number; y: number; on: boolean; dir: 1 | -1; t0: number; lx: number; lt: number; v: number; id: number } | null>(null)
   const moved = useRef(false)
-  const animate = prefs.curl !== false
-  const sound = prefs.flipSound !== false
+  // power saving: pages change at once and quietly
+  const power = usePowerSave()
+  const animate = prefs.curl !== false && !power
+  const sound = prefs.flipSound !== false && !power
 
   const paint = useCallback((t: number) => {
     tNow.current = t

@@ -12,14 +12,15 @@ import { useChapters, pickLang } from './useChapters'
 import { MdImg, PAPER } from './ui'
 import { useAsync } from '../lib/useAsync'
 import { cn } from '../lib/format'
-import { isElectron, isIOS, hideStatusBarWhileReading } from '../lib/platform'
+import { isElectron, isIOS } from '../lib/platform'
+import { usePowerSave, useReaderSession } from '../lib/power'
 import { useReadingClock } from '../lib/activity'
 import { awayAfter, minutesLeft, pagePace, usePagePace, usePresence } from '../lib/reading'
 import { PageCurl, type CurlHandle } from './PageCurl'
 import { GlossaryEditor } from './GlossaryEditor'
 import { PageLookup, PressCtx, justPressed, longPress, type PressAt } from './PageLookup'
 import { AmbienceLayer, useAmbientSound } from '../read/Ambience'
-import { AmbienceControls, PaperPicker } from '../read/ReadingSheet'
+import { AmbienceControls, PaperPicker, PowerSaveCard } from '../read/ReadingSheet'
 import { savedChapter, savedManga, savedPages, useSaved } from './saved'
 
 type Doc = Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void }
@@ -29,7 +30,7 @@ export default function MangaReader() {
   const { id = '', chapterId = '' } = useParams()
   const nav = useNavigate()
   useReadingClock()
-  useEffect(hideStatusBarWhileReading, [])
+  useReaderSession()
   // with no connection, the title and its chapter list come from what was downloaded
   const m = useAsync(() => manga(id).catch(async (e) => (await savedManga(id)) ?? Promise.reject(e)), [id])
   const entryLang = useManga((s) => s.entries[id]?.lang)
@@ -687,7 +688,9 @@ function Paged({
   const setPrefs = useManga((s) => s.setPrefs)
   const zoom = prefs.pageZoom ?? 1
   const zoomed = zoom > 1.01
-  const curlOn = prefs.curl !== false && !zoomed
+  // power saving: pages change at once, without the curl and its sound
+  const power = usePowerSave()
+  const curlOn = prefs.curl !== false && !zoomed && !power
   const down = useRef<{ x: number; y: number; t: number; sx: number; sy: number } | null>(null)
   const lastTap = useRef(0)
   const box = useRef<HTMLDivElement>(null)
@@ -834,7 +837,7 @@ function Paged({
       <PageCurl
         ref={curl}
         enabled={curlOn}
-        sound={prefs.flipSound !== false}
+        sound={prefs.flipSound !== false && !power}
         rtl={rtl}
         paper={paper}
         canNext={next != null}
@@ -1301,6 +1304,7 @@ function SettingsSheet({ prefs, set, close, onSaved, glossary }: { prefs: Reader
   return (
     <Sheet title="Настройки чтения" close={close}>
       <div className="flex flex-col gap-6">
+        <PowerSaveCard />
         <Field label="Режим">
           <Seg
             value={prefs.mode}

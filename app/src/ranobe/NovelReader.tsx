@@ -12,7 +12,8 @@ import { Narrator } from '../manga/Narrator'
 import { isRussian, savedChapter, translateChapter } from '../manga/bookTranslate'
 import { DEFAULT_MODEL } from '../manga/translate'
 import { cn } from '../lib/format'
-import { isElectron, hideStatusBarWhileReading } from '../lib/platform'
+import { isElectron } from '../lib/platform'
+import { useReaderSession } from '../lib/power'
 import { useReadingClock } from '../lib/activity'
 import { awayAfter, minutesLeft, usePresence, useTextPace, wordCount } from '../lib/reading'
 import { SelectionTranslate } from '../manga/SelectionTranslate'
@@ -29,7 +30,7 @@ export default function NovelReader() {
   const novelId = decodeURIComponent(id)
   const chapterId = decodeURIComponent(ch)
   useReadingClock()
-  useEffect(hideStatusBarWhileReading, [])
+  useReaderSession()
   const nav = useNavigate()
   const source = sourceById(src)
   const prefs = useManga((s) => s.book)

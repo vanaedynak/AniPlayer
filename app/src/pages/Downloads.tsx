@@ -5,6 +5,7 @@ import { useDownloads, fmtBytes } from '../lib/downloads'
 import { posterUrl } from '../lib/api'
 import { freeSpace } from '../lib/offline'
 import { DownloadRow } from '../components/Downloads'
+import { FolderPanel } from '../components/FolderPanel'
 import { Empty, Panel } from '../components/ui'
 import { SavedShelf } from '../manga/SavedShelf'
 import { TorrentSavesPanel } from '../components/TorrentSaves'
@@ -55,6 +56,8 @@ export default function Downloads() {
           </span>
         )}
       </div>
+
+      <FolderPanel />
 
       {groups.length ? (
         groups.map(([alias, list]) => {
