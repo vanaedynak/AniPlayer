@@ -27,9 +27,13 @@ export function FolderPanel() {
   return (
     <Panel className="!p-4 sm:!p-5">
       <div className="flex flex-wrap items-center gap-4">
-        <div className={name ? 'text-emerald-300' : lost ? 'text-yellow-300' : 'text-muted'}>{name ? <FolderCheck size={28} /> : lost != null ? <TriangleAlert size={28} /> : <FolderOpen size={28} />}</div>
+        <div className={name ? 'text-emerald-300' : lost ? 'text-yellow-300' : 'text-muted'}>
+          {name ? <FolderCheck size={28} /> : lost != null ? <TriangleAlert size={28} /> : <FolderOpen size={28} />}
+        </div>
         <div className="min-w-0 flex-1">
-          <div className="font-extrabold">{name ? `Папка для загрузок: ${name}` : lost != null ? `Папка${lost ? ` «${lost}»` : ''} больше недоступна` : 'Скачанное хранится внутри приложения'}</div>
+          <div className="font-extrabold">
+            {name ? `Папка для загрузок: ${name}` : lost != null ? `Папка${lost ? ` «${lost}»` : ''} больше недоступна` : 'Скачанное хранится внутри приложения'}
+          </div>
           <div className="text-sm font-semibold text-muted">
             {name
               ? 'Серии, главы и книги сохраняются сюда и останутся, даже если удалить приложение. После переустановки выберите эту же папку, и всё скачанное вернётся.'

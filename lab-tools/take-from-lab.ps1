@@ -8,7 +8,7 @@ param(
 
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
-$keep = @('app/flavor.json', '.github/workflows/pages.yml', 'AGENTS.md', 'GEMINI.md', 'LAB.md', '.agent', 'lab-tools')
+$keep = @('app/flavor.json', '.github/workflows/pages.yml', 'AGENTS.md', 'GEMINI.md', 'LAB.md', '.agent', 'lab-tools', '.proof')
 
 function Say($text, $color = 'Gray') { Write-Host $text -ForegroundColor $color }
 function Stop-With($text) { Say $text 'Red'; Read-Host 'Нажми Enter, чтобы закрыть'; exit 1 }
