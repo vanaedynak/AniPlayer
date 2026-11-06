@@ -252,58 +252,186 @@ input[type="range"].slider::-webkit-slider-thumb { -webkit-appearance: none; wid
 :root[data-theme="grandline"] .theme-panel::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 5px; pointer-events: none; background: repeating-linear-gradient(60deg, #a16207 0 5px, #fde047 5px 8px, #78350f 8px 11px); opacity: 0.8; }
 :root[data-theme="grandline"] [data-nav][aria-current="page"] { background: linear-gradient(100deg, #991b1b, #b91c1c 60%, #dc2626); color: #fff; border-color: #fde04766; box-shadow: inset 0 -3px 0 #fde047; }
 
-/* 86: Eighty-Six: tactical HUD panels, Para-RAID frequency glow, and Lycoris accents */
+/* 86: Eighty-Six: tactical HUD panels, Para-RAID frequency glow, Lycoris petals, and military button styling */
 :root[data-theme="eightysix"] .theme-art {
-  opacity: 0.75;
-  filter: saturate(1.12) contrast(1.05);
+  opacity: 0.96;
+  filter: saturate(1.15) contrast(1.06);
+  background-position: right top;
+  background-size: cover;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.2) 28%, rgba(0, 0, 0, 0.7) 50%, #000 65%);
+  mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.2) 28%, rgba(0, 0, 0, 0.7) 50%, #000 65%);
 }
 @media (max-width: 1023px) {
   :root[data-theme="eightysix"] .theme-art {
-    opacity: 0.42;
+    opacity: 0.45;
+    background-position: 85% top;
   }
 }
+
+/* Ensure desktop main content never obscures Lena & Shin on the right */
+@media (min-width: 1280px) {
+  :root[data-theme="eightysix"] main {
+    margin-right: 480px !important;
+  }
+}
+@media (min-width: 1536px) {
+  :root[data-theme="eightysix"] main {
+    margin-right: 540px !important;
+  }
+}
+
+/* Floating Lycoris (Red Spider Lily) Petals */
+@keyframes petalDrift {
+  0% {
+    transform: translate3d(0, -40px, 0) rotate(0deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.8;
+  }
+  85% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate3d(-140px, 105vh, 0) rotate(380deg);
+    opacity: 0;
+  }
+}
+.petal-flow {
+  position: fixed;
+  top: -30px;
+  width: 13px;
+  height: 20px;
+  border-radius: 50% 0 50% 50%;
+  background: radial-gradient(circle at 30% 30%, #ff4d6d, #dc2626 70%, #7f1d1d);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.55);
+  pointer-events: none;
+  z-index: 1;
+}
+.petal-1 { right: 6%; animation: petalDrift 14s linear infinite; }
+.petal-2 { right: 20%; animation: petalDrift 19s linear 4s infinite; width: 10px; height: 16px; }
+.petal-3 { right: 32%; animation: petalDrift 16s linear 8s infinite; width: 15px; height: 24px; }
+.petal-4 { right: 14%; animation: petalDrift 22s linear 2s infinite; width: 9px; height: 14px; }
+.petal-5 { right: 26%; animation: petalDrift 20s linear 11s infinite; width: 12px; height: 19px; }
+
+/* Tactical Panels */
 :root[data-theme="eightysix"] .theme-panel {
   border-radius: 14px;
-  border: 1px solid rgba(56, 189, 248, 0.22);
-  border-bottom-color: rgba(239, 68, 68, 0.35);
-  box-shadow: inset 0 0 32px -12px rgba(56, 189, 248, 0.12), 0 8px 30px -10px rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  border-bottom: 2px solid rgba(239, 68, 68, 0.45);
+  box-shadow: inset 0 0 36px -12px rgba(56, 189, 248, 0.14), 0 12px 36px -12px rgba(0, 0, 0, 0.8);
   position: relative;
 }
 :root[data-theme="eightysix"] .theme-panel::before {
-  content: "";
+  content: "[ 86 // TACTICAL ]";
   position: absolute;
-  top: -1px;
+  top: -8px;
   right: 20px;
-  width: 38px;
-  height: 2px;
-  background: #38bdf8;
-  box-shadow: 0 0 10px #38bdf8;
+  font-family: monospace;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  padding: 1px 6px;
+  background: #07090e;
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  color: #38bdf8;
+  border-radius: 4px;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
   pointer-events: none;
 }
 :root[data-theme="eightysix"] .theme-panel::after {
   content: "";
   position: absolute;
-  bottom: -1px;
+  bottom: -2px;
   left: 20px;
-  width: 24px;
-  height: 2px;
+  width: 32px;
+  height: 3px;
   background: #ef4444;
-  box-shadow: 0 0 8px #ef4444;
+  box-shadow: 0 0 12px #ef4444;
   pointer-events: none;
 }
+
+/* Tactical Navigation Buttons */
 :root[data-theme="eightysix"] [data-nav] {
   border-radius: 12px;
+  border-left: 3px solid rgba(56, 189, 248, 0.25);
   transition: all 0.25s ease;
 }
+:root[data-theme="eightysix"] [data-nav]:hover {
+  border-left-color: #38bdf8;
+  background: rgba(14, 165, 233, 0.12);
+  box-shadow: inset 4px 0 14px -4px rgba(56, 189, 248, 0.3);
+}
 :root[data-theme="eightysix"] [data-nav][aria-current="page"] {
-  background: linear-gradient(95deg, rgba(2, 132, 199, 0.9) 0%, rgba(14, 165, 233, 0.75) 55%, rgba(239, 68, 68, 0.4) 100%);
-  color: #ffffff;
-  border-color: rgba(56, 189, 248, 0.65);
-  box-shadow: 0 0 22px -4px rgba(56, 189, 248, 0.45), inset 3px 0 0 #38bdf8, inset -2px 0 0 #ef4444;
+  background: linear-gradient(95deg, rgba(2, 132, 199, 0.95) 0%, rgba(14, 165, 233, 0.8) 55%, rgba(239, 68, 68, 0.45) 100%) !important;
+  color: #ffffff !important;
+  border-color: rgba(56, 189, 248, 0.7);
+  border-left: 4px solid #38bdf8;
+  border-right: 2px solid #ef4444;
+  box-shadow: 0 0 24px -4px rgba(56, 189, 248, 0.55), inset 0 0 16px -6px rgba(239, 68, 68, 0.4);
   letter-spacing: 0.02em;
 }
+
+/* Tactical Action Buttons (Смотреть, Скачать приложение) */
+:root[data-theme="eightysix"] a.bg-white,
+:root[data-theme="eightysix"] button.bg-white,
+:root[data-theme="eightysix"] a.bg-accent,
+:root[data-theme="eightysix"] button.bg-accent {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 40%, #075985 100%) !important;
+  color: #f0f9ff !important;
+  border-radius: 10px !important;
+  border: 1px solid rgba(56, 189, 248, 0.75) !important;
+  box-shadow: 0 4px 18px -2px rgba(2, 132, 199, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 13px;
+  font-weight: 800;
+  transition: all 0.25s ease;
+}
+:root[data-theme="eightysix"] a.bg-white:hover,
+:root[data-theme="eightysix"] button.bg-white:hover,
+:root[data-theme="eightysix"] a.bg-accent:hover,
+:root[data-theme="eightysix"] button.bg-accent:hover {
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 45%, #0369a1 100%) !important;
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 22px rgba(239, 68, 68, 0.55), 0 0 12px rgba(56, 189, 248, 0.4) !important;
+  transform: translateY(-1px) scale(1.02);
+}
+
+/* Secondary Glass Buttons */
+:root[data-theme="eightysix"] .glass,
+:root[data-theme="eightysix"] a.glass,
+:root[data-theme="eightysix"] button.glass {
+  border-radius: 10px !important;
+  border: 1px solid rgba(56, 189, 248, 0.32) !important;
+  background: rgba(15, 23, 42, 0.75) !important;
+  color: #e2e8f0 !important;
+  box-shadow: inset 0 0 14px -4px rgba(56, 189, 248, 0.18);
+  transition: all 0.2s ease;
+}
+:root[data-theme="eightysix"] .glass:hover,
+:root[data-theme="eightysix"] a.glass:hover,
+:root[data-theme="eightysix"] button.glass:hover {
+  border-color: rgba(56, 189, 248, 0.75) !important;
+  background: rgba(14, 116, 144, 0.3) !important;
+  box-shadow: 0 0 16px -2px rgba(56, 189, 248, 0.35);
+}
+
+/* Tactical Anime Cards Glass Styling */
+:root[data-theme="eightysix"] .bg-card {
+  background-color: rgba(15, 20, 32, 0.75) !important;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(56, 189, 248, 0.16);
+  border-radius: 16px;
+}
+:root[data-theme="eightysix"] .bg-card:hover {
+  border-color: rgba(56, 189, 248, 0.45);
+  box-shadow: 0 8px 24px -6px rgba(2, 132, 199, 0.35);
+}
+
 :root[data-theme="eightysix"] h1,
 :root[data-theme="eightysix"] .theme-panel h2 {
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   text-shadow: 0 0 20px rgba(56, 189, 248, 0.35);
 }

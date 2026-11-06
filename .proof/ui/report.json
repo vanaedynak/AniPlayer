@@ -1,0 +1,8 @@
+{
+  "url": null,
+  "problems": [],
+  "viewports": {},
+  "steps": null,
+  "clickAll": null,
+  "fatal": "Error: pass --dir <folder> or --url <url>\n    at file:///C:/Users/Ivan/.gemini/config/plugins/proofkit/skills/proof-verify/scripts/ui_probe.mjs:74:26\n    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)\n    at async node:internal/modules/esm/loader:639:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)"
+}

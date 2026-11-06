@@ -395,6 +395,7 @@ export const PALETTES: Palette[] = [
     pattern:
       'linear-gradient(rgba(56, 189, 248, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(56, 189, 248, 0.04) 1px, transparent 1px), radial-gradient(circle at 85% 15%, rgba(239, 68, 68, 0.08) 0%, transparent 60%)',
     patternSize: '48px 48px, 48px 48px, auto',
+    unlock: 't-eightysix-n23',
   },
 ]
 

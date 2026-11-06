@@ -33,6 +33,18 @@ import { MiniPlayer } from './Music'
 import { RoomBridge, RoomButton } from './Room'
 import { cn } from '../lib/format'
 import { useStore } from '../lib/store'
+import {
+  Theme86SidebarMascot,
+  Theme86FidoMascot,
+  Theme86Petals,
+  UndertakerMarkIcon,
+  JuggernautIcon,
+  LycorisIcon,
+  RadarDishIcon,
+  DogTagsIcon,
+  SupplyDepotIcon,
+  MagnoliaMedalIcon,
+} from './Theme86Decorations'
 import { CrashGuard } from './Crash'
 import { Avatar } from './Social'
 import { useMyProfile } from '../lib/social'
@@ -393,28 +405,66 @@ function ProfileButton() {
   )
 }
 
+
+const CALLSIGNS: Record<string, string> = {
+  '/': '[HQ-01]',
+  '/catalog': '[RECON]',
+  '/schedule': '[RADAR]',
+  '/history': '[LOGS]',
+  '/collection': '[DEPOT]',
+  '/manga': '[LIB]',
+  '/stats': '[SYNC]',
+  '/roulette': '[DICE]',
+  '/top': '[ACE]',
+  '/achievements': '[MEDAL]',
+  '/downloads': '[CACHE]',
+  '/torrent': '[P2P]',
+}
+
 function Sidebar() {
+  const theme = useStore((s) => s.local.theme)
+  const is86 = theme === 'eightysix'
   return (
     <aside className="sticky top-[84px] hidden h-[calc(100vh-100px)] w-[250px] shrink-0 flex-col gap-2 overflow-y-auto pt-4 pb-6 pl-10 lg:flex">
-      {NAV.map(({ to, label, icon: Icon }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={to === '/'}
-          data-nav=""
-          className={({ isActive }) =>
-            cn(
-              'flex items-center gap-4 rounded-2xl border px-5 py-3.5 text-[15px] font-bold transition',
-              isActive
-                ? 'border-white/10 bg-white text-black shadow-lg shadow-white/5'
-                : 'border-white/[0.06] bg-card/60 text-white/85 hover:border-white/10 hover:bg-card-2 hover:text-white',
-            )
-          }
-        >
-          <Icon size={22} strokeWidth={2.3} />
-          {label}
-        </NavLink>
-      ))}
+      {NAV.map(({ to, label, icon: Icon }) => {
+        const Custom86Icon = is86 && (
+          to === '/' ? UndertakerMarkIcon :
+          to === '/catalog' ? JuggernautIcon :
+          to === '/schedule' ? RadarDishIcon :
+          to === '/history' ? DogTagsIcon :
+          to === '/collection' ? SupplyDepotIcon :
+          to === '/manga' ? LycorisIcon :
+          to === '/achievements' ? MagnoliaMedalIcon :
+          null
+        )
+        const Tag = Custom86Icon || Icon
+        return (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === '/'}
+            data-nav=""
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3.5 rounded-2xl border px-4 py-3 text-[14px] font-bold transition group relative',
+                isActive
+                  ? 'border-white/10 bg-white text-black shadow-lg shadow-white/5'
+                  : 'border-white/[0.06] bg-card/60 text-white/85 hover:border-white/10 hover:bg-card-2 hover:text-white',
+                is86 && 'rounded-xl',
+              )
+            }
+          >
+            <Tag size={20} strokeWidth={2.3} className={cn(is86 && 'text-sky-300 group-hover:scale-110 transition-transform shrink-0')} />
+            <span className="flex-1 truncate">{label}</span>
+            {is86 && (
+              <span className="text-[9px] font-mono text-sky-400/60 uppercase tracking-wider">
+                {CALLSIGNS[to] ?? ''}
+              </span>
+            )}
+          </NavLink>
+        )
+      })}
+      {is86 && <Theme86SidebarMascot />}
       <div className="mt-auto flex flex-col gap-2 pt-6 text-xs leading-relaxed text-dim">
         <div className="flex flex-wrap gap-x-3 gap-y-1 font-bold text-muted">
           <Link to="/about" className="hover:text-white">
@@ -467,6 +517,7 @@ function TabBar() {
 export default function Layout({ children }: { children: ReactNode }) {
   const loc = useLocation()
   const mainRef = useRef<HTMLDivElement>(null)
+  const theme = useStore((s) => s.local.theme)
   useEffect(() => {
     window.scrollTo({ top: 0 })
   }, [loc.pathname])
@@ -474,6 +525,12 @@ export default function Layout({ children }: { children: ReactNode }) {
     <div className="relative min-h-full" style={{ paddingLeft: 'var(--safe-left)', paddingRight: 'var(--safe-right)' }}>
       {/* a unique theme's illustration, behind everything */}
       <div className="theme-art" aria-hidden />
+      {theme === 'eightysix' && (
+        <>
+          <Theme86Petals />
+          <Theme86FidoMascot />
+        </>
+      )}
       <Header />
       <div className="flex gap-8">
         <Sidebar />
