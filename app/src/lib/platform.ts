@@ -96,6 +96,9 @@ export function initLifecycle() {
     if (document.visibilityState === 'hidden') {
       saveAll()
       void flushAll()
+    } else {
+      // back from the background: iOS may have shown the status bar again over an open reader
+      syncStatusBar()
     }
   })
   window.addEventListener('pagehide', () => {
