@@ -149,6 +149,9 @@ function checkForUpdates() {
 function initUpdater() {
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
+  // Install over the copy that is running. Without this the installer picks its own folder, and lab
+  // updates landed in the main app's folder while the pinned shortcut kept opening the old lab.
+  if (app.isPackaged && process.platform === 'win32') autoUpdater.installDirectory = path.dirname(process.execPath)
   autoUpdater.on('checking-for-update', () => setUpdate({ status: 'checking' }))
   autoUpdater.on('update-not-available', () => setUpdate({ status: 'latest' }))
   autoUpdater.on('update-available', (i) => setUpdate({ status: 'downloading', version: i.version, percent: 0 }))
