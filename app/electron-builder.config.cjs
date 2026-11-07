@@ -5,6 +5,9 @@ const flavor = require('./flavor.json')
 module.exports = {
   appId: `${flavor.appId}.desktop`,
   productName: flavor.desktopName,
+  // The package name picks the install folder (Programs\<name>) and the update cache. Both copies had
+  // "aniplayer", so the lab installed over the main app and each update replaced the other's files.
+  extraMetadata: { name: flavor.dataFolder },
   protocols: [{ name: flavor.name, schemes: [flavor.scheme] }],
   publish: [{ provider: 'generic', url: `https://github.com/${flavor.repo}/releases/latest/download` }],
   directories: { output: 'release' },
