@@ -74,11 +74,12 @@ AnimeVost и т.д.) во встроенном плеере Kodik. Ничего 
 
 ### Windows
 `app/release/Anyflow-Desktop-Setup-1.0.0.exe` — установщик (создаёт ярлык на рабочем столе).
-Свежие сборки также лежат в GitHub Releases (`latest`).
+Выпущенные версии лежат в GitHub Releases (`v1.0.N`, актуальная помечена **Latest**).
+Как выпускать, отмечать стабильную и откатывать — в [RELEASES.md](RELEASES.md).
 
 ### iPad
 GitHub Actions собирает неподписанный `Anyflow.ipa` при каждом пуше
-(вкладка **Releases → latest** или **Actions → артефакт Anyflow-ipa**).
+(**Actions → артефакт Anyflow-ipa**; выпущенные версии — во вкладке **Releases**, помеченная Latest).
 
 Установить без Mac можно через **Sideloadly** (<https://sideloadly.io>) с ПК:
 1. Поставьте iTunes и iCloud с сайта Apple (не из Microsoft Store), затем Sideloadly.

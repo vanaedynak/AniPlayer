@@ -209,7 +209,7 @@
 
     <script>
       // the Windows installer's file name carries the build number: ask GitHub which one is current
-      fetch('https://api.github.com/repos/vanaedynak/AniPlayer/releases/tags/latest')
+      fetch('https://api.github.com/repos/vanaedynak/AniPlayer/releases/latest')
         .then((r) => (r.ok ? r.json() : null))
         .then((rel) => {
           const exe = rel && rel.assets.find((a) => /\.exe$/.test(a.name))

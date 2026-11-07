@@ -3,25 +3,90 @@ name: Build apps
 on:
   push:
     branches: [main]
-    paths: ['app/**', '.github/workflows/**']
+    paths: ['app/**', '.github/workflows/**', '.github/scripts/**']
+  # Actions -> Build apps -> Run workflow (or lab-tools\Выпуски.cmd). See RELEASES.md.
   workflow_dispatch:
+    inputs:
+      action:
+        description: 'publish — выпустить новую версию · rollback — удалить последнюю (все вернутся к предыдущей) · stable — отметить версию стабильной'
+        type: choice
+        default: publish
+        options: [publish, rollback, stable]
+      from:
+        description: 'publish: из чего собрать. Пусто = текущий main. v1.0.57 или stable = собрать ту версию заново под новым номером (так её получат все)'
+        required: false
+        default: ''
+      version:
+        description: 'stable: какую версию отметить, например v1.0.57. Пусто = ту, что сейчас у всех'
+        required: false
+        default: ''
+      notes:
+        description: 'publish: пара слов о том, что нового (видно в релизе)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
 
+# a new push cancels the previous push's build; button runs are never cancelled
 concurrency:
-  group: build
-  cancel-in-progress: true
+  group: ${{ github.event_name == 'push' && 'build-push' || format('build-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 jobs:
+  # What this run does. In the main project a push only builds (to check it and to keep the files as artifacts);
+  # a version reaches the apps only from the publish button. The lab (flavor.json "lab": true) publishes every push.
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.p.outputs.build }}
+      publish: ${{ steps.p.outputs.publish }}
+      ref: ${{ steps.p.outputs.ref }}
+      from: ${{ steps.p.outputs.from }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github
+            app/flavor.json
+          sparse-checkout-cone-mode: false
+      - id: p
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          ACTION: ${{ inputs.action }}
+          FROM: ${{ inputs.from }}
+        run: |
+          set -euo pipefail
+          lab=$(jq -r '.lab' app/flavor.json)
+          if [ "$EVENT" = push ]; then
+            echo build=true >> "$GITHUB_OUTPUT"
+            echo "publish=$([ "$lab" = true ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+            bash .github/scripts/releases.sh resolve "" >> "$GITHUB_OUTPUT"
+          elif [ "$ACTION" = publish ]; then
+            echo build=true >> "$GITHUB_OUTPUT"
+            echo publish=true >> "$GITHUB_OUTPUT"
+            bash .github/scripts/releases.sh resolve "$FROM" >> "$GITHUB_OUTPUT"
+          else
+            echo build=false >> "$GITHUB_OUTPUT"
+            echo publish=false >> "$GITHUB_OUTPUT"
+          fi
+          cat "$GITHUB_OUTPUT"
+
   ios:
     name: iPad (unsigned IPA)
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
     runs-on: macos-15
     defaults:
       run:
         working-directory: app
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -79,12 +144,16 @@ jobs:
 
   android:
     name: Android (APK)
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: app
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -138,12 +207,16 @@ jobs:
 
   windows:
     name: Windows installer
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
     runs-on: windows-latest
     defaults:
       run:
         working-directory: app
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -162,20 +235,60 @@ jobs:
             app/release/*.blockmap
             app/release/latest.yml
 
-  release:
-    name: Publish "latest" release
-    needs: [ios, android, windows]
+  # every version is its own release vX.Y.Z and stays; GitHub's "Latest" mark is what the apps update from
+  publish:
+    name: Publish version 1.0.${{ github.run_number }}
+    needs: [plan, ios, android, windows]
+    if: needs.plan.outputs.publish == 'true'
     runs-on: ubuntu-latest
+    concurrency:
+      group: releases
+      cancel-in-progress: false
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github
+            app/flavor.json
+          sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@v4
         with:
           path: out
           merge-multiple: true
-      - name: Replace rolling release
+      - name: Create the release and move "Latest" to it
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          REF: ${{ needs.plan.outputs.ref }}
+          FROM: ${{ needs.plan.outputs.from }}
+          NOTES: ${{ inputs.notes }}
         run: |
-          gh release delete latest --yes --cleanup-tag || true
-          gh release create latest out/* --title "Anyflow build ${{ github.run_number }}" \
-            --notes "IPA для iPad (ставится через Sideloadly/AltStore), APK для Android и установщик для Windows. Сборка из ${GITHUB_SHA::7}." --latest
+          bash .github/scripts/releases.sh publish out "1.0.${{ github.run_number }}" "$REF" "$FROM" "$NOTES"
+          bash .github/scripts/releases.sh summary >> "$GITHUB_STEP_SUMMARY"
+
+  manage:
+    name: Releases (${{ inputs.action }})
+    if: github.event_name == 'workflow_dispatch' && inputs.action != 'publish'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: releases
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github
+            app/flavor.json
+          sparse-checkout-cone-mode: false
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ACTION: ${{ inputs.action }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$ACTION" = stable ]; then
+            bash .github/scripts/releases.sh stable "$VERSION"
+          else
+            bash .github/scripts/releases.sh rollback
+          fi
+          bash .github/scripts/releases.sh summary >> "$GITHUB_STEP_SUMMARY"
