@@ -1,0 +1,296 @@
+name: Build apps
+
+# The source is private (vanaedynak/anyflow-source); this public repository only builds it and hosts the files.
+# Checking out the source needs the SOURCE_TOKEN secret: a fine-grained token with read access to its contents.
+on:
+  # Actions -> Build apps -> Run workflow (or lab-tools\Выпуски.cmd in the source)
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'publish — выпустить новую версию · rollback — удалить последнюю (все вернутся к предыдущей) · stable — отметить версию стабильной · check — только собрать, не выпускать'
+        type: choice
+        default: publish
+        options: [publish, rollback, stable, check]
+      from:
+        description: 'publish: из чего собрать. Пусто = текущий main. v1.0.57 или stable = собрать ту версию заново под новым номером (так её получат все)'
+        required: false
+        default: ''
+      version:
+        description: 'stable: какую версию отметить, например v1.0.57. Пусто = ту, что сейчас у всех'
+        required: false
+        default: ''
+      notes:
+        description: 'publish: пара слов о том, что нового (видно в релизе)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  SRC_REPO: vanaedynak/anyflow-source
+  NAME: Anyflow
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.p.outputs.build }}
+      publish: ${{ steps.p.outputs.publish }}
+      ref: ${{ steps.p.outputs.ref }}
+      from: ${{ steps.p.outputs.from }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: p
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SRC_TOKEN: ${{ secrets.SOURCE_TOKEN }}
+          ACTION: ${{ inputs.action }}
+          FROM: ${{ inputs.from }}
+        run: |
+          set -euo pipefail
+          [ -n "$SRC_TOKEN" ] || { echo "::error::Нет секрета SOURCE_TOKEN (Settings → Secrets → Actions)"; exit 1; }
+          case "$ACTION" in
+            publish) echo build=true >> "$GITHUB_OUTPUT"; echo publish=true >> "$GITHUB_OUTPUT"; bash .github/scripts/releases.sh resolve "$FROM" >> "$GITHUB_OUTPUT" ;;
+            check)   echo build=true >> "$GITHUB_OUTPUT"; echo publish=false >> "$GITHUB_OUTPUT"; bash .github/scripts/releases.sh resolve "$FROM" >> "$GITHUB_OUTPUT" ;;
+            *)       echo build=false >> "$GITHUB_OUTPUT"; echo publish=false >> "$GITHUB_OUTPUT" ;;
+          esac
+          cat "$GITHUB_OUTPUT"
+
+  ios:
+    name: iPad (unsigned IPA)
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SRC_REPO }}
+          ref: ${{ needs.plan.outputs.ref }}
+          token: ${{ secrets.SOURCE_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      # the torrent engine's native modules are desktop only; their install scripts (prebuilt downloads) are not needed here
+      - run: npm ci --ignore-scripts
+      - run: npm version 1.0.${{ github.run_number }} --no-git-tag-version
+      - run: npm run build
+
+      - name: Create iOS project
+        run: |
+          npx cap add ios
+          npx cap sync ios
+
+      - name: App icon
+        run: npx --yes @capacitor/assets@3 generate --ios --assetPath resources --iconBackgroundColor '#09090d'
+
+      - name: Patch Info.plist
+        run: |
+          P=ios/App/App/Info.plist
+          pb() { /usr/libexec/PlistBuddy -c "$1" "$P" || true; }
+          pb "Set :CFBundleDisplayName $(node -p "require('./flavor.json').name")"
+          pb "Add :UIBackgroundModes array"
+          pb "Add :UIBackgroundModes:0 string audio"
+          pb "Add :UIStatusBarStyle string UIStatusBarStyleLightContent"
+          pb "Delete :UIViewControllerBasedStatusBarAppearance"
+          # YES: lets fullscreen video hide the status bar (and the StatusBar plugin control it)
+          pb "Add :UIViewControllerBasedStatusBarAppearance bool true"
+          pb "Add :UIRequiresFullScreen bool false"
+          pb "Delete :UISupportedInterfaceOrientations~ipad"
+          pb "Add :UISupportedInterfaceOrientations~ipad array"
+          pb "Add :UISupportedInterfaceOrientations~ipad:0 string UIInterfaceOrientationPortrait"
+          pb "Add :UISupportedInterfaceOrientations~ipad:1 string UIInterfaceOrientationPortraitUpsideDown"
+          pb "Add :UISupportedInterfaceOrientations~ipad:2 string UIInterfaceOrientationLandscapeLeft"
+          pb "Add :UISupportedInterfaceOrientations~ipad:3 string UIInterfaceOrientationLandscapeRight"
+          pb "Set :CFBundleShortVersionString $(node -p "require('./package.json').version")"
+          pb "Set :CFBundleVersion ${{ github.run_number }}"
+
+      - name: Build unsigned app
+        run: |
+          cd ios/App
+          if [ -d App.xcworkspace ]; then TARGET="-workspace App.xcworkspace"; else TARGET="-project App.xcodeproj"; fi
+          xcodebuild $TARGET -scheme App -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build | tail -30
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/App.app Payload/
+          zip -qry ../../Anyflow.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Anyflow-ipa
+          path: app/Anyflow.ipa
+
+  android:
+    name: Android (APK)
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SRC_REPO }}
+          ref: ${{ needs.plan.outputs.ref }}
+          token: ${{ secrets.SOURCE_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci --ignore-scripts
+      - run: npm version 1.0.${{ github.run_number }} --no-git-tag-version
+      - run: npm run build
+
+      - name: Create Android project
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: App icon
+        run: npx --yes @capacitor/assets@3 generate --android --assetPath resources --iconBackgroundColor '#09090d' --iconBackgroundColorDark '#09090d'
+
+      - name: Version and orientation
+        run: |
+          G=android/app/build.gradle
+          sed -i -E "s/versionCode [0-9]+/versionCode ${{ github.run_number }}/; s/versionName \"[^\"]*\"/versionName \"$(node -p "require('./package.json').version")\"/" $G
+          # phones and tablets in any orientation; video goes landscape on its own
+          sed -i 's/<activity/<activity android:screenOrientation="fullUser"/' android/app/src/main/AndroidManifest.xml
+
+      # with the keystore secrets every build carries the same signature, so a new APK installs over the old one
+      - name: Build APK
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          cd android
+          if [ -n "$KEYSTORE" ]; then
+            ./gradlew assembleRelease --no-daemon -q
+            echo "$KEYSTORE" | base64 -d > release.jks
+            BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+            $BT/zipalign -f 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+            $BT/apksigner sign --ks release.jks --ks-key-alias aniplayer --ks-pass env:KEYSTORE_PASSWORD --out ../Anyflow.apk aligned.apk
+          else
+            ./gradlew assembleDebug --no-daemon -q
+            cp app/build/outputs/apk/debug/app-debug.apk ../Anyflow.apk
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Anyflow-android
+          path: app/Anyflow.apk
+
+  windows:
+    name: Windows installer
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SRC_REPO }}
+          ref: ${{ needs.plan.outputs.ref }}
+          token: ${{ secrets.SOURCE_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      # every build gets a higher version so installed apps see it as an update
+      - run: npm version 1.0.${{ github.run_number }} --no-git-tag-version
+      - run: npm run build
+      - run: npx electron-builder --config electron-builder.config.cjs --win --x64 --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Anyflow-windows
+          path: |
+            app/release/*.exe
+            app/release/*.blockmap
+            app/release/latest.yml
+
+  # every version is its own release vX.Y.Z and stays; GitHub's "Latest" mark is what the apps update from
+  publish:
+    name: Publish version 1.0.${{ github.run_number }}
+    needs: [plan, ios, android, windows]
+    if: needs.plan.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: releases
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      # the source's history, for the "what changed" list (commit titles only, no code)
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SRC_REPO }}
+          ref: ${{ needs.plan.outputs.ref }}
+          token: ${{ secrets.SOURCE_TOKEN }}
+          path: src
+          fetch-depth: 300
+          sparse-checkout: app/flavor.json
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Create the release and move "Latest" to it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SRC_TOKEN: ${{ secrets.SOURCE_TOKEN }}
+          REF: ${{ needs.plan.outputs.ref }}
+          FROM: ${{ needs.plan.outputs.from }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          set -euo pipefail
+          prev=$(gh api "repos/$GH_REPO/releases/latest" -q .body 2>/dev/null | sed -nE 's/.*<!-- source:([0-9a-f]{40}) -->.*/\1/p' | tail -1 || true)
+          changes=""
+          if [ -n "$prev" ] && git -C src cat-file -e "$prev" 2>/dev/null; then
+            changes=$(git -C src log --no-merges --pretty='- %s' "$prev..$REF" | head -30)
+          fi
+          bash .github/scripts/releases.sh publish out "1.0.${{ github.run_number }}" "$REF" "$FROM" "$NOTES" "$changes"
+          bash .github/scripts/releases.sh summary >> "$GITHUB_STEP_SUMMARY"
+      # the site's web version follows the released version
+      - name: Update the website
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml -R "${{ github.repository }}" -f ref="${{ needs.plan.outputs.ref }}"
+
+  manage:
+    name: Releases (${{ inputs.action }})
+    if: inputs.action == 'rollback' || inputs.action == 'stable'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: releases
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ACTION: ${{ inputs.action }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$ACTION" = stable ]; then
+            bash .github/scripts/releases.sh stable "$VERSION"
+          else
+            bash .github/scripts/releases.sh rollback
+          fi
+          bash .github/scripts/releases.sh summary >> "$GITHUB_STEP_SUMMARY"

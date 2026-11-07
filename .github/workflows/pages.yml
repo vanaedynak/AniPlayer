@@ -1,0 +1,60 @@
+name: Website
+
+# The site on GitHub Pages: the landing page and invite page (docs/ in the private source) and the app itself built
+# for the browser under /app/. Runs after every published version, or by hand (Actions -> Website -> Run workflow).
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Source commit to build. Empty = the current main'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: vanaedynak/anyflow-source
+          ref: ${{ inputs.ref || 'main' }}
+          token: ${{ secrets.SOURCE_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Build the web app
+        working-directory: app
+        run: |
+          npm ci --ignore-scripts
+          npm version 1.0.${{ github.run_number }} --no-git-tag-version
+          npm run build
+      - name: Put the site together
+        run: |
+          mkdir -p site
+          cp -r docs/. site/
+          cp -r app/dist site/app
+          touch site/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
