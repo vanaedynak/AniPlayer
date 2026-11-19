@@ -160,6 +160,7 @@ jobs:
         run: |
           npx cap add android
           npx cap sync android
+          if [ -f scripts/android-tv.mjs ]; then node scripts/android-tv.mjs; fi
 
       - name: App icon
         run: npx --yes @capacitor/assets@3 generate --android --assetPath resources --iconBackgroundColor '#09090d' --iconBackgroundColorDark '#09090d'
