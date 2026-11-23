@@ -122,12 +122,12 @@ jobs:
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build | tail -30
           mkdir -p Payload
           cp -R build/Build/Products/Release-iphoneos/App.app Payload/
-          zip -qry ../../Anyflow.ipa Payload
+          zip -qry "../../Anyflow-1.0.${{ github.run_number }}.ipa" Payload
 
       - uses: actions/upload-artifact@v4
         with:
           name: Anyflow-ipa
-          path: app/Anyflow.ipa
+          path: app/Anyflow-*.ipa
 
   android:
     name: Android (APK)
@@ -184,16 +184,16 @@ jobs:
             echo "$KEYSTORE" | base64 -d > release.jks
             BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
             $BT/zipalign -f 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
-            $BT/apksigner sign --ks release.jks --ks-key-alias aniplayer --ks-pass env:KEYSTORE_PASSWORD --out ../Anyflow.apk aligned.apk
+            $BT/apksigner sign --ks release.jks --ks-key-alias aniplayer --ks-pass env:KEYSTORE_PASSWORD --out "../Anyflow-1.0.${{ github.run_number }}.apk" aligned.apk
           else
             ./gradlew assembleDebug --no-daemon -q
-            cp app/build/outputs/apk/debug/app-debug.apk ../Anyflow.apk
+            cp app/build/outputs/apk/debug/app-debug.apk "../Anyflow-1.0.${{ github.run_number }}.apk"
           fi
 
       - uses: actions/upload-artifact@v4
         with:
           name: Anyflow-android
-          path: app/Anyflow.apk
+          path: app/Anyflow-*.apk
 
   windows:
     name: Windows installer
